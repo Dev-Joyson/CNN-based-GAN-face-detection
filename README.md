@@ -25,7 +25,7 @@ Only touch `model.py` to change the *method*.
 | `train.py` | Entry point (`--config`) |
 | `configs/*.yaml` | Per-experiment settings |
 | `tests/` | Two guard tests (see below) |
-| `notebooks/colab_runner.ipynb` | Launcher for training on Colab |
+| `notebooks/` | `colab_runner.ipynb` launches Colab training; anything else is scratch, never imported |
 
 ## Architecture
 

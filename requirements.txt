@@ -1,6 +1,6 @@
 # On Colab, tensorflow/numpy/sklearn/matplotlib are preinstalled -- normally you
 # only need:  pip install pyyaml
-tensorflow==2.19.0
+tensorflow>=2.19,<3        # verified on 2.20
 numpy==2.0.2
 scikit-learn==1.6.1
 PyYAML==6.0.2

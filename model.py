@@ -125,7 +125,10 @@ def load_paths(cfg):
 
 def random_jpeg(image):
     quality = tf.random.uniform([], 60, 100, dtype=tf.int32)
-    image_uint8 = tf.cast(image * 255.0, tf.uint8)
+    # clip BEFORE the uint8 cast: the bicubic resize in random_crop_resize
+    # overshoots past 1.0, and 1.07 * 255 = 273 wraps around to 17 -- bright
+    # edge pixels turn into black speckles.
+    image_uint8 = tf.cast(tf.clip_by_value(image, 0.0, 1.0) * 255.0, tf.uint8)
     image_uint8 = tf.image.adjust_jpeg_quality(image_uint8, quality)
     return tf.cast(image_uint8, tf.float32) / 255.0
 
