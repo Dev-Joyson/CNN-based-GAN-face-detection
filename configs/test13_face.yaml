@@ -17,4 +17,4 @@ patience: 6
 seed: 42
 
 cache_dir: "/content/cache"
-out_dir: "experiments"
+out_dir: "/content/drive/MyDrive/Research/experiments"
