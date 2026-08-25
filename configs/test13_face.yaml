@@ -1,0 +1,20 @@
+# Test13: face region only -- the model sees the face, background is zeroed.
+name: test13_face
+
+real_dir: "/content/drive/MyDrive/Research/Dataset New/final Real"
+fake_dir: "/content/drive/MyDrive/Research/Dataset New/Fake"
+
+mask_mode: face_only
+limit_per_class: 25000
+
+img_size: 256
+native_size: 512
+batch_size: 144
+
+epochs: 500
+lr: 0.0003
+patience: 6
+seed: 42
+
+cache_dir: "/content/cache"
+out_dir: "experiments"

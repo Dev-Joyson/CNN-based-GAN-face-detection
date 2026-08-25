@@ -1,0 +1,24 @@
+# datasets & caches
+data/
+*.tfrecord
+cache*/
+/content/
+
+# trained models
+*.keras
+*.h5
+*.weights.h5
+
+# experiment outputs
+experiments/
+
+# python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
+.venv/
+venv/
+
+# os
+.DS_Store
