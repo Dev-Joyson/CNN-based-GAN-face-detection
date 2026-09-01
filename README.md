@@ -23,6 +23,7 @@ Only touch `model.py` to change the *method*.
 |---|---|
 | `model.py` | Config, data pipeline, FFT layer, model, training loop |
 | `train.py` | Entry point (`--config`) |
+| `audit_dataset.py` | Checks whether the two folders are separable by metadata alone |
 | `configs/*.yaml` | Per-experiment settings |
 | `tests/` | Two guard tests (see below) |
 | `notebooks/` | `colab_runner.ipynb` launches Colab training; anything else is scratch, never imported |
@@ -87,6 +88,17 @@ Drive so they survive a disconnect. Epoch 1 is slow — it builds the cache.
 test13's number is a record of the original notebook run (best of 48 epochs) —
 retrain to reproduce it. The old test14 run is excluded: its mask line sat inside
 `if training:`, so val/test were unmasked and it went degenerate.
+
+## Is the dataset honest?
+
+```bash
+python audit_dataset.py --config configs/test13_face.yaml
+```
+
+Scores each trivial file property (resolution, size, JPEG tables, post-resize
+high-frequency energy) as an AUC. If any reaches ~0.9, the model can hit that
+score without looking at a face — a shortcut, not detection. Metadata only; a
+held-out generator is the real test.
 
 ## Tests
 
