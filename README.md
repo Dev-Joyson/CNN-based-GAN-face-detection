@@ -31,6 +31,9 @@ Only touch `model.py` to change the *method*.
 | `audit_dataset.py` | Checks whether the two folders are separable by metadata alone |
 | `configs/*.yaml` | Per-experiment settings |
 | `tests/` | Two guard tests (see below) |
+| `conftest.py` | Puts the repo root on `sys.path` so bare `pytest tests -q` can import `model` |
+| `requirements-dev.txt` | Laptop install (CPU-only) for tests + audit; `requirements.txt` is the training env |
+| `docs/` | `research-repo-practice.md` — sourced notes on how this repo should be run |
 | `notebooks/` | One file, `colab_runner.ipynb`. It exists because the VS Code Colab extension only activates `onNotebook` — no notebook open, no kernel picker, no `Colab: Open Terminal`, no Drive mount. It holds the connection and the launch commands, never method code. |
 
 ## Architecture
@@ -69,6 +72,22 @@ Caching *before* augment/mask means augmentation stays random each epoch, and
 switching `mask_mode` reuses the cache for free. Cache is keyed by
 `limit_per_class`; changing `img_size` needs a manual clear.
 
+## Where to run what
+
+| task | where | why |
+|---|---|---|
+| edit, `pytest tests -q`, `audit_dataset.py` | laptop, CPU | seconds, no GPU wanted; `pip install -r requirements-dev.txt` |
+| training, `evaluate.py`, baselines | Colab GPU | the dataset is in Drive and the runs are hours long |
+
+Do **not** train on an Apple Silicon laptop. A MacBook Air is fanless and throttles
+on sustained load, `tensorflow-metal`'s op coverage is weakest exactly where this
+model is unusual (`tf.signal.fft2d`), and 16 GB shared memory forces the batch size
+down, which makes the run non-comparable to the Colab ones.
+
+**The hard rule:** every latency number — this model and every baseline — must come
+from one GPU in one session. Mixing hardware voids the comparison, and training
+locally is mostly a way to get tempted into it.
+
 ## Running (Colab)
 
 Open `notebooks/colab_runner.ipynb` → Select Kernel → Colab → New Colab Server → GPU.
@@ -102,12 +121,34 @@ sit on the face. If it sits on a corner, the model found something that isn't a 
 The same command also prints, and writes into `eval.json`:
 
 ```
-device      : <GPU name>
+device      : <GPU name>  (TF <version>, git <sha>)
 params      : <count>  (<size> MB on disk)
+MACs        : 1.199 G per image at 256^2  (FLOPs ~= 2.40 G)
 peak memory : <MB>
-latency bs=1: <median> ms median | <mean> mean | <p95> p95   (n=100)
+latency bs=1: <median> ms median | <mean> mean | <p95> p95   (n=1000)
 throughput  : <img/s> at batch 144
 ```
+
+`eval.json` also carries a `system_under_test` block — GPU, TF version, platform,
+mixed-precision policy, git SHA, timestamp, warmup and run count. Colab states its
+GPU types vary over time, so a latency number without that block cannot be compared
+to anything, including your own earlier run.
+
+**Params are not compute — say which resource you mean.**
+
+| model | params | MACs | input |
+|---|---|---|---|
+| **this model** | **1.02 M** | **1.20 G** | 256² |
+| EfficientNet-B0 | 5.3 M | 0.39 G | 224² |
+| ResNet-50 | 25.6 M | 4.1 G | 224² |
+| Xception | 22.9 M | 8.4 G | 299² |
+
+5× fewer parameters than EfficientNet-B0 and roughly 3× more compute, because the
+spatial branch has no stride-2 stem and no bottleneck — the first two convs run at
+full 256² and 128² and account for ~1.11 G of the 1.20 G. A panel will do this
+arithmetic. Measured latency may still favour this model (depthwise convs, B0's
+whole trick, often underutilise a GPU), which is exactly why the measured number
+matters more than the FLOP count — but the claim must name the resource it saves.
 
 This is the evidence for the resource claim, so the measurement is deliberate:
 it times `tf.function(model(x, training=False))` rather than `model.predict()`
@@ -123,14 +164,21 @@ yet; it belongs beside `build_model` when that phase starts.
 
 ## Results
 
-| experiment | what changed | val AUC |
-|---|---|---|
-| test13_face | `face_only`, 25k/class | **0.9995** |
-| test14_background | `background_only`, 20k/class | _rerun pending_ |
+| experiment | what changed | **test AUC** | val AUC (selection) | run folder |
+|---|---|---|---|---|
+| test13_face | `face_only`, 25k/class | _pending_ | 0.9995 | `experiments/test13_face/` |
+| test14_background | `background_only`, 20k/class | _pending_ | _rerun pending_ | `experiments/test14_background/` |
 
-test13's number is a record of the original notebook run (best of 48 epochs) —
-retrain to reproduce it. The old test14 run is excluded: its mask line sat inside
-`if training:`, so val/test were unmasked and it went degenerate.
+**Cite the test column, not val.** `ModelCheckpoint` and `EarlyStopping` both
+select on `val_auc`, so 0.9995 is the maximum over 48 epochs on the very set used
+to pick the model — optimistically biased by construction (Cawley & Talbot, JMLR
+11, 2010). The split is a real 70/15/15 and `evaluate.py` already writes the
+unbiased test number into `eval.json`; the table just has to quote that one.
+
+test13's val figure is a record of the original notebook run — there is no run
+folder behind it, so retrain before citing it anywhere. The old test14 run is
+excluded: its mask line sat inside `if training:`, so val/test went unmasked and
+it degenerated.
 
 ## Is the dataset honest?
 
@@ -146,8 +194,13 @@ held-out generator is the real test.
 ## Tests
 
 ```bash
-pytest tests -q     # 12 tests, ~3s, no dataset or GPU needed
+pip install -r requirements-dev.txt   # once, CPU-only, fine on a laptop
+pytest tests -q                       # 12 tests, ~3s, no dataset or GPU needed
 ```
+
+Root `conftest.py` exists solely so the bare command works: pytest's default
+`prepend` import mode inserts `tests/`, not the repo root, so without it
+`from model import ...` fails and the guard tests error instead of running.
 
 - `test_fft_axes.py` — `fft2d` transforms the *last two* axes, so a 4D input
   would transform colour, not space. Checked against `numpy.fft.fft2`.

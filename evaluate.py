@@ -23,7 +23,10 @@ a number the model never earned.
 import argparse
 import json
 import os
+import platform
+import subprocess
 import time
+from datetime import datetime, timezone
 
 import matplotlib
 matplotlib.use("Agg")                  # no display on a Colab VM
@@ -206,7 +209,69 @@ def _peak_memory_mb():
         return None
 
 
-def measure_efficiency(model, cfg, ds, warmup=20, runs=100):
+def count_macs(model):
+    """Multiply-accumulates per image, counted analytically from layer shapes.
+
+    Analytic rather than tf.profiler: the profiler does not reliably register
+    FLOPs for tf.signal.fft2d, so an automated count can silently undercount the
+    FFT branch. Conv2D and Dense dominate and their cost is exact arithmetic.
+
+    MACs, NOT FLOPs: 1 MAC = 1 multiply + 1 add, so FLOPs ~= 2 x MACs. Papers
+    use both and rarely say which -- always state the convention next to the
+    number, or the comparison is meaningless.
+
+    The fft2d transform itself is excluded: it is O(N log N) ~= 1.0e6 ops at
+    256x256, under 0.1% of the conv cost, and is not a multiply-accumulate.
+    """
+    macs = 0
+    for layer in model.layers:
+        if isinstance(layer, layers.Conv2D):
+            _, out_h, out_w, _ = layer.output.shape
+            k_h, k_w = layer.kernel_size
+            c_in = layer.input.shape[-1]
+            macs += int(out_h) * int(out_w) * layer.filters * k_h * k_w * int(c_in)
+        elif isinstance(layer, layers.Dense):
+            macs += int(layer.input.shape[-1]) * layer.units
+    return int(macs)
+
+
+def _git_sha():
+    try:
+        return subprocess.check_output(["git", "rev-parse", "--short", "HEAD"],
+                                       stderr=subprocess.DEVNULL,
+                                       cwd=os.path.dirname(os.path.abspath(__file__))
+                                       ).decode().strip()
+    except Exception:
+        return None
+
+
+def system_under_test(cfg, warmup, runs):
+    """Everything a reader needs to judge whether a latency number is comparable.
+
+    NeurIPS-style compute disclosure, and not optional here: Colab states its
+    GPU types vary over time, so a latency figure without the GPU recorded next
+    to it cannot be compared against anything -- including your own earlier run.
+    """
+    try:
+        policy = tf.keras.mixed_precision.global_policy().name
+    except Exception:
+        policy = None
+    return {
+        "device": _device_name(),
+        "tensorflow": tf.__version__,
+        "python": platform.python_version(),
+        "platform": platform.platform(),
+        "build_cuda": bool(tf.test.is_built_with_cuda()),
+        "mixed_precision_policy": policy,
+        "git_sha": _git_sha(),
+        "timestamp_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "latency_warmup": warmup,
+        "latency_runs": runs,
+        "img_size": cfg.img_size,
+    }
+
+
+def measure_efficiency(model, cfg, ds, warmup=50, runs=1000):
     """Params, file size, peak GPU memory, single-image latency, batch throughput.
 
     Three things this does differently from a naive timing loop, because the
@@ -219,7 +284,10 @@ def measure_efficiency(model, cfg, ds, warmup=20, runs=100):
     2. .numpy() inside the timed region. GPU ops are queued asynchronously; stop
        the clock without forcing a sync and you have timed kernel launches.
     3. Median and p95, not just mean. GPU timings have a long right tail, so a
-       mean over 100 runs moves between sessions while the median does not.
+       mean over a short loop moves between sessions while the median does not.
+       runs defaults to 1000: a p95 from 100 samples rests on 5 observations and
+       is noise. Too few queries also bias latency OPTIMISTICALLY, which reads
+       as cheating in your own favour -- the opposite of what you want here.
 
     Latency is the model only -- decode, resize and mask are excluded, since a
     comparison against a bigger detector is about the network. Comparable only
@@ -253,9 +321,12 @@ def measure_efficiency(model, cfg, ds, warmup=20, runs=100):
         infer(images).numpy()
     batch_seconds = (time.perf_counter() - t0) / 10.0
 
+    macs = count_macs(model)
     eff = {
-        "device": _device_name(),
         "params": int(model.count_params()),
+        "macs": macs,
+        "macs_note": "conv+dense multiply-accumulates per image; FLOPs ~= 2x this",
+        "system_under_test": system_under_test(cfg, warmup, runs),
         "model_file_mb": round(os.path.getsize(os.path.join(cfg.run_dir, "model.keras")) / 1e6, 2),
         "peak_gpu_memory_mb": _peak_memory_mb(),
         "latency_bs1_ms": {
@@ -265,12 +336,14 @@ def measure_efficiency(model, cfg, ds, warmup=20, runs=100):
         },
         "throughput_img_per_s": round(batch_size / batch_seconds, 1),
         "throughput_batch_size": batch_size,
-        "latency_runs": runs,
     }
 
     lat = eff["latency_bs1_ms"]
-    print(f"device      : {eff['device']}")
+    sut = eff["system_under_test"]
+    print(f"device      : {sut['device']}  (TF {sut['tensorflow']}, git {sut['git_sha']})")
     print(f"params      : {eff['params']:,}  ({eff['model_file_mb']} MB on disk)")
+    print(f"MACs        : {macs / 1e9:.3f} G per image at {cfg.img_size}^2  "
+          f"(FLOPs ~= {2 * macs / 1e9:.2f} G)")
     print(f"peak memory : {eff['peak_gpu_memory_mb']} MB")
     print(f"latency bs=1: {lat['median']:.2f} ms median | {lat['mean']:.2f} mean "
           f"| {lat['p95']:.2f} p95   (n={runs})")
