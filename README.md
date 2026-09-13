@@ -15,6 +15,10 @@ python train.py --config configs/test13_face.yaml
     model.py  ← all the code lives here
        ▼
   experiments/<name>/   model.keras · history.csv · metrics.json
+
+python evaluate.py --config configs/test13_face.yaml
+       ▼
+  experiments/<name>/   confusion_matrix.png · roc.png · gradcam.png · eval.json
 ```
 
 Only touch `model.py` to change the *method*.
@@ -22,11 +26,12 @@ Only touch `model.py` to change the *method*.
 | file | what it is |
 |---|---|
 | `model.py` | Config, data pipeline, FFT layer, model, training loop |
-| `train.py` | Entry point (`--config`) |
+| `train.py` | Entry point: train (`--config`) |
+| `evaluate.py` | Entry point: confusion matrix, ROC, Grad-CAM, efficiency numbers |
 | `audit_dataset.py` | Checks whether the two folders are separable by metadata alone |
 | `configs/*.yaml` | Per-experiment settings |
 | `tests/` | Two guard tests (see below) |
-| `notebooks/` | `colab_runner.ipynb` launches Colab training; anything else is scratch, never imported |
+| `notebooks/` | One file, `colab_runner.ipynb`. It exists because the VS Code Colab extension only activates `onNotebook` — no notebook open, no kernel picker, no `Colab: Open Terminal`, no Drive mount. It holds the connection and the launch commands, never method code. |
 
 ## Architecture
 
@@ -77,6 +82,44 @@ python train.py --config configs/test13_face.yaml
 
 Dataset stays in Drive, cache goes to `/content` (fast local disk), outputs go to
 Drive so they survive a disconnect. Epoch 1 is slow — it builds the cache.
+
+## Evaluating a run
+
+```bash
+python evaluate.py --config configs/test13_face.yaml
+```
+
+Reloads `experiments/<name>/model.keras` and writes the figures beside it, so a
+run folder is self-describing. It rebuilds the data through `model.build_datasets`,
+so eval sees exactly the mask training saw — an eval that quietly skipped the mask
+would report a number the model never earned.
+
+Grad-CAM is the shortcut check, not decoration: under `face_only` the heat should
+sit on the face. If it sits on a corner, the model found something that isn't a face.
+
+### Efficiency numbers
+
+The same command also prints, and writes into `eval.json`:
+
+```
+device      : <GPU name>
+params      : <count>  (<size> MB on disk)
+peak memory : <MB>
+latency bs=1: <median> ms median | <mean> mean | <p95> p95   (n=100)
+throughput  : <img/s> at batch 144
+```
+
+This is the evidence for the resource claim, so the measurement is deliberate:
+it times `tf.function(model(x, training=False))` rather than `model.predict()`
+(which measures Keras dispatch, not a 1M-param forward pass), calls `.numpy()`
+inside the timed region to force the async GPU queue to drain, and reports the
+median and p95 because GPU timings have a long right tail.
+
+**These numbers only mean something next to a baseline.** Latency is hardware-
+and session-specific, so Xception / EfficientNet / ResNet must be measured on
+the same GPU in the same session against the same test split — a number copied
+from another run, or another paper, proves nothing. No baseline runner exists
+yet; it belongs beside `build_model` when that phase starts.
 
 ## Results
 
