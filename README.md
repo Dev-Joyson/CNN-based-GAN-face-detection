@@ -178,13 +178,13 @@ yet; it belongs beside `build_model` when that phase starts.
 
 | experiment | role | dataset | **test AUC** | val AUC (selection) | run folder |
 |---|---|---|---|---|---|
-| **test16_full** | **headline** — full image, no mask | `Dataset/Real` + `Dataset/FakeMix`, 8k/class | _pending_ | _pending_ | `experiments/test16_full/` |
+| **test16_full** | **headline** — full image, no mask | `Dataset New`, 20k/class | _pending_ | _pending_ | `experiments/test16_full/` |
 | test13_face | control — `face_only` | `Dataset New`, 25k/class | _pending_ | 0.9995 | `experiments/test13_face/` |
 | test14_background | control — `background_only` | `Dataset New`, 20k/class | _pending_ | _rerun pending_ | `experiments/test14_background/` |
 
-The controls currently point at a different dataset and size than the headline.
-For the face/background comparison to say anything about `test16_full`, all three
-must run on the same data — see the open question at the bottom of this section.
+All three run on the same dataset. `test13_face` is at 25k/class where the other
+two are at 20k — the split members differ, so it is a near-comparison, not an
+exact one; drop it to 20k for parity if that matters at presentation time.
 
 **Cite the test column, not val.** `ModelCheckpoint` and `EarlyStopping` both
 select on `val_auc`, so 0.9995 is the maximum over 48 epochs on the very set used
@@ -196,10 +196,6 @@ test13's val figure is a record of the original notebook run — there is no run
 folder behind it, so retrain before citing it anywhere. The old test14 run is
 excluded: its mask line sat inside `if training:`, so val/test went unmasked and
 it degenerated.
-
-**Open:** should `test13_face` / `test14_background` move to test16's dataset
-(`Dataset/Real` + `FakeMix`, 8k/class)? If the answer is yes, that is a two-line
-edit to each config and the caches rebuild themselves.
 
 ## Is the dataset honest?
 
