@@ -104,29 +104,47 @@ def main():
     formats = {r["format"] for r in rows}
     if len(formats) > 1:
         print("  !! classes differ in file format -- a giveaway on its own.")
-    if formats - {"JPEG"}:
-        print("  !! non-JPEG present: load_and_resize uses decode_jpeg and will fail on these.")
+    if len(formats) > 1:
+        print("     (JPEG leaves block artifacts in the pixels; PNG does not. If one class is")
+        print("      JPEG and the other PNG, the model can read that after any resize.)")
 
     # --- numeric: one AUC per property --------------------------------------
-    print("\n" + "=" * 62)
-    print("SEPARABILITY  (0.50 = harmless, 1.00 = perfect shortcut)\n")
-    print(f"  {'property':<18}{'real mean':>12}{'fake mean':>12}{'AUC':>8}   verdict")
-    print("  " + "-" * 58)
+    # Two groups, because they mean different things. FILE properties are erased
+    # by decode+resize -- the model never sees a width. PIXEL properties survive
+    # the pipeline, so the model CAN use them; that group decides the verdict.
+    # A file-level gap is still a warning: if real and fake come at different
+    # native sizes they travel different resampling paths to 256, and that can
+    # leave a pixel-level trace -- which is exactly what `highfreq` measures.
+    def score(keys):
+        out = []
+        for key in keys:
+            v = np.array([r[key] for r in rows], dtype=float)
+            if np.isnan(v).any() or len(np.unique(v)) < 2:
+                continue
+            auc = roc_auc_score(y, v)
+            auc = max(auc, 1 - auc)                # direction doesn't matter
+            out.append((auc, key, v[y == 0].mean(), v[y == 1].mean()))
+        return sorted(out, reverse=True)
 
-    results = []
-    for key in ("width", "height", "file_size", "bytes_per_pixel",
-                "jpeg_q_table", "brightness", "contrast", "highfreq"):
-        v = np.array([r[key] for r in rows], dtype=float)
-        if np.isnan(v).any() or len(np.unique(v)) < 2:
-            continue
-        auc = roc_auc_score(y, v)
-        auc = max(auc, 1 - auc)                    # direction doesn't matter
-        results.append((auc, key, v[y == 0].mean(), v[y == 1].mean()))
+    def table(title, results):
+        print("\n" + "=" * 62)
+        print(title + "  (0.50 = harmless, 1.00 = perfect shortcut)\n")
+        print(f"  {'property':<18}{'real mean':>12}{'fake mean':>12}{'AUC':>8}   verdict")
+        print("  " + "-" * 58)
+        for auc, key, rm, fm in results:
+            verdict = "SHORTCUT" if auc >= 0.70 else ("suspicious" if auc >= 0.60 else "ok")
+            print(f"  {key:<18}{rm:>12.2f}{fm:>12.2f}{auc:>8.3f}   {verdict}")
 
-    for auc, key, rm, fm in sorted(results, reverse=True):
-        verdict = "SHORTCUT" if auc >= 0.70 else ("suspicious" if auc >= 0.60 else "ok")
-        print(f"  {key:<18}{rm:>12.2f}{fm:>12.2f}{auc:>8.3f}   {verdict}")
+    file_res = score(("width", "height", "file_size", "bytes_per_pixel", "jpeg_q_table"))
+    pixel_res = score(("highfreq", "brightness", "contrast"))
+    table("FILE PROPERTIES -- erased by decode+resize; a warning, not a verdict", file_res)
+    if any(k in ("width", "height") and a >= 0.7 for a, k, _, _ in file_res):
+        print("\n  !! native sizes differ between classes -> different resampling paths to")
+        print(f"     {cfg.img_size}px. Whether that leaves a trace the model can read is the")
+        print("     `highfreq` row below. That row is the one that matters.")
+    table("PIXEL PROPERTIES -- survive the pipeline; THIS decides the verdict", pixel_res)
 
+    results = pixel_res
     worst = max(results)[0] if results else 0.5
     print("\n" + "=" * 62)
     if worst >= 0.70:
