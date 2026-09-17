@@ -6,7 +6,7 @@ Research angle: **efficiency** — high accuracy at low compute/latency.
 ## How it works
 
 ```
-python train.py --config configs/test13_face.yaml
+python train.py --config configs/test16_full.yaml
        │                 │
        │                 └── configs/*.yaml   ← the only thing you change per experiment
        ▼
@@ -15,6 +15,10 @@ python train.py --config configs/test13_face.yaml
     model.py  ← all the code lives here
        ▼
   experiments/<name>/   model.keras · history.csv · metrics.json
+
+python evaluate.py --config configs/test16_full.yaml
+       ▼
+  experiments/<name>/   confusion_matrix.png · roc.png · gradcam.png · eval.json
 ```
 
 Only touch `model.py` to change the *method*.
@@ -22,11 +26,16 @@ Only touch `model.py` to change the *method*.
 | file | what it is |
 |---|---|
 | `model.py` | Config, data pipeline, FFT layer, model, training loop |
-| `train.py` | Entry point (`--config`) |
+| `train.py` | Entry point: train (`--config`) |
+| `evaluate.py` | Entry point: confusion matrix, ROC, Grad-CAM, efficiency numbers |
+| `predict.py` | Entry point: classify one image — the panel demo. Uses the training preprocessing, so it cannot drift |
 | `audit_dataset.py` | Checks whether the two folders are separable by metadata alone |
 | `configs/*.yaml` | Per-experiment settings |
 | `tests/` | Two guard tests (see below) |
-| `notebooks/` | `colab_runner.ipynb` launches Colab training; anything else is scratch, never imported |
+| `conftest.py` | Puts the repo root on `sys.path` so bare `pytest tests -q` can import `model` |
+| `requirements-dev.txt` | Laptop install (CPU-only) for tests + audit; `requirements.txt` is the training env |
+| `docs/` | `research-repo-practice.md` — sourced notes on how this repo should be run |
+| `notebooks/` | One file, `colab_runner.ipynb`. It exists because the VS Code Colab extension only activates `onNotebook` — no notebook open, no kernel picker, no `Colab: Open Terminal`, no Drive mount. It holds the connection and the launch commands, never method code. |
 
 ## Architecture
 
@@ -43,15 +52,24 @@ checkerboard pattern upsampling leaves in the spectrum. Output: `0` real, `1` fa
 
 ## Two things to understand
 
-**The mask controls what the model may see.** One feathered oval, three modes:
+**The mask exists to answer one question from the panel.** The model is trained
+and reported on full images (`mask_mode: none`). At the progress review the panel
+head raised that real and fake *backgrounds* might be separable enough for a CNN
+to classify on them alone. The two masked runs are the controlled answer:
 
-| `mask_mode` | model sees |
-|---|---|
-| `face_only` | face only, background blacked out |
-| `background_only` | background only — the **control**: if it still works, it wasn't reading the face |
-| `none` | everything |
+| `mask_mode` | model sees | role |
+|---|---|---|
+| `none` | everything | **the headline** — `test16_full` |
+| `face_only` | face only, background zeroed | control: does the face alone carry the signal? |
+| `background_only` | background only, face zeroed | control: does the background alone? |
 
-Applied to train, val and test identically. This is load-bearing.
+| face_only | background_only | reading |
+|---|---|---|
+| high | low | signal is in the face — concern dismissed |
+| high | high | face works, but background *also* leaks: the dataset has a shortcut, the model isn't dependent on it |
+| low | high | the model was reading background — the panel was right |
+
+One feathered oval, applied to train, val and test identically. This is load-bearing.
 
 **Cache placement makes training fast.**
 
@@ -61,8 +79,26 @@ read → resize → uint8  ──► CACHE ──►  shuffle → augment → ma
 ```
 
 Caching *before* augment/mask means augmentation stays random each epoch, and
-switching `mask_mode` reuses the cache for free. Cache is keyed by
-`limit_per_class`; changing `img_size` needs a manual clear.
+switching `mask_mode` reuses the cache for free. The cache key holds everything
+that changes the cached bytes — dataset folders, `limit_per_class`, both resize
+sizes, and the `seed` (which picks the split) — so no config change can read
+another config's images by accident.
+
+## Where to run what
+
+| task | where | why |
+|---|---|---|
+| edit, `pytest tests -q`, `audit_dataset.py` | laptop, CPU | seconds, no GPU wanted; `pip install -r requirements-dev.txt` |
+| training, `evaluate.py`, baselines | Colab GPU | the dataset is in Drive and the runs are hours long |
+
+Do **not** train on an Apple Silicon laptop. A MacBook Air is fanless and throttles
+on sustained load, `tensorflow-metal`'s op coverage is weakest exactly where this
+model is unusual (`tf.signal.fft2d`), and 16 GB shared memory forces the batch size
+down, which makes the run non-comparable to the Colab ones.
+
+**The hard rule:** every latency number — this model and every baseline — must come
+from one GPU in one session. Mixing hardware voids the comparison, and training
+locally is mostly a way to get tempted into it.
 
 ## Running (Colab)
 
@@ -72,22 +108,94 @@ Or from a `Colab: Open Terminal` shell on the VM:
 ```bash
 git clone https://github.com/Dev-Joyson/CNN-based-GAN-face-detection.git
 cd CNN-based-GAN-face-detection && pip install -q pyyaml
-python train.py --config configs/test13_face.yaml
+python train.py --config configs/test16_full.yaml
 ```
 
 Dataset stays in Drive, cache goes to `/content` (fast local disk), outputs go to
 Drive so they survive a disconnect. Epoch 1 is slow — it builds the cache.
 
+## Evaluating a run
+
+```bash
+python evaluate.py --config configs/test16_full.yaml
+```
+
+Reloads `experiments/<name>/model.keras` and writes the figures beside it, so a
+run folder is self-describing. It rebuilds the data through `model.build_datasets`,
+so eval sees exactly the mask training saw — an eval that quietly skipped the mask
+would report a number the model never earned.
+
+Grad-CAM is the shortcut check, not decoration: under `face_only` the heat should
+sit on the face. If it sits on a corner, the model found something that isn't a face.
+
+### Efficiency numbers
+
+The same command also prints, and writes into `eval.json`:
+
+```
+device      : <GPU name>  (TF <version>, git <sha>)
+params      : <count>  (<size> MB on disk)
+MACs        : 1.199 G per image at 256^2  (FLOPs ~= 2.40 G)
+peak memory : <MB>
+latency bs=1: <median> ms median | <mean> mean | <p95> p95   (n=1000)
+throughput  : <img/s> at batch 144
+```
+
+`eval.json` also carries a `system_under_test` block — GPU, TF version, platform,
+mixed-precision policy, git SHA, timestamp, warmup and run count. Colab states its
+GPU types vary over time, so a latency number without that block cannot be compared
+to anything, including your own earlier run.
+
+**Params are not compute — say which resource you mean.**
+
+| model | params | MACs | input |
+|---|---|---|---|
+| **this model** | **1.02 M** | **1.20 G** | 256² |
+| EfficientNet-B0 | 5.3 M | 0.39 G | 224² |
+| ResNet-50 | 25.6 M | 4.1 G | 224² |
+| Xception | 22.9 M | 8.4 G | 299² |
+
+5× fewer parameters than EfficientNet-B0 and roughly 3× more compute, because the
+spatial branch has no stride-2 stem and no bottleneck — the first two convs run at
+full 256² and 128² and account for ~1.11 G of the 1.20 G. A panel will do this
+arithmetic. Measured latency may still favour this model (depthwise convs, B0's
+whole trick, often underutilise a GPU), which is exactly why the measured number
+matters more than the FLOP count — but the claim must name the resource it saves.
+
+This is the evidence for the resource claim, so the measurement is deliberate:
+it times `tf.function(model(x, training=False))` rather than `model.predict()`
+(which measures Keras dispatch, not a 1M-param forward pass), calls `.numpy()`
+inside the timed region to force the async GPU queue to drain, and reports the
+median and p95 because GPU timings have a long right tail.
+
+**These numbers only mean something next to a baseline.** Latency is hardware-
+and session-specific, so Xception / EfficientNet / ResNet must be measured on
+the same GPU in the same session against the same test split — a number copied
+from another run, or another paper, proves nothing. No baseline runner exists
+yet; it belongs beside `build_model` when that phase starts.
+
 ## Results
 
-| experiment | what changed | val AUC |
-|---|---|---|
-| test13_face | `face_only`, 25k/class | **0.9995** |
-| test14_background | `background_only`, 20k/class | _rerun pending_ |
+| experiment | role | dataset | **test AUC** | val AUC (selection) | run folder |
+|---|---|---|---|---|---|
+| **test16_full** | **headline** — full image, no mask | `Dataset New`, 20k/class | _pending_ | _pending_ | `experiments/test16_full/` |
+| test13_face | control — `face_only` | `Dataset New`, 25k/class | _pending_ | 0.9995 | `experiments/test13_face/` |
+| test14_background | control — `background_only` | `Dataset New`, 20k/class | _pending_ | _rerun pending_ | `experiments/test14_background/` |
 
-test13's number is a record of the original notebook run (best of 48 epochs) —
-retrain to reproduce it. The old test14 run is excluded: its mask line sat inside
-`if training:`, so val/test were unmasked and it went degenerate.
+All three run on the same dataset. `test13_face` is at 25k/class where the other
+two are at 20k — the split members differ, so it is a near-comparison, not an
+exact one; drop it to 20k for parity if that matters at presentation time.
+
+**Cite the test column, not val.** `ModelCheckpoint` and `EarlyStopping` both
+select on `val_auc`, so 0.9995 is the maximum over 48 epochs on the very set used
+to pick the model — optimistically biased by construction (Cawley & Talbot, JMLR
+11, 2010). The split is a real 70/15/15 and `evaluate.py` already writes the
+unbiased test number into `eval.json`; the table just has to quote that one.
+
+test13's val figure is a record of the original notebook run — there is no run
+folder behind it, so retrain before citing it anywhere. The old test14 run is
+excluded: its mask line sat inside `if training:`, so val/test went unmasked and
+it degenerated.
 
 ## Is the dataset honest?
 
@@ -103,8 +211,13 @@ held-out generator is the real test.
 ## Tests
 
 ```bash
-pytest tests -q     # 12 tests, ~3s, no dataset or GPU needed
+pip install -r requirements-dev.txt   # once, CPU-only, fine on a laptop
+pytest tests -q                       # 12 tests, ~3s, no dataset or GPU needed
 ```
+
+Root `conftest.py` exists solely so the bare command works: pytest's default
+`prepend` import mode inserts `tests/`, not the repo root, so without it
+`from model import ...` fails and the guard tests error instead of running.
 
 - `test_fft_axes.py` — `fft2d` transforms the *last two* axes, so a 4D input
   would transform colour, not space. Checked against `numpy.fft.fft2`.

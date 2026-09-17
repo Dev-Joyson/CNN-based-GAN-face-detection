@@ -1,0 +1,18 @@
+# Local dev on a laptop: edit, run the guard tests, audit the dataset.
+# NOT for training -- see the README. CPU-only on purpose; the guard tests use
+# tiny tensors and want a GPU less than they want a fast, boring install.
+#
+#   python3 -m venv .venv && source .venv/bin/activate
+#   pip install -r requirements-dev.txt
+#   pytest tests -q
+#
+# Apple Silicon: plain `tensorflow` is CPU-only here and that is what we want.
+# Do NOT add tensorflow-metal -- it buys nothing for tests and its FFT op
+# coverage is exactly the part of this model that would break.
+tensorflow>=2.19,<3
+numpy==2.0.2
+scikit-learn==1.6.1
+PyYAML==6.0.2
+matplotlib==3.10.0
+pytest==8.3.4
+Pillow>=10          # audit_dataset.py reads JPEG quantization tables

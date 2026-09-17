@@ -3,9 +3,11 @@
 Single source of truth: config, data pipeline, FFT layer, model, training loop.
 Everything that varies between experiments lives in configs/*.yaml.
 
-Refactored from Test13_FFT_More_dataset.ipynb.
+Pipeline follows Test16_FFT_fix_final.ipynb (the "fixed" version): decode_image
+so PNG fakes load, crop_frac 0.85, seeded full-set shuffle, named spatial convs.
 """
 
+import hashlib
 import json
 import os
 from collections import Counter
@@ -45,6 +47,10 @@ class Config:
     patience: int = 6
     seed: int = 42
 
+    # augmentation (train split only)
+    crop_frac_min: float = 0.85           # Test16: random crop keeps 85-100% of the side
+    shuffle_buffer: int = 4096            # images held for shuffling; Test16 used the whole train set
+
     # mask geometry (feathered ellipse over an aligned FFHQ/StyleGAN face)
     mask_rx: float = 0.38
     mask_ry: float = 0.48
@@ -63,8 +69,17 @@ class Config:
         return os.path.join(self.out_dir, self.name)
 
     def cache_path(self, split):
-        """Cache is shared across mask modes: switching mask does NOT invalidate it."""
-        return os.path.join(self.cache_dir, f"n{self.limit_per_class}", split)
+        """Cache is shared across mask modes: switching mask does NOT invalidate it.
+
+        Everything that changes the cached bytes IS in the key: which folders, how
+        many, the two resize sizes, and the seed (which picks the split members).
+        Without the seed, a 3-seed run would read seed-42's images from disk and
+        label them seed-43 -- silently, with plausible numbers.
+        """
+        ident = f"{self.real_dir}|{self.fake_dir}".encode()
+        tag = hashlib.sha1(ident).hexdigest()[:8]
+        key = f"n{self.limit_per_class}_i{self.img_size}_n{self.native_size}_s{self.seed}_{tag}"
+        return os.path.join(self.cache_dir, key, split)
 
 
 def load_config(path):
@@ -141,8 +156,8 @@ def random_blur(image):
     )
 
 
-def random_crop_resize(image, img_size):
-    crop_frac = tf.random.uniform([], 0.95, 1.0)
+def random_crop_resize(image, img_size, crop_frac_min):
+    crop_frac = tf.random.uniform([], crop_frac_min, 1.0)
     h = tf.shape(image)[0]
     w = tf.shape(image)[1]
     crop_h = tf.cast(crop_frac * tf.cast(h, tf.float32), tf.int32)
@@ -156,7 +171,9 @@ def random_crop_resize(image, img_size):
 def load_and_resize(path, label, cfg):
     """The slow, deterministic part -- this is what gets cached."""
     image = tf.io.read_file(path)
-    image = tf.image.decode_jpeg(image, channels=3)
+    # decode_image handles JPEG and PNG (the fakes may be PNG); expand_animations
+    # keeps a static (H, W, 3) rather than a (frames, H, W, 3) for GIF-like input
+    image = tf.io.decode_image(image, channels=3, expand_animations=False)
 
     # Normalize native resolution (fix resolution bias), then resize to model input
     image = tf.image.resize(image, [cfg.native_size, cfg.native_size],
@@ -173,7 +190,8 @@ def augment_and_mask(image, label, cfg, face_mask, training):
     image = tf.cast(image, tf.float32) / 255.0     # float conversion AFTER cache
 
     if training:
-        image = random_crop_resize(image, cfg.img_size)
+        image = random_crop_resize(image, cfg.img_size, cfg.crop_frac_min)
+        image = tf.clip_by_value(image, 0.0, 1.0)   # bicubic overshoots again
         image = random_blur(image)
         image = tf.cond(tf.random.uniform([]) < 0.3,
                         lambda: random_jpeg(image),
@@ -201,7 +219,10 @@ def build_dataset(paths, labels, cfg, split, shuffle, training, face_mask=None):
                 num_parallel_calls=tf.data.AUTOTUNE)
     ds = ds.cache(cache_path)                      # cache AFTER resize, BEFORE augment
     if shuffle:
-        ds = ds.shuffle(1000)                      # shuffle AFTER cache
+        # AFTER cache: shuffling before it would freeze the first epoch's order
+        # into the cache file and every later epoch would replay it.
+        ds = ds.shuffle(min(cfg.shuffle_buffer, len(paths)), seed=cfg.seed,
+                        reshuffle_each_iteration=True)
     ds = ds.map(lambda x, y: augment_and_mask(x, y, cfg, face_mask, training),
                 num_parallel_calls=tf.data.AUTOTUNE)
     return ds.batch(cfg.batch_size).prefetch(tf.data.AUTOTUNE)
@@ -253,20 +274,20 @@ def fft_layer(x):
     return mag[..., tf.newaxis]                # (B, H, W, 1)
 
 
-def conv_block(x, filters):
-    x = layers.Conv2D(filters, 3, padding='same', activation='relu')(x)
+def conv_block(x, filters, name=None):
+    x = layers.Conv2D(filters, 3, padding='same', activation='relu', name=name)(x)
     return layers.MaxPooling2D()(x)
 
 
 def build_model(cfg):
     input_img = layers.Input(shape=(cfg.img_size, cfg.img_size, 3))
 
-    # Spatial branch
-    x = conv_block(input_img, 32)
-    x = conv_block(x, 64)
-    x = conv_block(x, 128)
-    x = conv_block(x, 256)
-    x = conv_block(x, 256)
+    # Spatial branch -- fixed names so Grad-CAM can ask for "spatial_conv_5"
+    x = conv_block(input_img, 32, name="spatial_conv_1")
+    x = conv_block(x, 64, name="spatial_conv_2")
+    x = conv_block(x, 128, name="spatial_conv_3")
+    x = conv_block(x, 256, name="spatial_conv_4")
+    x = conv_block(x, 256, name="spatial_conv_5")
     x = layers.GlobalAveragePooling2D()(x)
 
     # FFT branch
