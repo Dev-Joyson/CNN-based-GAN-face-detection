@@ -6,7 +6,7 @@ Research angle: **efficiency** — high accuracy at low compute/latency.
 ## How it works
 
 ```
-python train.py --config configs/test13_face.yaml
+python train.py --config configs/test16_full.yaml
        │                 │
        │                 └── configs/*.yaml   ← the only thing you change per experiment
        ▼
@@ -16,7 +16,7 @@ python train.py --config configs/test13_face.yaml
        ▼
   experiments/<name>/   model.keras · history.csv · metrics.json
 
-python evaluate.py --config configs/test13_face.yaml
+python evaluate.py --config configs/test16_full.yaml
        ▼
   experiments/<name>/   confusion_matrix.png · roc.png · gradcam.png · eval.json
 ```
@@ -28,6 +28,7 @@ Only touch `model.py` to change the *method*.
 | `model.py` | Config, data pipeline, FFT layer, model, training loop |
 | `train.py` | Entry point: train (`--config`) |
 | `evaluate.py` | Entry point: confusion matrix, ROC, Grad-CAM, efficiency numbers |
+| `predict.py` | Entry point: classify one image — the panel demo. Uses the training preprocessing, so it cannot drift |
 | `audit_dataset.py` | Checks whether the two folders are separable by metadata alone |
 | `configs/*.yaml` | Per-experiment settings |
 | `tests/` | Two guard tests (see below) |
@@ -51,15 +52,24 @@ checkerboard pattern upsampling leaves in the spectrum. Output: `0` real, `1` fa
 
 ## Two things to understand
 
-**The mask controls what the model may see.** One feathered oval, three modes:
+**The mask exists to answer one question from the panel.** The model is trained
+and reported on full images (`mask_mode: none`). At the progress review the panel
+head raised that real and fake *backgrounds* might be separable enough for a CNN
+to classify on them alone. The two masked runs are the controlled answer:
 
-| `mask_mode` | model sees |
-|---|---|
-| `face_only` | face only, background blacked out |
-| `background_only` | background only — the **control**: if it still works, it wasn't reading the face |
-| `none` | everything |
+| `mask_mode` | model sees | role |
+|---|---|---|
+| `none` | everything | **the headline** — `test16_full` |
+| `face_only` | face only, background zeroed | control: does the face alone carry the signal? |
+| `background_only` | background only, face zeroed | control: does the background alone? |
 
-Applied to train, val and test identically. This is load-bearing.
+| face_only | background_only | reading |
+|---|---|---|
+| high | low | signal is in the face — concern dismissed |
+| high | high | face works, but background *also* leaks: the dataset has a shortcut, the model isn't dependent on it |
+| low | high | the model was reading background — the panel was right |
+
+One feathered oval, applied to train, val and test identically. This is load-bearing.
 
 **Cache placement makes training fast.**
 
@@ -69,8 +79,10 @@ read → resize → uint8  ──► CACHE ──►  shuffle → augment → ma
 ```
 
 Caching *before* augment/mask means augmentation stays random each epoch, and
-switching `mask_mode` reuses the cache for free. Cache is keyed by
-`limit_per_class`; changing `img_size` needs a manual clear.
+switching `mask_mode` reuses the cache for free. The cache key holds everything
+that changes the cached bytes — dataset folders, `limit_per_class`, both resize
+sizes, and the `seed` (which picks the split) — so no config change can read
+another config's images by accident.
 
 ## Where to run what
 
@@ -96,7 +108,7 @@ Or from a `Colab: Open Terminal` shell on the VM:
 ```bash
 git clone https://github.com/Dev-Joyson/CNN-based-GAN-face-detection.git
 cd CNN-based-GAN-face-detection && pip install -q pyyaml
-python train.py --config configs/test13_face.yaml
+python train.py --config configs/test16_full.yaml
 ```
 
 Dataset stays in Drive, cache goes to `/content` (fast local disk), outputs go to
@@ -105,7 +117,7 @@ Drive so they survive a disconnect. Epoch 1 is slow — it builds the cache.
 ## Evaluating a run
 
 ```bash
-python evaluate.py --config configs/test13_face.yaml
+python evaluate.py --config configs/test16_full.yaml
 ```
 
 Reloads `experiments/<name>/model.keras` and writes the figures beside it, so a
@@ -164,10 +176,15 @@ yet; it belongs beside `build_model` when that phase starts.
 
 ## Results
 
-| experiment | what changed | **test AUC** | val AUC (selection) | run folder |
-|---|---|---|---|---|
-| test13_face | `face_only`, 25k/class | _pending_ | 0.9995 | `experiments/test13_face/` |
-| test14_background | `background_only`, 20k/class | _pending_ | _rerun pending_ | `experiments/test14_background/` |
+| experiment | role | dataset | **test AUC** | val AUC (selection) | run folder |
+|---|---|---|---|---|---|
+| **test16_full** | **headline** — full image, no mask | `Dataset/Real` + `Dataset/FakeMix`, 8k/class | _pending_ | _pending_ | `experiments/test16_full/` |
+| test13_face | control — `face_only` | `Dataset New`, 25k/class | _pending_ | 0.9995 | `experiments/test13_face/` |
+| test14_background | control — `background_only` | `Dataset New`, 20k/class | _pending_ | _rerun pending_ | `experiments/test14_background/` |
+
+The controls currently point at a different dataset and size than the headline.
+For the face/background comparison to say anything about `test16_full`, all three
+must run on the same data — see the open question at the bottom of this section.
 
 **Cite the test column, not val.** `ModelCheckpoint` and `EarlyStopping` both
 select on `val_auc`, so 0.9995 is the maximum over 48 epochs on the very set used
@@ -179,6 +196,10 @@ test13's val figure is a record of the original notebook run — there is no run
 folder behind it, so retrain before citing it anywhere. The old test14 run is
 excluded: its mask line sat inside `if training:`, so val/test went unmasked and
 it degenerated.
+
+**Open:** should `test13_face` / `test14_background` move to test16's dataset
+(`Dataset/Real` + `FakeMix`, 8k/class)? If the answer is yes, that is a two-line
+edit to each config and the caches rebuild themselves.
 
 ## Is the dataset honest?
 

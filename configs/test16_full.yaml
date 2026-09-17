@@ -1,0 +1,27 @@
+# Test16: the HEADLINE run -- full image, no mask. This is the model the thesis
+# is about. test13_face / test14_background are controls on it, not rivals.
+#
+# Ported from Test16_FFT_fix_final.ipynb. Note the dataset differs from the
+# test13/14 configs: Dataset/Real + Dataset/FakeMix, 8000 per class.
+name: test16_full
+
+real_dir: "/content/drive/MyDrive/Research/Dataset/Real"
+fake_dir: "/content/drive/MyDrive/Research/Dataset/FakeMix"
+
+mask_mode: none
+limit_per_class: 8000
+
+img_size: 256
+native_size: 512
+batch_size: 144
+
+epochs: 50
+lr: 0.0003
+patience: 6
+seed: 42
+
+crop_frac_min: 0.85
+shuffle_buffer: 11200        # = the whole train split (70% of 16000), as the notebook did
+
+cache_dir: "/content/cache"
+out_dir: "/content/drive/MyDrive/Research/experiments"

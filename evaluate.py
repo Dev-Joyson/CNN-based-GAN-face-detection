@@ -109,10 +109,13 @@ def plot_roc(y_true, y_score, out_path):
 def last_spatial_conv(model):
     """The deepest conv of the SPATIAL branch.
 
-    Not simply the last Conv2D in the model: the FFT branch is built after the
-    spatial one, so its 32-filter conv comes last in layer order. The spatial
-    branch is the widest (256), so take the last conv at the maximum width.
+    build_model names it "spatial_conv_5", so ask for that first. The fallback
+    exists for checkpoints from before the layers were named: NOT simply the
+    last Conv2D -- the FFT branch is built after the spatial one, so its
+    32-filter conv comes last in layer order. Take the last conv at max width.
     """
+    if any(l.name == "spatial_conv_5" for l in model.layers):
+        return "spatial_conv_5"
     convs = [l for l in model.layers if isinstance(l, layers.Conv2D)]
     if not convs:
         raise ValueError("no Conv2D layers found")
