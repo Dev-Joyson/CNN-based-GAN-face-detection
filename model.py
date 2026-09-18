@@ -339,6 +339,9 @@ def train(cfg):
                                         patience=cfg.patience,
                                         restore_best_weights=True),
         tf.keras.callbacks.CSVLogger(os.path.join(cfg.run_dir, "history.csv")),
+        # live curves: %tensorboard --logdir <out_dir> in a notebook cell
+        tf.keras.callbacks.TensorBoard(log_dir=os.path.join(cfg.run_dir, "tb"),
+                                       write_graph=False),
     ]
 
     model.fit(ds["train"], validation_data=ds["val"], epochs=cfg.epochs,
