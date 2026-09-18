@@ -319,7 +319,18 @@ def compile_model(model, cfg):
 # Training
 # --------------------------------------------------------------------------- #
 
-def train(cfg):
+def train(cfg, resume=False):
+    """Train from scratch, or -- with resume=True -- pick up a run the VM lost.
+
+    Colab deletes VMs on idle and on a max lifetime; nothing inside the VM can
+    stop that. What makes it survivable is that model.keras (best val_auc so
+    far, optimizer state included) and history.csv are on Drive after every
+    epoch. Resume reloads that checkpoint and continues the epoch count from
+    history.csv, so a dead VM costs the epochs since the last improvement, not
+    the run. Caveat, stated plainly: the checkpoint is the BEST epoch, not the
+    last one, so a resume re-trains from the best weights at the last epoch
+    number -- and EarlyStopping's patience counter starts fresh.
+    """
     tf.keras.utils.set_random_seed(cfg.seed)
     os.makedirs(cfg.run_dir, exist_ok=True)
 
@@ -328,24 +339,36 @@ def train(cfg):
     print(f"cache: {cfg.cache_path('<split>')}  out: {cfg.run_dir}")
 
     ds = build_datasets(cfg)
-    model = compile_model(build_model(cfg), cfg)
-    model.summary()
 
     ckpt = os.path.join(cfg.run_dir, "model.keras")
+    history_csv = os.path.join(cfg.run_dir, "history.csv")
+    initial_epoch = 0
+    if resume and os.path.exists(ckpt):
+        model = tf.keras.models.load_model(ckpt, safe_mode=False)   # compiled + optimizer state
+        if os.path.exists(history_csv):
+            with open(history_csv) as f:
+                initial_epoch = max(sum(1 for _ in f) - 1, 0)      # rows minus header
+        print(f"RESUME: loaded {ckpt}, continuing from epoch {initial_epoch}")
+    else:
+        if resume:
+            print(f"resume requested but no checkpoint at {ckpt} -- starting fresh")
+        model = compile_model(build_model(cfg), cfg)
+    model.summary()
+
     callbacks = [
         tf.keras.callbacks.ModelCheckpoint(ckpt, monitor='val_auc', mode='max',
                                            save_best_only=True),
         tf.keras.callbacks.EarlyStopping(monitor='val_auc', mode='max',
                                         patience=cfg.patience,
                                         restore_best_weights=True),
-        tf.keras.callbacks.CSVLogger(os.path.join(cfg.run_dir, "history.csv")),
+        tf.keras.callbacks.CSVLogger(history_csv, append=initial_epoch > 0),
         # live curves: %tensorboard --logdir <out_dir> in a notebook cell
         tf.keras.callbacks.TensorBoard(log_dir=os.path.join(cfg.run_dir, "tb"),
                                        write_graph=False),
     ]
 
     model.fit(ds["train"], validation_data=ds["val"], epochs=cfg.epochs,
-              callbacks=callbacks)
+              initial_epoch=initial_epoch, callbacks=callbacks)
 
     metrics = {"config": asdict(cfg), "params": int(model.count_params())}
     for split in ("val", "test"):
