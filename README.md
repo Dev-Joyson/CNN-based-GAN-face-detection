@@ -102,17 +102,58 @@ locally is mostly a way to get tempted into it.
 
 ## Running (Colab)
 
-Open `notebooks/colab_runner.ipynb` → Select Kernel → Colab → New Colab Server → GPU.
-Or from a `Colab: Open Terminal` shell on the VM:
+**1. Connect.** Open `notebooks/colab_runner.ipynb` → Select Kernel → Colab →
+New Colab Server → GPU. Run the notebook's first sections: GPU check, mount Drive
+(approve the popup), clone, `pytest`. About a minute.
+
+**2. Keep the Mac awake.** In a local terminal, before anything long:
 
 ```bash
-git clone https://github.com/Dev-Joyson/CNN-based-GAN-face-detection.git
-cd CNN-based-GAN-face-detection && pip install -q pyyaml
-python train.py --config configs/test16_full.yaml
+caffeinate -i
 ```
 
+A sleeping laptop is the most common way to lose a Colab session.
+
+**3. Train from a terminal, not a cell.** Cmd+Shift+P → `Colab: Open Terminal`
+(this shell runs on the Colab VM, not your Mac):
+
+```bash
+cd /content/CNN-based-GAN-face-detection
+nohup python train.py --config configs/test16_full.yaml > train.log 2>&1 &
+tail -f train.log          # watch; Ctrl+C stops the watching, not the training
+```
+
+`nohup … &` hands the process to the VM. Close the notebook, lose the network,
+shut the lid for a while — it keeps running. Come back, open the terminal again,
+`tail -f train.log`.
+
+**4. Watch the curves.** In a notebook cell, while training runs in the terminal:
+
+```
+%load_ext tensorboard
+%tensorboard --logdir "/content/drive/MyDrive/Research/experiments"
+```
+
+Refreshes itself every 30 s. (If the panel is blank in VS Code, open the same
+notebook at colab.research.google.com — it renders there.) `history.csv` in the
+run folder is the same data as a file, updated every epoch.
+
+**5. If the VM dies anyway.** Colab deletes VMs on idle and on a maximum lifetime,
+and on Pro nothing running inside the VM can stop that. What survives is on
+Drive: the best `model.keras` and `history.csv`. Start a fresh server, redo step
+1, then:
+
+```bash
+nohup python train.py --config configs/test16_full.yaml --resume > train.log 2>&1 &
+```
+
+It reloads the checkpoint, continues the epoch count, and rebuilds the cache
+(the slow first epoch, again). The checkpoint is the *best* epoch, not the last,
+so a resumed run is not bit-identical to an uninterrupted one — say so if a
+headline number came from one.
+
 Dataset stays in Drive, cache goes to `/content` (fast local disk), outputs go to
-Drive so they survive a disconnect. Epoch 1 is slow — it builds the cache.
+Drive. Epoch 1 is slow — it builds the cache.
 
 ## Evaluating a run
 
