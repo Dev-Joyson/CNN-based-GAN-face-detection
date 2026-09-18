@@ -1,18 +1,21 @@
-# Local dev on a laptop: edit, run the guard tests, audit the dataset.
-# NOT for training -- see the README. CPU-only on purpose; the guard tests use
-# tiny tensors and want a GPU less than they want a fast, boring install.
+# Local dev on a laptop: edit, run the guard tests, audit the dataset, smoke-run
+# the pipeline on CPU. NOT for training -- see the README.
 #
 #   python3 -m venv .venv && source .venv/bin/activate
 #   pip install -r requirements-dev.txt
 #   pytest tests -q
 #
+# Floors, not pins, on purpose: requirements.txt pins Colab's exact versions for
+# the training env; this file has to install on whatever Python a laptop has
+# (macOS ships 3.9, where matplotlib 3.10 / numpy 2.1+ do not exist).
+#
 # Apple Silicon: plain `tensorflow` is CPU-only here and that is what we want.
 # Do NOT add tensorflow-metal -- it buys nothing for tests and its FFT op
 # coverage is exactly the part of this model that would break.
-tensorflow>=2.19,<3
-numpy==2.0.2
-scikit-learn==1.6.1
-PyYAML==6.0.2
-matplotlib==3.10.0
-pytest==8.3.4
+tensorflow>=2.16,<3
+numpy>=1.26
+scikit-learn>=1.3
+PyYAML>=6.0
+matplotlib>=3.7
+pytest>=8.0
 Pillow>=10          # audit_dataset.py reads JPEG quantization tables
