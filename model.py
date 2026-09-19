@@ -270,25 +270,6 @@ def build_datasets(cfg):
     }
 
 
-def warm_caches(ds):
-    """One full pass over each split before fit(), so the on-disk cache is
-    finalized before Keras touches it.
-
-    tf.data only marks a cache complete when an iterator reads past the last
-    element. Keras knows the epoch is N steps, pulls N batches and stops -- it
-    never asks for the (N+1)th, so the cache is left "partially read" and tf.data
-    DISCARDS it at the end of epoch 1 (cache_dataset_ops.cc:333). Every epoch
-    then re-reads Drive. Seen on test16, 2026-09-19.
-
-    Cost: on a fresh VM this IS the Drive read -- the same 50 minutes, just
-    before epoch 1 instead of during it. On a VM with a complete cache it is a
-    local-disk pass, seconds to a minute.
-    """
-    for split, d in ds.items():
-        n = sum(1 for _ in d)
-        print(f"cache ready: {split} ({n} batches)", flush=True)
-
-
 # --------------------------------------------------------------------------- #
 # Model
 # --------------------------------------------------------------------------- #
@@ -384,7 +365,6 @@ def train(cfg, resume=False):
     print(f"cache: {cfg.cache_path('<split>')}  out: {cfg.run_dir}")
 
     ds = build_datasets(cfg)
-    warm_caches(ds)
 
     ckpt = os.path.join(cfg.run_dir, "model.keras")
     history_csv = os.path.join(cfg.run_dir, "history.csv")
