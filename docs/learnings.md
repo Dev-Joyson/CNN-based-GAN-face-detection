@@ -58,6 +58,14 @@ the README says how things *are*, this says how we found out.
   → test-time background swap (with a same-class seam control) and Grad-CAM-in-face
   fraction, both on the trained model, in `evaluate.py`. Also: the "backgrounds look
   different" the panel saw may have been the resampling asymmetry itself.
+- **2026-09-19 — The trained model follows the face, measured.** Swap AUC 0.847 vs
+  control 0.934 (background-following would be ~0.07); Grad-CAM 83% in-face for fakes.
+  Background conflict costs ~0.09 AUC, does not flip it. "Real" evidence is diffuse
+  (in-face 0.54, below uniform); "fake" evidence is localized in the face.
+- **2026-09-19 — TF "peak memory" is what it reserved, not what the model needs.**
+  1.3 GB at bs=1 for a 4 MB model is cuDNN/XLA workspace. Comparable across models
+  measured the same way; never quote it as a footprint. The checkpoint (12.3 MB) is
+  3x the weights (4.1 MB) because it carries Adam's moments.
 - **Baselines compare on the headline task, never on a masked one.** Xception is the
   field standard (FaceForensics++); EfficientNet-B0 is the real rival; MobileNetV3 is the
   one a panel will ask about. Fine-tune fully, `preprocess_input` inside each model.

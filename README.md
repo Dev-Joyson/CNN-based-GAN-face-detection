@@ -191,18 +191,35 @@ over the whole test set, per class. Compare to `uniform_baseline` (the ellipse's
 share of the image, ~0.55): well above it means the spatial branch attends to the
 face. Spatial branch only — the FFT branch has no image-space heatmap.
 
+**Result, test16_full at epoch 50 (2026-09-19):**
+
+| check | value | reading |
+|---|---|---|
+| plain test AUC | 0.947 | reference |
+| control (same-class composites) | 0.934 | seams cost 0.013 — benign |
+| swap, scored by face label | **0.847** | follows the face (background-following would be ~0.07) |
+| attention in face, fakes | **0.83** | vs 0.57 uniform — looks at the face to call fake |
+| attention in face, reals | 0.54 | "realness" evidence is diffuse across the whole image |
+
+The decision follows the face. A conflicting background costs ~0.09 AUC; it does
+not flip the prediction. Roughly: 90% face, 10% background.
+
 ### Efficiency numbers
 
 The same command also prints, and writes into `eval.json`:
 
 ```
-device      : <GPU name>  (TF <version>, git <sha>)
-params      : <count>  (<size> MB on disk)
+device      : NVIDIA L4  (TF 2.20.0, XLA)                         measured 2026-09-19
+params      : 1,020,417  (4.08 MB fp32 weights; checkpoint 12.33 MB incl. optimizer)
 MACs        : 1.199 G per image at 256^2  (FLOPs ~= 2.40 G)
-peak memory : <MB>
-latency bs=1: <median> ms median | <mean> mean | <p95> p95   (n=1000)
-throughput  : <img/s> at batch 144
+peak memory : 1301 MB at bs=1 | 7319 MB at bs=144
+latency bs=1: 1.41 ms median | 1.43 mean | 1.57 p95   (n=1000)
+throughput  : 1,555 img/s at batch 144
 ```
+
+Peak memory is what TensorFlow *reserved* (cuDNN/XLA workspace, allocator pool), not
+what a 4 MB model strictly needs — an upper bound, comparable across models measured
+identically on the same machine, not an absolute footprint.
 
 `eval.json` also carries a `system_under_test` block — GPU, TF version, platform,
 mixed-precision policy, git SHA, timestamp, warmup and run count. Colab states its
