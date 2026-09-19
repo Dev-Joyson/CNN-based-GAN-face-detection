@@ -120,11 +120,12 @@ A sleeping laptop is the most common way to lose a Colab session.
 
 ```bash
 cd /content/CNN-based-GAN-face-detection
-nohup python train.py --config configs/test16_full.yaml > train.log 2>&1 &
+nohup python -u train.py --config configs/test16_full.yaml > train.log 2>&1 &
 tail -f train.log          # watch; Ctrl+C stops the watching, not the training
 ```
 
-`nohup … &` hands the process to the VM. Close the notebook, lose the network,
+`nohup … &` hands the process to the VM; `-u` keeps the log live (Python
+buffers stdout when it goes to a file — without `-u`, `tail` shows nothing for ages). Close the notebook, lose the network,
 shut the lid for a while — it keeps running. Come back, open the terminal again,
 `tail -f train.log`.
 
@@ -145,7 +146,7 @@ Drive: the best `model.keras` and `history.csv`. Start a fresh server, redo step
 1, then:
 
 ```bash
-nohup python train.py --config configs/test16_full.yaml --resume > train.log 2>&1 &
+nohup python -u train.py --config configs/test16_full.yaml --resume > train.log 2>&1 &
 ```
 
 It reloads the checkpoint, continues the epoch count, and rebuilds the cache
