@@ -116,7 +116,8 @@ def last_spatial_conv(model):
     """
     if any(l.name == "spatial_conv_5" for l in model.layers):
         return "spatial_conv_5"
-    convs = [l for l in model.layers if isinstance(l, layers.Conv2D)]
+    convs = [l for l in _iter_layers(model)
+             if isinstance(l, (layers.Conv2D, layers.SeparableConv2D))]
     if not convs:
         raise ValueError("no Conv2D layers found")
     widest = max(l.filters for l in convs)
@@ -352,15 +353,38 @@ def count_macs(model):
     256x256, under 0.1% of the conv cost, and is not a multiply-accumulate.
     """
     macs = 0
-    for layer in model.layers:
-        if isinstance(layer, layers.Conv2D):
-            _, out_h, out_w, _ = layer.output.shape
-            k_h, k_w = layer.kernel_size
-            c_in = layer.input.shape[-1]
-            macs += int(out_h) * int(out_w) * layer.filters * k_h * k_w * int(c_in)
-        elif isinstance(layer, layers.Dense):
+    for layer in _iter_layers(model):
+        if isinstance(layer, layers.Dense):
             macs += int(layer.input.shape[-1]) * layer.units
+            continue
+        if not isinstance(layer, (layers.Conv2D, layers.DepthwiseConv2D,
+                                  layers.SeparableConv2D)):
+            continue
+        _, out_h, out_w, _ = layer.output.shape
+        hw = int(out_h) * int(out_w)
+        k_h, k_w = layer.kernel_size
+        c_in = int(layer.input.shape[-1])
+        # order matters: SeparableConv2D and DepthwiseConv2D are NOT Conv2D
+        # subclasses in Keras 3, but check the specific ones first anyway
+        if isinstance(layer, layers.SeparableConv2D):
+            dm = layer.depth_multiplier
+            macs += hw * c_in * dm * k_h * k_w            # depthwise
+            macs += hw * c_in * dm * layer.filters         # pointwise 1x1
+        elif isinstance(layer, layers.DepthwiseConv2D):
+            macs += hw * c_in * layer.depth_multiplier * k_h * k_w
+        else:                                              # plain Conv2D
+            macs += hw * layer.filters * k_h * k_w * c_in // int(layer.groups or 1)
     return int(macs)
+
+
+def _iter_layers(model):
+    """Layers, descending into nested models -- Keras applications wrapped in
+    a head are a Model inside a Model."""
+    for layer in model.layers:
+        if isinstance(layer, tf.keras.Model):
+            yield from _iter_layers(layer)
+        else:
+            yield layer
 
 
 def _git_sha():

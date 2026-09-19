@@ -1,0 +1,29 @@
+# Ablation of test16_full: identical in every way except the FFT branch is
+# removed. The difference in test AUC is what the spectrum buys -- for ~9k
+# parameters, 0.9% of the model.
+name: test16_no_fft
+fft_branch: false
+
+real_dir: "/content/drive/MyDrive/Real(FFHQ)"
+fake_dir: "/content/drive/MyDrive/FakeMix"
+
+mask_mode: none
+limit_per_class: 20000
+
+img_size: 256
+native_size: 512
+batch_size: 144
+
+epochs: 150               # was 50 -- still climbing at 50 (val_auc 0.945). Let patience decide.
+lr: 0.0003
+patience: 6
+seed: 42
+
+crop_frac_min: 0.85
+shuffle_buffer: 8192         # train split is 28000; a full-set buffer would be ~5.5 GB of
+                             # uint8 images in RAM -- too much for a standard Colab runtime.
+                             # Raise toward 28000 on a high-RAM runtime if you want the
+                             # notebook's whole-set shuffle.
+
+cache_dir: "/content/cache"
+out_dir: "/content/drive/MyDrive/Research/experiments"

@@ -30,6 +30,7 @@ Only touch `model.py` to change the *method*.
 | `train.py` | Entry point: train (`--config`) |
 | `evaluate.py` | Entry point: confusion matrix, ROC, Grad-CAM, efficiency numbers |
 | `predict.py` | Entry point: classify one image — the panel demo. Uses the training preprocessing, so it cannot drift |
+| `baselines.py` | Entry point: Xception / EfficientNet-B0 / MobileNetV3-Small on the identical task (`--model`, `--train`) |
 | `audit_dataset.py` | Checks whether the two folders are separable by metadata alone |
 | `configs/*.yaml` | Per-experiment settings |
 | `tests/` | Two guard tests (see below) |
@@ -249,16 +250,40 @@ inside the timed region to force the async GPU queue to drain, and reports the
 median and p95 because GPU timings have a long right tail.
 
 **These numbers only mean something next to a baseline.** Latency is hardware-
-and session-specific, so Xception / EfficientNet / ResNet must be measured on
-the same GPU in the same session against the same test split — a number copied
-from another run, or another paper, proves nothing. No baseline runner exists
-yet; it belongs beside `build_model` when that phase starts.
+and session-specific, so the baselines are measured on the same GPU, in the same
+session, on the same test split — a number copied from another run, or another
+paper, proves nothing.
+
+### Baselines
+
+```bash
+python baselines.py --config configs/test16_full.yaml --model xception            # efficiency only, minutes
+python baselines.py --config configs/test16_full.yaml --model xception --train    # fine-tune from ImageNet, ~1 h
+```
+
+Models: `xception` (the field's standard, FaceForensics++), `efficientnet_b0`
+(the real efficiency rival — fewer MACs than this model), `mobilenet_v3_small`
+(the one a panel will ask about). Each runs the *identical* task — same data,
+split, mask, input size, `build_datasets`, timing code — and writes to
+`experiments/test16_full/baselines/<model>/`, so one folder holds the model and
+everything it is compared against.
+
+Latency, params, MACs and memory do not depend on weights, so the efficiency
+half needs no training. The accuracy half is a full fine-tune at lr 1e-4 through
+the same `train()` loop. Each backbone's ImageNet preprocessing is a layer inside
+the model — the data pipeline is byte-identical for every model, and the
+preprocessing is timed as part of running it.
+
+**The ablation.** `configs/test16_no_fft.yaml` is the headline with the FFT
+branch removed and nothing else changed. The branch is ~9k parameters, 0.9% of
+the model; the test-AUC difference is what the spectrum buys for that.
 
 ## Results
 
 | experiment | role | dataset | **test AUC** | val AUC (selection) | run folder |
 |---|---|---|---|---|---|
 | **test16_full** | **headline** — full image, no mask | FFHQ 1024 + FakeMix, 20k/class | **0.9473** (epoch 50, still climbing — resume pending) | 0.9450 | `experiments/test16_full/` |
+| test16_no_fft | ablation — FFT branch removed, else identical | FFHQ 1024 + FakeMix, 20k/class | _pending_ | _pending_ | `experiments/test16_no_fft/` |
 | test13_face | control — `face_only` | FFHQ 1024 + FakeMix, 25k/class | _pending_ | 0.9995 | `experiments/test13_face/` |
 | test14_background | control — `background_only` | FFHQ 1024 + FakeMix, 20k/class | _pending_ | _rerun pending_ | `experiments/test14_background/` |
 

@@ -48,6 +48,9 @@ class Config:
     patience: int = 6
     seed: int = 42
 
+    # architecture
+    fft_branch: bool = True               # False = spatial branch only (the ablation)
+
     # augmentation (train split only)
     crop_frac_min: float = 0.85           # Test16: random crop keeps 85-100% of the side
     shuffle_buffer: int = 4096            # images held for shuffling; Test16 used the whole train set
@@ -316,15 +319,21 @@ def build_model(cfg):
     x = conv_block(x, 256, name="spatial_conv_5")
     x = layers.GlobalAveragePooling2D()(x)
 
-    # FFT branch
-    f = layers.Lambda(fft_layer, name="fft")(input_img)
-    f = layers.Conv2D(16, 3, activation='relu', padding='same')(f)
-    f = layers.MaxPooling2D()(f)
-    f = layers.Conv2D(32, 3, activation='relu', padding='same')(f)
-    f = layers.GlobalAveragePooling2D()(f)
+    if cfg.fft_branch:
+        # FFT branch
+        f = layers.Lambda(fft_layer, name="fft")(input_img)
+        f = layers.Conv2D(16, 3, activation='relu', padding='same')(f)
+        f = layers.MaxPooling2D()(f)
+        f = layers.Conv2D(32, 3, activation='relu', padding='same')(f)
+        f = layers.GlobalAveragePooling2D()(f)
+        combined = layers.Concatenate()([x, f])
+    else:
+        # ablation: what does the spectrum buy? The branch is ~0.9% of the
+        # params (4.8k of the convs + 4.1k of the fusion width), so any AUC it
+        # buys is bought cheaply.
+        combined = x
 
     # Fusion
-    combined = layers.Concatenate()([x, f])
     combined = layers.Dense(128, activation='relu')(combined)
     combined = layers.Dropout(0.4)(combined)
     output = layers.Dense(1, activation='sigmoid')(combined)
@@ -345,7 +354,7 @@ def compile_model(model, cfg):
 # Training
 # --------------------------------------------------------------------------- #
 
-def train(cfg, resume=False):
+def train(cfg, resume=False, build_fn=None):
     """Train from scratch, or -- with resume=True -- pick up a run the VM lost.
 
     Colab deletes VMs on idle and on a max lifetime; nothing inside the VM can
@@ -378,7 +387,7 @@ def train(cfg, resume=False):
     else:
         if resume:
             print(f"resume requested but no checkpoint at {ckpt} -- starting fresh")
-        model = compile_model(build_model(cfg), cfg)
+        model = compile_model((build_fn or build_model)(cfg), cfg)
     model.summary()
 
     callbacks = [
