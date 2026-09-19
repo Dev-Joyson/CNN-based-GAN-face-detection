@@ -114,6 +114,17 @@ def apply_mask(image, face_mask, mask_mode):
 # Data pipeline
 # --------------------------------------------------------------------------- #
 
+IMAGE_EXTS = (".jpg", ".jpeg", ".png")
+
+
+def list_images(folder):
+    """Image files in a folder, sorted. Anything else -- a readme, .DS_Store, a
+    zip left from the download -- would reach decode_image mid-epoch and kill
+    the run. (The FakeMix folder had 25,001 entries for 25,000 images.)"""
+    return sorted(p for p in glob(os.path.join(folder, '*'))
+                  if p.lower().endswith(IMAGE_EXTS))
+
+
 def load_paths(cfg):
     """Seeded random sample of limit_per_class from each folder, then a
     stratified 70/15/15 split over real(0) / fake(1).
@@ -124,7 +135,7 @@ def load_paths(cfg):
     config always picks the same images.
     """
     def sample(folder):
-        files = sorted(glob(os.path.join(folder, '*')))
+        files = list_images(folder)
         if len(files) <= cfg.limit_per_class:
             return files
         return sorted(random.Random(cfg.seed).sample(files, cfg.limit_per_class))

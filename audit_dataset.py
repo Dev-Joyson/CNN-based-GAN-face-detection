@@ -24,7 +24,7 @@ import tensorflow as tf
 from PIL import Image
 from sklearn.metrics import roc_auc_score
 
-from model import load_and_resize, load_config
+from model import list_images, load_and_resize, load_config
 
 
 def file_features(path):
@@ -82,8 +82,8 @@ def main():
     cfg = load_config(args.config)
     rng = random.Random(cfg.seed)
 
-    real = sorted(glob(os.path.join(cfg.real_dir, "*")))
-    fake = sorted(glob(os.path.join(cfg.fake_dir, "*")))
+    real = list_images(cfg.real_dir)
+    fake = list_images(cfg.fake_dir)
     if not real or not fake:
         raise FileNotFoundError(f"real={len(real)} fake={len(fake)} -- check paths in {args.config}")
 
