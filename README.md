@@ -251,6 +251,23 @@ high-frequency energy) as an AUC. If any reaches ~0.9, the model can hit that
 score without looking at a face — a shortcut, not detection. Metadata only; a
 held-out generator is the real test.
 
+**Result on the current data** (FFHQ 1024 + FakeMix, 800 sampled per class, 2026-09-19):
+
+| property | real | fake | AUC |
+|---|---|---|---|
+| width / height | 1024 | 1024 | — (identical, nothing to score) |
+| file_size | 1.37 MB | 1.43 MB | 0.56 |
+| brightness | 111.4 | 113.0 | 0.52 |
+| contrast | 61.3 | 56.8 | 0.63 |
+| highfreq (post-pipeline) | 1.73 | 1.65 | 0.62 |
+
+Verdict: no single property beats 0.63. The resolution asymmetry of the earlier
+data (reals 512, fakes 1024) is gone. The mild `highfreq`/`contrast` gap — fakes
+slightly smoother — survives an identical resize path for both classes, so it is
+a property of the images, not the preprocessing: GANs under-produce
+high-frequency detail (Durall et al., CVPR 2020). That is the signal the FFT
+branch is meant to find, and at 0.62 it is far too weak to explain a 0.99 alone.
+
 ## Tests
 
 ```bash
