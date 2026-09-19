@@ -15,7 +15,7 @@ img_size: 256
 native_size: 512
 batch_size: 144
 
-epochs: 50
+epochs: 150               # was 50 -- still climbing at 50 (val_auc 0.945). Let patience decide.
 lr: 0.0003
 patience: 6
 seed: 42
