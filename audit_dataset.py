@@ -61,7 +61,8 @@ def highfreq_energy(path, cfg):
 
 def collect(paths, cfg, label):
     rows = []
-    for p in paths:
+    name = "real" if label == 0 else "fake"
+    for i, p in enumerate(paths, 1):
         try:
             f = file_features(p)
             f["highfreq"] = highfreq_energy(p, cfg)
@@ -69,6 +70,10 @@ def collect(paths, cfg, label):
             rows.append(f)
         except Exception as e:                     # corrupt file, odd format
             print(f"  skipped {os.path.basename(p)}: {e}")
+        if i % 100 == 0 or i == len(paths):
+            # each image is two Drive reads of a ~1-2 MB PNG; this is slow and
+            # silent without a heartbeat
+            print(f"  {name}: {i}/{len(paths)}", flush=True)
     return rows
 
 
