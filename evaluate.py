@@ -34,7 +34,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 from sklearn.metrics import (auc, classification_report, confusion_matrix,
-                             roc_curve)
+                             roc_auc_score, roc_curve)
 from tensorflow.keras import layers
 
 from model import build_datasets, feathered_ellipse, load_config
@@ -421,15 +421,18 @@ def measure_efficiency(model, cfg, ds, warmup=50, runs=1000):
     comparison against a bigger detector is about the network. Comparable only
     against baselines measured on this same GPU, in this same session.
     """
-    try:
-        tf.config.experimental.reset_memory_stats("GPU:0")
-    except Exception:
-        pass
+    def reset_peak():
+        try:
+            tf.config.experimental.reset_memory_stats("GPU:0")
+        except Exception:
+            pass
 
     images, _ = next(iter(ds))
     infer = tf.function(lambda x: model(x, training=False))
 
-    # single image: the latency number
+    # single image: the latency number, and the memory number that matters for
+    # a "how much does it need to run" claim
+    reset_peak()
     x1 = images[:1]
     for _ in range(warmup):
         infer(x1).numpy()
@@ -439,8 +442,11 @@ def measure_efficiency(model, cfg, ds, warmup=50, runs=1000):
         infer(x1).numpy()
         times.append((time.perf_counter() - t0) * 1000.0)
     times = np.array(times)
+    peak_bs1 = _peak_memory_mb()
 
-    # full batch: the throughput number
+    # full batch: the throughput number; its peak is activations x batch, not
+    # the model's footprint
+    reset_peak()
     batch_size = int(images.shape[0])
     for _ in range(3):
         infer(images).numpy()
@@ -448,6 +454,7 @@ def measure_efficiency(model, cfg, ds, warmup=50, runs=1000):
     for _ in range(10):
         infer(images).numpy()
     batch_seconds = (time.perf_counter() - t0) / 10.0
+    peak_batch = _peak_memory_mb()
 
     macs = count_macs(model)
     eff = {
@@ -455,8 +462,11 @@ def measure_efficiency(model, cfg, ds, warmup=50, runs=1000):
         "macs": macs,
         "macs_note": "conv+dense multiply-accumulates per image; FLOPs ~= 2x this",
         "system_under_test": system_under_test(cfg, warmup, runs),
-        "model_file_mb": round(os.path.getsize(os.path.join(cfg.run_dir, "model.keras")) / 1e6, 2),
-        "peak_gpu_memory_mb": _peak_memory_mb(),
+        # the inference artifact: params x 4 bytes (fp32). model.keras on disk is
+        # ~3x that -- it carries Adam's two moment tensors for resuming training.
+        "weights_mb_fp32": round(int(model.count_params()) * 4 / 1e6, 2),
+        "checkpoint_file_mb": round(os.path.getsize(os.path.join(cfg.run_dir, "model.keras")) / 1e6, 2),
+        "peak_gpu_memory_mb": {"bs1": peak_bs1, f"bs{batch_size}": peak_batch},
         "latency_bs1_ms": {
             "median": round(float(np.median(times)), 3),
             "mean": round(float(times.mean()), 3),
@@ -469,10 +479,11 @@ def measure_efficiency(model, cfg, ds, warmup=50, runs=1000):
     lat = eff["latency_bs1_ms"]
     sut = eff["system_under_test"]
     print(f"device      : {sut['device']}  (TF {sut['tensorflow']}, git {sut['git_sha']})")
-    print(f"params      : {eff['params']:,}  ({eff['model_file_mb']} MB on disk)")
+    print(f"params      : {eff['params']:,}  ({eff['weights_mb_fp32']} MB fp32 weights; "
+          f"checkpoint {eff['checkpoint_file_mb']} MB incl. optimizer)")
     print(f"MACs        : {macs / 1e9:.3f} G per image at {cfg.img_size}^2  "
           f"(FLOPs ~= {2 * macs / 1e9:.2f} G)")
-    print(f"peak memory : {eff['peak_gpu_memory_mb']} MB")
+    print(f"peak memory : {peak_bs1} MB at bs=1 | {peak_batch} MB at bs={batch_size}")
     print(f"latency bs=1: {lat['median']:.2f} ms median | {lat['mean']:.2f} mean "
           f"| {lat['p95']:.2f} p95   (n={runs})")
     print(f"throughput  : {eff['throughput_img_per_s']:,.1f} img/s at batch {batch_size}")
