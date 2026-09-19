@@ -35,7 +35,7 @@ Only touch `model.py` to change the *method*.
 | `tests/` | Two guard tests (see below) |
 | `conftest.py` | Puts the repo root on `sys.path` so bare `pytest tests -q` can import `model` |
 | `requirements-dev.txt` | Laptop install (CPU-only) for tests + audit; `requirements.txt` is the training env |
-| `docs/` | `research-repo-practice.md` — sourced notes on how this repo should be run |
+| `docs/` | `learnings.md` — one line per thing we found out and what changed; `research-repo-practice.md` — sourced notes on how this repo should be run |
 | `notebooks/` | One file, `colab_runner.ipynb`. It exists because the VS Code Colab extension only activates `onNotebook` — no notebook open, no kernel picker, no `Colab: Open Terminal`, no Drive mount. It holds the connection and the launch commands, never method code. |
 
 ## Architecture
