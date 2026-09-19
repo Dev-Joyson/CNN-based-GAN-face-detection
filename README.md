@@ -241,7 +241,7 @@ yet; it belongs beside `build_model` when that phase starts.
 
 | experiment | role | dataset | **test AUC** | val AUC (selection) | run folder |
 |---|---|---|---|---|---|
-| **test16_full** | **headline** — full image, no mask | FFHQ 1024 + FakeMix, 20k/class | _pending_ | _pending_ | `experiments/test16_full/` |
+| **test16_full** | **headline** — full image, no mask | FFHQ 1024 + FakeMix, 20k/class | **0.9473** (epoch 50, still climbing — resume pending) | 0.9450 | `experiments/test16_full/` |
 | test13_face | control — `face_only` | FFHQ 1024 + FakeMix, 25k/class | _pending_ | 0.9995 | `experiments/test13_face/` |
 | test14_background | control — `background_only` | FFHQ 1024 + FakeMix, 20k/class | _pending_ | _rerun pending_ | `experiments/test14_background/` |
 

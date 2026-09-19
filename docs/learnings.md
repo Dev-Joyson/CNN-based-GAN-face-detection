@@ -18,6 +18,10 @@ the README says how things *are*, this says how we found out.
   The residual `highfreq`/`contrast` gap survives an identical resize path, so it is the
   images, not the pipeline — GANs under-produce high frequencies (Durall 2020). That is
   the signal, not a shortcut.
+- **2026-09-19 — With the resampling asymmetry removed, the same architecture scores
+  0.947 test AUC (epoch 50, still rising), not 0.9995.** The gap is roughly how much of
+  the old result was preprocessing. The curve was slow and steady from 0.77 — the
+  shape of learning, not of a shortcut. Accuracy 87%.
 - **Separate folders, one generator family: 0.9995 alone proves nothing.** Baselines
   double as a difficulty check; a held-out generator is the real test.
 
