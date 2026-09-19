@@ -35,7 +35,11 @@ the README says how things *are*, this says how we found out.
 - **Shuffle must come after the cache.** Before it, epoch 1's order is frozen into the
   file and replayed forever.
 - **2026-09-19 — Drive reads ~12 images/s.** Epoch 1 on 40k images ≈ 50 min, GPU idle;
-  epoch 2 onward reads the cache. Paid once per VM.
+  epoch 2 ran in 66 s off the cache. Paid once per VM.
+- **2026-09-19 — `cache_dataset_ops.cc:333 "will be discarded"` fires even when the cache
+  completes.** It comes from a side-iterator at the epoch boundary. Verify a cache by
+  its file: `train.data` must be N × H × W × 3 (+4 B/record) with no `.lockfile`. A
+  warm-pass "fix" was written for this and reverted once the bytes said otherwise.
 
 ## Model and the claim
 
