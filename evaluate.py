@@ -37,7 +37,7 @@ from sklearn.metrics import (auc, classification_report, confusion_matrix,
                              roc_curve)
 from tensorflow.keras import layers
 
-from model import build_datasets, load_config
+from model import build_datasets, feathered_ellipse, load_config
 
 CLASSES = ["Real", "Fake"]
 
@@ -187,6 +187,131 @@ def plot_gradcam(model, ds, out_path, n_per_class=4):
     fig.savefig(out_path, dpi=150)
     plt.close(fig)
     return layer_name
+
+
+# --------------------------------------------------------------------------- #
+# Shortcut checks -- what does THIS trained model actually use?
+# --------------------------------------------------------------------------- #
+# Retraining with face_only / background_only says where signal exists in the
+# DATA. The panel asked what the trained model USES. These two run on the
+# trained model at test time, no retraining, and answer that directly.
+
+def _collect(ds, n_per_class):
+    """Up to n test images per class, uint8 (N,H,W,3). Only meaningful when the
+    split is unmasked (mask_mode none) -- a masked image has no background."""
+    reals, fakes = [], []
+    for images, labels in ds:
+        imgs = tf.cast(tf.clip_by_value(images, 0, 1) * 255, tf.uint8).numpy()
+        for img, y in zip(imgs, labels.numpy()):
+            (fakes if y == 1 else reals).append(img)
+        if len(reals) >= n_per_class and len(fakes) >= n_per_class:
+            break
+    n = min(len(reals), len(fakes), n_per_class)
+    return np.stack(reals[:n]), np.stack(fakes[:n])
+
+
+def _predict_uint8(model, x, batch=64):
+    out = []
+    for i in range(0, len(x), batch):
+        xb = tf.cast(x[i:i + batch], tf.float32) / 255.0
+        out.append(model(xb, training=False).numpy().ravel())
+    return np.concatenate(out)
+
+
+def swap_test(model, ds, face_mask, n_per_class=500):
+    """Does the prediction follow the face or the background?
+
+    Composites via the same feathered ellipse the mask experiments use:
+    face pixels from one image, everything outside the ellipse from another.
+
+      swap     real face + fake bg, fake face + real bg   -> the question
+      control  real face + other REAL bg, fake + other FAKE bg -> the seam check
+
+    The control has identical seams and no conflict. If control_auc stays near
+    the plain test AUC, compositing is benign and swap_auc means what it says.
+    If control_auc collapses, the seam dominates and swap_auc is uninformative
+    -- the test reports that about itself rather than hiding it.
+
+    On the swap set, face label and background label are exact complements, so
+    one AUC (scored by FACE label) says it all: well above 0.5 = follows the
+    face; well below 0.5 = follows the background; ~0.5 = torn, uses both.
+
+    "Background" = outside the ellipse: hair, ears, shoulders, clothes, wall.
+    """
+    reals, fakes = _collect(ds, n_per_class)
+    n = len(reals)
+    if n < 20:
+        return {"skipped": f"only {n} per class collected"}
+    m = face_mask.numpy()                                     # (H, W, 1) in [0, 1]
+    r, f = reals.astype(np.float32), fakes.astype(np.float32)
+    other = lambda a: np.roll(a, 1, axis=0)                   # a different image, same class
+    comp = lambda face, bg: np.clip(face * m + bg * (1 - m), 0, 255).astype(np.uint8)
+
+    p = {
+        "real_face_real_bg": _predict_uint8(model, comp(r, other(r))),   # control
+        "fake_face_fake_bg": _predict_uint8(model, comp(f, other(f))),   # control
+        "real_face_fake_bg": _predict_uint8(model, comp(r, f)),          # swap
+        "fake_face_real_bg": _predict_uint8(model, comp(f, r)),          # swap
+    }
+    y = [0] * n + [1] * n
+    control_auc = roc_auc_score(y, np.concatenate([p["real_face_real_bg"], p["fake_face_fake_bg"]]))
+    swap_auc_by_face = roc_auc_score(y, np.concatenate([p["real_face_fake_bg"], p["fake_face_real_bg"]]))
+    return {
+        "n_per_class": n,
+        "control_auc_same_class_composites": round(float(control_auc), 4),
+        "swap_auc_scored_by_face_label": round(float(swap_auc_by_face), 4),
+        "mean_p_fake": {k: round(float(v.mean()), 4) for k, v in p.items()},
+        "read": ("control near test AUC => seams benign; then swap >0.5 follows face, "
+                 "<0.5 follows background, ~0.5 uses both. background = outside the ellipse."),
+    }
+
+
+def attention_in_face(model, ds, face_mask, layer_name, max_images=6000):
+    """Fraction of Grad-CAM heat inside the face ellipse, over the test set.
+
+    gradcam.png is eight pictures; this is the number. Heat is taken toward
+    the PREDICTED class (p for predicted-fake, 1-p for predicted-real), so it
+    is "evidence the model used", not "evidence for fake".
+
+    Read against uniform_baseline: the ellipse's share of the image (~0.55). A
+    model looking everywhere equally scores that; well above it means
+    attention on the face. Spatial branch only -- the FFT branch has no
+    image-space heatmap, so its share of the decision is not measured here.
+    """
+    grad_model = tf.keras.models.Model(
+        inputs=model.inputs,
+        outputs=[model.get_layer(layer_name).output, model.output])
+    m = face_mask[..., 0]                                     # (H, W)
+    hw = [int(m.shape[0]), int(m.shape[1])]
+    frac = {0: [], 1: []}
+    seen = 0
+    for images, labels in ds:
+        with tf.GradientTape() as tape:
+            conv, preds = grad_model(images, training=False)
+            pf = preds[:, 0]
+            score = tf.where(pf > 0.5, pf, 1.0 - pf)          # toward the predicted class
+        grads = tape.gradient(score, conv)                    # (B, h, w, C)
+        pooled = tf.reduce_mean(grads, axis=(1, 2), keepdims=True)
+        heat = tf.nn.relu(tf.reduce_sum(conv * pooled, axis=-1))   # (B, h, w)
+        heat = tf.image.resize(heat[..., None], hw)[..., 0]        # (B, H, W)
+        total = tf.reduce_sum(heat, axis=(1, 2))
+        inside = tf.reduce_sum(heat * m, axis=(1, 2))
+        ok = total > 1e-6                                     # skip all-zero maps
+        f = (inside / tf.where(ok, total, 1.0)).numpy()
+        for fi, oki, y in zip(f, ok.numpy(), labels.numpy()):
+            if oki:
+                frac[int(y)].append(float(fi))
+        seen += len(f)
+        if seen >= max_images:
+            break
+    return {
+        "layer": layer_name,
+        "n": seen,
+        "uniform_baseline": round(float(tf.reduce_mean(m)), 4),
+        "real": round(float(np.mean(frac[0])), 4) if frac[0] else None,
+        "fake": round(float(np.mean(frac[1])), 4) if frac[1] else None,
+        "read": "share of Grad-CAM heat inside the face ellipse; compare to uniform_baseline. spatial branch only.",
+    }
 
 
 # --------------------------------------------------------------------------- #
@@ -373,6 +498,21 @@ def evaluate(cfg):
     roc_auc = plot_roc(y_true, y_score, os.path.join(cfg.run_dir, "roc.png"))
     layer_name = plot_gradcam(model, ds["test"], os.path.join(cfg.run_dir, "gradcam.png"))
 
+    face_mask = feathered_ellipse(cfg.img_size, cfg.mask_rx, cfg.mask_ry, cfg.mask_feather)
+    attention = attention_in_face(model, ds["test"], face_mask, layer_name) if layer_name else None
+    if cfg.mask_mode == "none":
+        swap = swap_test(model, ds["test"], face_mask)
+    else:
+        swap = {"skipped": f"mask_mode={cfg.mask_mode}: masked images have no background to swap"}
+    print("shortcut checks:")
+    print(f"  attention in face : real {attention['real']}  fake {attention['fake']}  "
+          f"(uniform {attention['uniform_baseline']})" if attention else "  attention: n/a")
+    if "skipped" not in swap:
+        print(f"  swap   control AUC {swap['control_auc_same_class_composites']}  "
+              f"swap-by-face AUC {swap['swap_auc_scored_by_face_label']}")
+    else:
+        print(f"  swap: {swap['skipped']}")
+
     report = classification_report(y_true, y_pred, target_names=CLASSES,
                                    output_dict=True, zero_division=0)
     print(classification_report(y_true, y_pred, target_names=CLASSES,
@@ -387,6 +527,7 @@ def evaluate(cfg):
         "classes": CLASSES,
         "report": report,
         "gradcam_layer": layer_name,
+        "shortcut_checks": {"attention_in_face": attention, "background_swap": swap},
         "efficiency": eff,
     }
     with open(os.path.join(cfg.run_dir, "eval.json"), "w") as f:

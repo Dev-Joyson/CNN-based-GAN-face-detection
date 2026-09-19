@@ -49,6 +49,11 @@ the README says how things *are*, this says how we found out.
 - **2026-09-17 — The headline is the full-image model.** face_only / background_only
   are controls built to answer the panel head's "is it reading the background?" — not
   the result. (Had this backwards for two days.)
+- **2026-09-20 — The mask retrains answer the wrong question.** face_only / background_only
+  say where signal exists in the data; the panel asked what the trained model uses.
+  → test-time background swap (with a same-class seam control) and Grad-CAM-in-face
+  fraction, both on the trained model, in `evaluate.py`. Also: the "backgrounds look
+  different" the panel saw may have been the resampling asymmetry itself.
 - **Baselines compare on the headline task, never on a masked one.** Xception is the
   field standard (FaceForensics++); EfficientNet-B0 is the real rival; MobileNetV3 is the
   one a panel will ask about. Fine-tune fully, `preprocess_input` inside each model.

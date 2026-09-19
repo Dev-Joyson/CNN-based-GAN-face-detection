@@ -171,6 +171,26 @@ would report a number the model never earned.
 Grad-CAM is the shortcut check, not decoration: under `face_only` the heat should
 sit on the face. If it sits on a corner, the model found something that isn't a face.
 
+### Does the trained model use the background?
+
+The panel's question. Retraining with `face_only` / `background_only` says where
+signal exists in the *data*; it does not say what the trained model *uses*. Two
+checks in `eval.json` → `shortcut_checks` run on the trained model, no retraining:
+
+**Background swap.** Real face pasted onto a fake background and vice versa, via
+the same feathered ellipse. One AUC, scored by the *face* label: well above 0.5 the
+prediction follows the face; well below, the background; ~0.5, both. The seam is
+the known weakness, so a **control** — same-class composites with identical seams
+and no conflict — is reported beside it. If the control AUC stays near the plain
+test AUC, the seams are benign and the swap number means what it says; if the
+control collapses, the swap is uninformative and the output says so.
+"Background" means everything outside the ellipse: hair, ears, shoulders, wall.
+
+**Attention in face.** Share of Grad-CAM heat inside the face ellipse, averaged
+over the whole test set, per class. Compare to `uniform_baseline` (the ellipse's
+share of the image, ~0.55): well above it means the spatial branch attends to the
+face. Spatial branch only — the FFT branch has no image-space heatmap.
+
 ### Efficiency numbers
 
 The same command also prints, and writes into `eval.json`:
