@@ -2,11 +2,11 @@
 # is about. test13_face / test14_background are controls on it, not rivals.
 #
 # Ported from Test16_FFT_fix_final.ipynb, then moved onto the same dataset as
-# the controls (Dataset New, 20k/class) so face/background runs compare to it.
+# the controls (FFHQ 1024 + FakeMix, 20k/class) so face/background runs compare to it.
 name: test16_full
 
-real_dir: "/content/drive/MyDrive/Research/Dataset New/final Real"
-fake_dir: "/content/drive/MyDrive/Research/Dataset New/Fake"
+real_dir: "/content/drive/MyDrive/Real(FFHQ)"
+fake_dir: "/content/drive/MyDrive/FakeMix"
 
 mask_mode: none
 limit_per_class: 20000

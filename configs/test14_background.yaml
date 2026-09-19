@@ -2,8 +2,8 @@
 # finds comes from hair/shoulders/background. Control for "is it just the face?".
 name: test14_background
 
-real_dir: "/content/drive/MyDrive/Research/Dataset New/final Real"
-fake_dir: "/content/drive/MyDrive/Research/Dataset New/Fake"
+real_dir: "/content/drive/MyDrive/Real(FFHQ)"
+fake_dir: "/content/drive/MyDrive/FakeMix"
 
 mask_mode: background_only
 limit_per_class: 20000

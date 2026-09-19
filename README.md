@@ -1,6 +1,7 @@
 # GAN-face detection: lightweight dual-branch CNN
 
-Detects StyleGAN2 fake faces vs real FFHQ faces with a **1.02M parameter** CNN.
+Detects StyleGAN1/StyleGAN2 fake faces vs real FFHQ faces with a **1.02M parameter**
+CNN. Both classes are native 1024² and travel the identical resize path.
 Research angle: **efficiency** — high accuracy at low compute/latency.
 
 ## How it works
@@ -219,9 +220,9 @@ yet; it belongs beside `build_model` when that phase starts.
 
 | experiment | role | dataset | **test AUC** | val AUC (selection) | run folder |
 |---|---|---|---|---|---|
-| **test16_full** | **headline** — full image, no mask | `Dataset New`, 20k/class | _pending_ | _pending_ | `experiments/test16_full/` |
-| test13_face | control — `face_only` | `Dataset New`, 25k/class | _pending_ | 0.9995 | `experiments/test13_face/` |
-| test14_background | control — `background_only` | `Dataset New`, 20k/class | _pending_ | _rerun pending_ | `experiments/test14_background/` |
+| **test16_full** | **headline** — full image, no mask | FFHQ 1024 + FakeMix, 20k/class | _pending_ | _pending_ | `experiments/test16_full/` |
+| test13_face | control — `face_only` | FFHQ 1024 + FakeMix, 25k/class | _pending_ | 0.9995 | `experiments/test13_face/` |
+| test14_background | control — `background_only` | FFHQ 1024 + FakeMix, 20k/class | _pending_ | _rerun pending_ | `experiments/test14_background/` |
 
 All three run on the same dataset. `test13_face` is at 25k/class where the other
 two are at 20k — the split members differ, so it is a near-comparison, not an

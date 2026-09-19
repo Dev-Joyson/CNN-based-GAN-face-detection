@@ -10,6 +10,7 @@ so PNG fakes load, crop_frac 0.85, seeded full-set shuffle, named spatial convs.
 import hashlib
 import json
 import os
+import random
 from collections import Counter
 from dataclasses import asdict, dataclass
 from glob import glob
@@ -114,13 +115,27 @@ def apply_mask(image, face_mask, mask_mode):
 # --------------------------------------------------------------------------- #
 
 def load_paths(cfg):
-    """Stratified 70/15/15 split over real(0) / fake(1)."""
-    real_images = sorted(glob(os.path.join(cfg.real_dir, '*')))[:cfg.limit_per_class]
-    fake_images = sorted(glob(os.path.join(cfg.fake_dir, '*')))[:cfg.limit_per_class]
+    """Seeded random sample of limit_per_class from each folder, then a
+    stratified 70/15/15 split over real(0) / fake(1).
+
+    A random sample, not the first N by filename: the fake folder mixes
+    StyleGAN1 and StyleGAN2, and FFHQ is numbered, so a sorted prefix could
+    silently be one generator or one slice of FFHQ. Seeded, so the same
+    config always picks the same images.
+    """
+    def sample(folder):
+        files = sorted(glob(os.path.join(folder, '*')))
+        if len(files) <= cfg.limit_per_class:
+            return files
+        return sorted(random.Random(cfg.seed).sample(files, cfg.limit_per_class))
+
+    real_images = sample(cfg.real_dir)
+    fake_images = sample(cfg.fake_dir)
     if not real_images or not fake_images:
         raise FileNotFoundError(
             f"No images found. real_dir={cfg.real_dir!r} ({len(real_images)}), "
             f"fake_dir={cfg.fake_dir!r} ({len(fake_images)})")
+    print(f"real: {len(real_images)} of pool   fake: {len(fake_images)} of pool")
 
     paths = real_images + fake_images
     labels = [0] * len(real_images) + [1] * len(fake_images)
