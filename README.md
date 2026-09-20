@@ -32,6 +32,7 @@ Only touch `model.py` to change the *method*.
 | `evaluate.py` | Entry point: confusion matrix, ROC, Grad-CAM, efficiency numbers |
 | `predict.py` | Entry point: classify one image — the panel demo. Uses the training preprocessing, so it cannot drift |
 | `baselines.py` | Entry point: Xception / EfficientNet-B0 / MobileNetV3-Small on the identical task (`--model`, `--train`) |
+| `distill.py` | Entry point: train this architecture on a fine-tuned baseline's probabilities (`--teacher`), same latency, more accuracy |
 | `audit_dataset.py` | Checks whether the two folders are separable by metadata alone |
 | `configs/*.yaml` | Per-experiment settings |
 | `tests/` | Two guard tests (see below) |

@@ -235,18 +235,24 @@ def augment_and_mask(image, label, cfg, face_mask, training):
     return image, label
 
 
+def cached_dataset(paths, labels, cfg, split):
+    """(uint8 image, label) in path order, cached on disk. The slow part,
+    shared by build_dataset and by distill.py (which needs the same order to
+    line teacher logits up with images)."""
+    cache_path = cfg.cache_path(split)
+    os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+    ds = tf.data.Dataset.from_tensor_slices((paths, labels))
+    ds = ds.map(lambda p, y: load_and_resize(p, y, cfg),
+                num_parallel_calls=tf.data.AUTOTUNE)
+    return ds.cache(cache_path)                    # cache AFTER resize, BEFORE augment
+
+
 def build_dataset(paths, labels, cfg, split, shuffle, training, face_mask=None):
     if face_mask is None:
         face_mask = feathered_ellipse(cfg.img_size, cfg.mask_rx, cfg.mask_ry,
                                       cfg.mask_feather)
 
-    cache_path = cfg.cache_path(split)
-    os.makedirs(os.path.dirname(cache_path), exist_ok=True)
-
-    ds = tf.data.Dataset.from_tensor_slices((paths, labels))
-    ds = ds.map(lambda p, y: load_and_resize(p, y, cfg),
-                num_parallel_calls=tf.data.AUTOTUNE)
-    ds = ds.cache(cache_path)                      # cache AFTER resize, BEFORE augment
+    ds = cached_dataset(paths, labels, cfg, split)
     if shuffle:
         # AFTER cache: shuffling before it would freeze the first epoch's order
         # into the cache file and every later epoch would replay it.
