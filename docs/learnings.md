@@ -29,6 +29,12 @@ the README says how things *are*, this says how we found out.
   hides an easy SG1 number and a harder SG2 one. Report per-generator AUC.
 - **2026-09-20 — 50 epochs was too few.** The notebook's cap; val_auc was 0.945 and
   climbing at 50, 0.972 at 85. Let patience decide, not the cap.
+- **2026-09-20 — StyleGAN2 alone: test AUC 0.964, and nine epochs at chance first.** Same
+  model/seed that hit val 0.77 in one epoch on the mix sat at loss = ln 2 until epoch 9,
+  then climbed normally to 0.9645 (best 89, stopped 104). No easy handle: the audit's
+  worst pixel property is 0.52. The plateau length is itself a measure of how much
+  StyleGAN1 was carrying the mix result. Shortcut checks stronger than on the mix
+  (swap 0.896; real-class attention 0.77, up from 0.60).
 - **Separate folders, one generator family: 0.9995 alone proves nothing.** Baselines
   double as a difficulty check; a held-out generator is the real test.
 

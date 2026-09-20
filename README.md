@@ -193,20 +193,22 @@ over the whole test set, per class. Compare to `uniform_baseline` (the ellipse's
 share of the image, ~0.55): well above it means the spatial branch attends to the
 face. Spatial branch only — the FFT branch has no image-space heatmap.
 
-**Result, test16_full final (best epoch 85, 2026-09-20):**
+**Results (2026-09-20):**
 
-| check | epoch 50 | **epoch 85** | reading |
-|---|---|---|---|
-| plain test AUC | 0.947 | **0.973** | reference |
-| control (same-class composites) | 0.934 | 0.968 | seams cost 0.005 — benign |
-| swap, scored by face label | 0.847 | **0.886** | follows the face (background-following would be ~0.03) |
-| attention in face, fakes | 0.83 | **0.86** | vs 0.57 uniform — looks at the face to call fake |
-| attention in face, reals | 0.54 | 0.60 | now above uniform |
+| check | mix, epoch 50 | mix, final | **SG2, final** | reading |
+|---|---|---|---|---|
+| plain test AUC | 0.947 | 0.973 | **0.964** | reference |
+| control (same-class composites) | 0.934 | 0.968 | 0.963 | seams cost ≤0.005 — benign |
+| swap, scored by face label | 0.847 | 0.886 | **0.896** | follows the face (background-following would be ~0.04) |
+| attention in face, fakes | 0.83 | 0.86 | 0.78 | vs 0.57 uniform |
+| attention in face, reals | 0.54 | 0.60 | **0.77** | on SG2, reals are judged by the face too |
 
-The decision follows the face, and **every check moved further toward the face
-with more training** — the model became more face-focused, not less, as it
-improved. A conflicting background costs ~0.08 AUC and does not flip the
-prediction. Roughly: 90% face, 10% background.
+The decision follows the face, and it did so more firmly as the data got cleaner:
+the swap number rose with training on the mix, and rose again on StyleGAN2 alone.
+The real-class attention is the tell — barely above uniform on the mix (0.60), it
+is clearly on the face on SG2 (0.77). With StyleGAN1's background blobs gone the
+model stopped reading backgrounds for anything. A conflicting background costs
+~0.07 AUC and never flips the prediction.
 
 ### Efficiency numbers
 
@@ -283,10 +285,10 @@ preprocessing is timed as part of running it.
 
 **Efficiency, measured — one L4, one session, 2026-09-20:**
 
-| model | params | MACs @256² | **ms @ bs=1** | img/s @144 | peak MB @ bs=1 | test AUC |
-|---|---|---|---|---|---|---|
-| **this model** | 1.02M | 1.20G | **1.34** | 1,564 | 1,301 | **0.973** |
-| this model, no FFT branch | 1.01M | 1.11G | **0.99** | 2,098 | 1,301 | **0.975** |
+| model | params | MACs @256² | **ms @ bs=1** | img/s @144 | peak MB @ bs=1 | test AUC, SG2 | (mix) |
+|---|---|---|---|---|---|---|---|
+| **this model** | 1.02M | 1.20G | **1.34** | 1,564 | 1,301 | **0.964** | 0.973 |
+| this model, no FFT branch | 1.01M | 1.11G | **0.99** | 2,098 | 1,301 | _running_ | 0.975 |
 | MobileNetV3-Small | 1.01M | **0.07G** | 4.71 | **2,684** | **181** | _pending_ |
 | EfficientNet-B0 | 4.21M | 0.50G | 6.82 | 540 | 198 | _pending_ |
 | Xception | 21.1M | 5.95G | 4.78 | 377 | 560 | _pending_ |
@@ -325,10 +327,18 @@ to keep the branch.
 
 | experiment | role | dataset | **test AUC** | val AUC (selection) | run folder |
 |---|---|---|---|---|---|
-| **test16_full** | **headline** — full image, no mask | FFHQ 1024 + FakeMix, 20k/class | **0.9728** (acc 0.91) | 0.9724 (best epoch 85 of 91, early-stopped) | `experiments/test16_full/` |
-| test16_no_fft | ablation — FFT branch removed, else identical | FFHQ 1024 + FakeMix, 20k/class | **0.9751** (acc 0.91) | 0.9748 (resumed with patience 15; stopped at 101) | `experiments/test16_no_fft/` |
+| **test17_sg2** | **headline** — full image, no mask | FFHQ 1024 + StyleGAN2 ψ=1.0 (NVIDIA), 25k/class | **0.9636** (acc 0.90) | 0.9645 (best epoch 89 of 104, early-stopped) | `experiments/test17_sg2/` |
+| test17_sg2_no_fft | ablation — FFT branch removed | same | _running_ | | `experiments/test17_sg2_no_fft/` |
+| test16_full | *preliminary* — StyleGAN1+2 mix, ratio unknown | FFHQ 1024 + FakeMix, 20k/class | 0.9728 (acc 0.91) | 0.9724 (best 85 of 91) | `experiments/test16_full/` |
+| test16_no_fft | *preliminary* ablation on the mix | same | 0.9751 (acc 0.91) | 0.9748 (patience 15; stopped at 101) | `experiments/test16_no_fft/` |
 | test13_face | control — `face_only` | FFHQ 1024 + FakeMix, 25k/class | _pending_ | 0.9995 | `experiments/test13_face/` |
 | test14_background | control — `background_only` | FFHQ 1024 + FakeMix, 20k/class | _pending_ | _rerun pending_ | `experiments/test14_background/` |
+
+**StyleGAN2 alone is harder.** Same model, same seed: the mix reached val 0.77 after
+one epoch; SG2 sat at chance for nine epochs before finding any signal (loss stuck
+at ln 2), then climbed the same way to 0.964. The audit explains it — on SG2 no
+single pixel property beats AUC 0.52, where the mix had `highfreq` at 0.62 from
+StyleGAN1's artifacts. The 0.973 on the mix was partly StyleGAN1 being easy.
 
 All three run on the same dataset. `test13_face` is at 25k/class where the other
 two are at 20k — the split members differ, so it is a near-comparison, not an
