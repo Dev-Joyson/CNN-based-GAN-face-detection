@@ -286,7 +286,7 @@ preprocessing is timed as part of running it.
 | model | params | MACs @256² | **ms @ bs=1** | img/s @144 | peak MB @ bs=1 | test AUC |
 |---|---|---|---|---|---|---|
 | **this model** | 1.02M | 1.20G | **1.34** | 1,564 | 1,301 | **0.973** |
-| this model, no FFT branch | 1.01M | 1.11G | **0.99** | 2,098 | 1,301 | 0.963 (see ablation) |
+| this model, no FFT branch | 1.01M | 1.11G | **0.99** | 2,098 | 1,301 | **0.975** |
 | MobileNetV3-Small | 1.01M | **0.07G** | 4.71 | **2,684** | **181** | _pending_ |
 | EfficientNet-B0 | 4.21M | 0.50G | 6.82 | 540 | 198 | _pending_ |
 | Xception | 21.1M | 5.95G | 4.78 | 377 | 560 | _pending_ |
@@ -304,22 +304,29 @@ at the cost of more compute and activation memory than mobile-oriented designs* 
 a different point on the curve, not a dominated one. The ranking is GPU-specific;
 on a CPU or phone MobileNet's MAC advantage would likely reverse it.
 
-**The ablation.** `configs/test16_no_fft.yaml` is the headline with the FFT
-branch removed and nothing else changed. The branch is ~9k parameters, 0.9% of the
-model — but **26% of the latency** (0.35 ms: `fft2d`, the magnitude conversion and
-two convs at full 256², none of which a MAC count sees). Measured: with 0.973 /
-1.34 ms, without 0.963 / 0.99 ms. The AUC gap is unconfirmed — the ablation was
-cut off by early stopping at epoch 61 when both runs sat at 0.960, and is being
-resumed with longer patience. The shortcut checks are unchanged without the
-branch (swap 0.880 vs 0.886, attention 0.86 vs 0.86): it does not change where the
-model looks. The question is whether 0.01 AUC is worth 0.35 ms.
+**The ablation — the FFT branch buys nothing in-domain.** `configs/test16_no_fft.yaml`
+is the headline with the branch removed and nothing else changed. Result: **with
+0.973 / 1.34 ms, without 0.975 / 0.99 ms.** Same accuracy, 26% less latency. The
+branch is 0.9% of the parameters but a quarter of the time — `fft2d`, the magnitude
+conversion and two convs at full 256², none of which a MAC count sees. The shortcut
+checks are unchanged without it (swap 0.880 vs 0.886, attention 0.86 vs 0.86): it
+does not change where the model looks either.
+
+A first pass showed a 0.010 gap in the branch's favour. It was an artefact: the
+ablation was cut off by patience-6 early stopping at epoch 61, when both runs sat
+at 0.960; given patience 15 it climbed to 0.975. Patience is 15 in every config now.
+
+What this leaves open is the branch's real claim from the literature — that
+frequency features *generalise* to generators the model never saw. That is a
+held-out-generator test, not an in-domain one, and it is the only remaining reason
+to keep the branch.
 
 ## Results
 
 | experiment | role | dataset | **test AUC** | val AUC (selection) | run folder |
 |---|---|---|---|---|---|
 | **test16_full** | **headline** — full image, no mask | FFHQ 1024 + FakeMix, 20k/class | **0.9728** (acc 0.91) | 0.9724 (best epoch 85 of 91, early-stopped) | `experiments/test16_full/` |
-| test16_no_fft | ablation — FFT branch removed, else identical | FFHQ 1024 + FakeMix, 20k/class | 0.9631 (acc 0.90) | 0.9605 (stopped at 61; at 61 the headline was 0.9596 — resume with patience 15 pending) | `experiments/test16_no_fft/` |
+| test16_no_fft | ablation — FFT branch removed, else identical | FFHQ 1024 + FakeMix, 20k/class | **0.9751** (acc 0.91) | 0.9748 (resumed with patience 15; stopped at 101) | `experiments/test16_no_fft/` |
 | test13_face | control — `face_only` | FFHQ 1024 + FakeMix, 25k/class | _pending_ | 0.9995 | `experiments/test13_face/` |
 | test14_background | control — `background_only` | FFHQ 1024 + FakeMix, 20k/class | _pending_ | _rerun pending_ | `experiments/test14_background/` |
 
