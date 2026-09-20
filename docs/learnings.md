@@ -126,6 +126,11 @@ the README says how things *are*, this says how we found out.
 - **2026-09-20 — A 144-image GradientTape through EfficientNet-B0 OOMs on 24 GB.** Grad-CAM
   attention is computed in chunks of 16 now. Found after a successful fine-tune, not
   before -- the evaluation is the first thing to test on a new backbone.
+- **2026-09-20 — The four-model table is complete.** On StyleGAN2, one L4 + one CPU: this
+  model is fastest on both by 3.5–7.5×, 3 points of AUC behind the fine-tuned pretrained
+  backbones (0.964 vs 0.992–0.9997), and the least background-dependent (swap drop 0.07
+  vs 0.10–0.21). Xception is the most face-attentive (0.93) yet drops 0.12 under a
+  swapped background: attention and swap measure different things.
 - **Latency needs no training; accuracy does.** The efficiency half of the comparison
   can be measured before any baseline is fine-tuned.
 - **Published detectors zero-shot measure generalisation, not architecture.** CNNDetection

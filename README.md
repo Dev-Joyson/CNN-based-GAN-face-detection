@@ -206,18 +206,21 @@ face. Spatial branch only — the FFT branch has no image-space heatmap.
 
 And against the fine-tuned baselines on the same SG2 test set:
 
-| | this model | MobileNetV3-S | EfficientNet-B0 |
-|---|---|---|---|
-| test AUC | 0.964 | 0.992 | **0.9997** |
-| control (same-class composites) | 0.963 | 0.977 | 0.999 |
-| swap, scored by face label | 0.896 | 0.764 | 0.902 |
-| drop under a conflicting background | **0.07** | 0.21 | 0.10 |
-| attention in face, real / fake | **0.77 / 0.78** | 0.69 / 0.65 | **0.47** / 0.83 |
+| | this model | MobileNetV3-S | Xception | EfficientNet-B0 |
+|---|---|---|---|---|
+| test AUC | 0.964 | 0.992 | 0.999 | **0.9997** |
+| control (same-class composites) | 0.963 | 0.977 | 0.998 | 0.999 |
+| swap, scored by face label | 0.896 | 0.764 | 0.879 | 0.902 |
+| drop under a conflicting background | **0.07** | 0.21 | 0.12 | 0.10 |
+| attention in face, real / fake | 0.77 / 0.78 | 0.69 / 0.65 | **0.93 / 0.94** | **0.47** / 0.83 |
 
-The pretrained models are more accurate and lean more on the background. MobileNet
-loses 0.21 AUC when the background conflicts; EfficientNet, when it calls an image
-*real*, puts less than half its attention inside the face — below uniform. This model
-judges both classes by the face. Accuracy alone hides that.
+The pretrained models are more accurate and every one of them is more
+background-dependent than this model: a conflicting background costs them 0.10–0.21
+AUC against 0.07 here. Xception is the most face-*attentive* of the five yet still
+drops 0.12 — where a model looks and what flips its decision are different
+measurements, which is why both are made. EfficientNet, when it calls an image
+*real*, puts less than half its attention inside the face. Accuracy alone hides all
+of that.
 
 The decision follows the face, and it did so more firmly as the data got cleaner:
 the swap number rose with training on the mix, and rose again on StyleGAN2 alone.
@@ -307,7 +310,7 @@ preprocessing is timed as part of running it.
 | this model, no FFT branch | 1.01M | 1.11G | **0.99** | **6.6** | 2,098 | 1,301 | 0.953 | 0.975 |
 | MobileNetV3-Small | 1.01M | **0.07G** | 4.71 | 18.7 | **2,684** | **181** | **0.992** (ImageNet-pretrained, fine-tuned) |
 | EfficientNet-B0 | 4.21M | 0.50G | 6.82 | 39.8 | 540 | 198 | **0.9997** (ImageNet-pretrained, fine-tuned) |
-| Xception | 21.1M | 5.95G | 4.78 | _pending_ | 377 | 560 | _pending_ |
+| Xception | 21.1M | 5.95G | 4.78 | 65.0 | 377 | 560 | 0.9987 (ImageNet-pretrained, fine-tuned, stopped early at a 0.999 plateau) |
 
 The honest reading. **Single-image latency: this model wins by 3.5–5×**, including
 against EfficientNet-B0, which has *half* the MACs — MACs are an indirect metric
