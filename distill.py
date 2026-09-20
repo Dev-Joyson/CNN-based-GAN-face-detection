@@ -23,9 +23,11 @@ the student sees augmented views with that fixed target.
 Loss (Hinton et al. 2015, binary form):
     alpha * T^2 * BCE(sigmoid(z_s/T), sigmoid(z_t/T))  +  (1-alpha) * BCE(p_s, y)
 
-Output: experiments/<headline>/distill/<teachers>/  -- the student's own
+Output: experiments/<name>/ (default test18_distill -- the experiment
+numbering continues from the test17 headline) -- the student's own
 model.keras (a plain build_model, loadable by evaluate.py and predict.py),
-history.csv, metrics.json, then the full evaluate() block.
+history.csv, metrics.json with the distillation settings, then the full
+evaluate() block.
 """
 
 import argparse
@@ -131,11 +133,13 @@ def main():
     ap.add_argument("--no-extra", action="store_true", help="train on the headline's 35k only")
     ap.add_argument("--init", action="store_true",
                     help="warm-start the student from the headline's model.keras instead of scratch")
+    ap.add_argument("--name", default="test18_distill",
+                    help="run name -> experiments/<name>/ (default test18_distill)")
     args = ap.parse_args()
 
     cfg = load_config(args.config)
     tag = "+".join(args.teacher) + ("" if args.no_extra else "+extra") + ("+init" if args.init else "")
-    scfg = replace(cfg, name=f"{cfg.name}/distill/{tag}")
+    scfg = replace(cfg, name=args.name)
     os.makedirs(scfg.run_dir, exist_ok=True)
     tf.keras.utils.set_random_seed(cfg.seed)
     print(f"=== distill -> {scfg.run_dir}\n    teachers={args.teacher} T={args.temperature} "
@@ -204,7 +208,8 @@ def main():
     clean.set_weights(student.get_weights())
     clean.save(os.path.join(scfg.run_dir, "model.keras"))
     with open(os.path.join(scfg.run_dir, "metrics.json"), "w") as f:
-        json.dump({"distill": {"teachers": args.teacher, "temperature": args.temperature,
+        json.dump({"distill": {"tag": tag, "headline": cfg.name,
+                               "teachers": args.teacher, "temperature": args.temperature,
                                "alpha": args.alpha, "extra": not args.no_extra, "init": args.init,
                                "n_train": len(train_paths)}}, f, indent=2)
 
