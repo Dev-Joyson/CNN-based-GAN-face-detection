@@ -105,6 +105,17 @@ the README says how things *are*, this says how we found out.
   parameters" and "cheap in time" are different claims. Without it: 0.99 ms, 4.8× MobileNet.
 - **2026-09-20 — The 1.3 GB peak at bs=1 is the spatial stem, not the FFT.** The no-FFT model
   peaks identically. Earlier attribution corrected.
+- **2026-09-20 — A fine-tuned MobileNetV3-Small reaches 0.992 on SG2 where this model
+  reaches 0.964.** Same 1M params; ImageNet pretraining vs from scratch on 35k images.
+  The task is learnable to 0.99 — the ceiling was the training regime, not the data.
+  It is 3.9× slower in-session and drops 0.21 AUC under a conflicting background where
+  this model drops 0.07: more accurate, and much more background-dependent.
+- **2026-09-20 — Keras' AUC metric is approximate (200 thresholds).** The training log's
+  `test:` said 0.9885; sklearn's exact AUC on the same weights is 0.9916. Quote the exact
+  one from evaluate.py, never the Keras metric.
+- **2026-09-20 — Depthwise nets vary more across sessions than plain convs.** MobileNetV3
+  4.71 → 5.48 ms between two L4 VMs; this model 1.34 → 1.42. Launch-bound kernels are
+  sensitive to session state. In-session ratios only.
 - **Latency needs no training; accuracy does.** The efficiency half of the comparison
   can be measured before any baseline is fine-tuned.
 - **Published detectors zero-shot measure generalisation, not architecture.** CNNDetection

@@ -203,6 +203,19 @@ face. Spatial branch only — the FFT branch has no image-space heatmap.
 | attention in face, fakes | 0.83 | 0.86 | 0.78 | vs 0.57 uniform |
 | attention in face, reals | 0.54 | 0.60 | **0.77** | on SG2, reals are judged by the face too |
 
+And against a fine-tuned baseline on the same SG2 test set:
+
+| | this model | MobileNetV3-Small (fine-tuned) |
+|---|---|---|
+| test AUC | 0.964 | **0.992** |
+| control (same-class composites) | 0.963 | 0.977 |
+| swap, scored by face label | **0.896** | 0.764 |
+| drop under a conflicting background | 0.07 | **0.21** |
+| attention in face, real / fake | 0.77 / 0.78 | 0.69 / 0.65 |
+
+The pretrained model is more accurate and leans far more on the background — roughly
+75% face / 25% background against ~93 / 7 for this model. Accuracy alone hides that.
+
 The decision follows the face, and it did so more firmly as the data got cleaner:
 the swap number rose with training on the mix, and rose again on StyleGAN2 alone.
 The real-class attention is the tell — barely above uniform on the mix (0.60), it
@@ -289,7 +302,7 @@ preprocessing is timed as part of running it.
 |---|---|---|---|---|---|---|---|
 | **this model** | 1.02M | 1.20G | **1.34** | 1,564 | 1,301 | **0.964** | 0.973 |
 | this model, no FFT branch | 1.01M | 1.11G | **0.99** | 2,098 | 1,301 | 0.953 | 0.975 |
-| MobileNetV3-Small | 1.01M | **0.07G** | 4.71 | **2,684** | **181** | _pending_ |
+| MobileNetV3-Small | 1.01M | **0.07G** | 4.71 | **2,684** | **181** | **0.992** (ImageNet-pretrained, fine-tuned) |
 | EfficientNet-B0 | 4.21M | 0.50G | 6.82 | 540 | 198 | _pending_ |
 | Xception | 21.1M | 5.95G | 4.78 | 377 | 560 | _pending_ |
 
