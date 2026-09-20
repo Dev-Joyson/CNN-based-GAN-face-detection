@@ -286,6 +286,7 @@ preprocessing is timed as part of running it.
 | model | params | MACs @256² | **ms @ bs=1** | img/s @144 | peak MB @ bs=1 | test AUC |
 |---|---|---|---|---|---|---|
 | **this model** | 1.02M | 1.20G | **1.34** | 1,564 | 1,301 | **0.973** |
+| this model, no FFT branch | 1.01M | 1.11G | **0.99** | 2,098 | 1,301 | 0.963 (see ablation) |
 | MobileNetV3-Small | 1.01M | **0.07G** | 4.71 | **2,684** | **181** | _pending_ |
 | EfficientNet-B0 | 4.21M | 0.50G | 6.82 | 540 | 198 | _pending_ |
 | Xception | 21.1M | 5.95G | 4.78 | 377 | 560 | _pending_ |
@@ -294,8 +295,8 @@ The honest reading. **Single-image latency: this model wins by 3.5–5×**, incl
 against EfficientNet-B0, which has *half* the MACs — MACs are an indirect metric
 (ShuffleNetV2); depthwise-separable nets are FLOP-cheap and GPU-hostile, this model
 is five plain convs. **It loses MACs (second-worst), peak memory (worst, 7× MobileNet
-— no stride-2 stem, so full-resolution early activations plus a 256² complex FFT
-tensor), and batched throughput (MobileNet's 17× fewer MACs pay off once the GPU is
+— no stride-2 stem, so full-resolution early activations; the FFT tensor is not the
+cause, the no-FFT model peaks identically at bs=1), and batched throughput (MobileNet's 17× fewer MACs pay off once the GPU is
 saturated).** Params: tied with MobileNetV3-Small.
 
 The claim this supports is *the lowest single-image GPU latency at ~1M parameters,
@@ -304,8 +305,14 @@ a different point on the curve, not a dominated one. The ranking is GPU-specific
 on a CPU or phone MobileNet's MAC advantage would likely reverse it.
 
 **The ablation.** `configs/test16_no_fft.yaml` is the headline with the FFT
-branch removed and nothing else changed. The branch is ~9k parameters, 0.9% of
-the model; the test-AUC difference is what the spectrum buys for that.
+branch removed and nothing else changed. The branch is ~9k parameters, 0.9% of the
+model — but **26% of the latency** (0.35 ms: `fft2d`, the magnitude conversion and
+two convs at full 256², none of which a MAC count sees). Measured: with 0.973 /
+1.34 ms, without 0.963 / 0.99 ms. The AUC gap is unconfirmed — the ablation was
+cut off by early stopping at epoch 61 when both runs sat at 0.960, and is being
+resumed with longer patience. The shortcut checks are unchanged without the
+branch (swap 0.880 vs 0.886, attention 0.86 vs 0.86): it does not change where the
+model looks. The question is whether 0.01 AUC is worth 0.35 ms.
 
 ## Results
 

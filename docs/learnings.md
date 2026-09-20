@@ -92,6 +92,11 @@ the README says how things *are*, this says how we found out.
   0.960; the headline found a late climb, the ablation hit six flat epochs first.
   Patience 6 is short for a slow noisy curve. One seed each cannot separate "branch
   helps" from "timing luck". → resume the ablation with patience 15; then seeds.
+- **2026-09-20 — The FFT branch is 0.9% of the params and 26% of the latency.** MACs do not
+  see fft2d, the complex magnitude, or that its convs run at full 256². "Cheap in
+  parameters" and "cheap in time" are different claims. Without it: 0.99 ms, 4.8× MobileNet.
+- **2026-09-20 — The 1.3 GB peak at bs=1 is the spatial stem, not the FFT.** The no-FFT model
+  peaks identically. Earlier attribution corrected.
 - **Latency needs no training; accuracy does.** The efficiency half of the comparison
   can be measured before any baseline is fine-tuned.
 - **Published detectors zero-shot measure generalisation, not architecture.** CNNDetection
