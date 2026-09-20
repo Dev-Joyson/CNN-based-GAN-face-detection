@@ -312,7 +312,7 @@ the model; the test-AUC difference is what the spectrum buys for that.
 | experiment | role | dataset | **test AUC** | val AUC (selection) | run folder |
 |---|---|---|---|---|---|
 | **test16_full** | **headline** — full image, no mask | FFHQ 1024 + FakeMix, 20k/class | **0.9728** (acc 0.91) | 0.9724 (best epoch 85 of 91, early-stopped) | `experiments/test16_full/` |
-| test16_no_fft | ablation — FFT branch removed, else identical | FFHQ 1024 + FakeMix, 20k/class | _pending_ | _pending_ | `experiments/test16_no_fft/` |
+| test16_no_fft | ablation — FFT branch removed, else identical | FFHQ 1024 + FakeMix, 20k/class | 0.9631 (acc 0.90) | 0.9605 (stopped at 61; at 61 the headline was 0.9596 — resume with patience 15 pending) | `experiments/test16_no_fft/` |
 | test13_face | control — `face_only` | FFHQ 1024 + FakeMix, 25k/class | _pending_ | 0.9995 | `experiments/test13_face/` |
 | test14_background | control — `background_only` | FFHQ 1024 + FakeMix, 20k/class | _pending_ | _rerun pending_ | `experiments/test14_background/` |
 

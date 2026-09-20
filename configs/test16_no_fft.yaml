@@ -16,7 +16,8 @@ batch_size: 144
 
 epochs: 150               # was 50 -- still climbing at 50 (val_auc 0.945). Let patience decide.
 lr: 0.0003
-patience: 6
+patience: 15              # was 6, like the headline. Raised for the RESUME only: at epoch 61 both runs sat at 0.960;
+                          # the headline then found a late climb to 0.972 and this one was cut off. Same chance.
 seed: 42
 
 crop_frac_min: 0.85

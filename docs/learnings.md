@@ -87,6 +87,11 @@ the README says how things *are*, this says how we found out.
 - **2026-09-20 — This model is the worst of the four on peak memory at bs=1** (1.3 GB
   vs 181–560 MB): no stride-2 stem, so the first two convs run at 256²/128², plus a
   256² complex FFT tensor. Same root cause as the MACs. Say it, don't hide it.
+- **2026-09-20 — The FFT ablation is confounded by early stopping.** Without the branch:
+  test 0.963, stopped at 61. With: 0.973, stopped at 91. But at epoch 61 both sat at
+  0.960; the headline found a late climb, the ablation hit six flat epochs first.
+  Patience 6 is short for a slow noisy curve. One seed each cannot separate "branch
+  helps" from "timing luck". → resume the ablation with patience 15; then seeds.
 - **Latency needs no training; accuracy does.** The efficiency half of the comparison
   can be measured before any baseline is fine-tuned.
 - **Published detectors zero-shot measure generalisation, not architecture.** CNNDetection
