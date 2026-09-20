@@ -111,6 +111,8 @@ def main():
     ap.add_argument("--config", required=True, help="the HEADLINE config to compare against")
     ap.add_argument("--model", required=True, choices=sorted(MODELS))
     ap.add_argument("--train", action="store_true", help="fine-tune from ImageNet, then evaluate")
+    ap.add_argument("--eval-only", action="store_true",
+                    help="re-run evaluate() on an already fine-tuned baseline (e.g. to add a measurement)")
     ap.add_argument("--resume", action="store_true")
     ap.add_argument("--lr", type=float, default=1e-4, help="fine-tune LR (headline uses 3e-4 from scratch)")
     ap.add_argument("--batch", type=int, default=32)
@@ -121,11 +123,14 @@ def main():
     tcfg, ecfg = baseline_cfgs(cfg, args.model, args.lr, args.batch, args.epochs)
     print(f"baseline {args.model} of {cfg.name} -> {tcfg.run_dir}")
 
+    from evaluate import evaluate
+    if args.eval_only:
+        evaluate(ecfg)
+        return
     if not args.train:
         efficiency_only(ecfg, args.model)
         return
 
-    from evaluate import evaluate
     train(tcfg, resume=args.resume,
           build_fn=lambda c: build_baseline(args.model, c, pretrained=True))
     evaluate(ecfg)

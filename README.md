@@ -298,13 +298,13 @@ preprocessing is timed as part of running it.
 
 **Efficiency, measured — one L4, one session, 2026-09-20:**
 
-| model | params | MACs @256² | **ms @ bs=1** | img/s @144 | peak MB @ bs=1 | test AUC, SG2 | (mix) |
-|---|---|---|---|---|---|---|---|
-| **this model** | 1.02M | 1.20G | **1.34** | 1,564 | 1,301 | **0.964** | 0.973 |
-| this model, no FFT branch | 1.01M | 1.11G | **0.99** | 2,098 | 1,301 | 0.953 | 0.975 |
-| MobileNetV3-Small | 1.01M | **0.07G** | 4.71 | **2,684** | **181** | **0.992** (ImageNet-pretrained, fine-tuned) |
-| EfficientNet-B0 | 4.21M | 0.50G | 6.82 | 540 | 198 | _pending_ |
-| Xception | 21.1M | 5.95G | 4.78 | 377 | 560 | _pending_ |
+| model | params | MACs @256² | **ms @ bs=1, L4** | ms @ bs=1, CPU | img/s @144 | peak MB @ bs=1 | test AUC, SG2 | (mix) |
+|---|---|---|---|---|---|---|---|---|
+| **this model** | 1.02M | 1.20G | **1.34** | _pending_ | 1,564 | 1,301 | **0.964** | 0.973 |
+| this model, no FFT branch | 1.01M | 1.11G | **0.99** | _pending_ | 2,098 | 1,301 | 0.953 | 0.975 |
+| MobileNetV3-Small | 1.01M | **0.07G** | 4.71 | _pending_ | **2,684** | **181** | **0.992** (ImageNet-pretrained, fine-tuned) |
+| EfficientNet-B0 | 4.21M | 0.50G | 6.82 | _pending_ | 540 | 198 | _pending_ |
+| Xception | 21.1M | 5.95G | 4.78 | _pending_ | 377 | 560 | _pending_ |
 
 The honest reading. **Single-image latency: this model wins by 3.5–5×**, including
 against EfficientNet-B0, which has *half* the MACs — MACs are an indirect metric
@@ -317,7 +317,9 @@ saturated).** Params: tied with MobileNetV3-Small.
 The claim this supports is *the lowest single-image GPU latency at ~1M parameters,
 at the cost of more compute and activation memory than mobile-oriented designs* —
 a different point on the curve, not a dominated one. The ranking is GPU-specific;
-on a CPU or phone MobileNet's MAC advantage would likely reverse it.
+on a CPU MobileNet's MAC advantage may reverse it — which is why the CPU column
+exists. It is measured by the same `evaluate.py` on the VM's CPU (plain TF, no XLA,
+n=300); if the order flips there, that is reported, not hidden.
 
 **The ablation — the FFT branch helps only when the task is hard.** Same model with
 the branch removed and nothing else changed, on both datasets:

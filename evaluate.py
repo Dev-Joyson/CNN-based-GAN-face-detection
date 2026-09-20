@@ -329,6 +329,17 @@ def _device_name():
         return "GPU"
 
 
+def _cpu_name():
+    try:
+        with open("/proc/cpuinfo") as f:
+            for line in f:
+                if line.startswith("model name"):
+                    return line.split(":", 1)[1].strip()
+    except Exception:
+        pass
+    return platform.processor() or "unknown"
+
+
 def _peak_memory_mb():
     if not tf.config.list_physical_devices("GPU"):
         return None
@@ -410,6 +421,8 @@ def system_under_test(cfg, warmup, runs):
         policy = None
     return {
         "device": _device_name(),
+        "cpu": _cpu_name(),
+        "cpu_threads": os.cpu_count(),
         "tensorflow": tf.__version__,
         "python": platform.python_version(),
         "platform": platform.platform(),
@@ -480,6 +493,25 @@ def measure_efficiency(model, cfg, ds, warmup=50, runs=1000):
     batch_seconds = (time.perf_counter() - t0) / 10.0
     peak_batch = _peak_memory_mb()
 
+    # CPU, bs=1: the second hardware leg. The GPU ranking favours few large
+    # kernels; a CPU is where MobileNet's 17x fewer MACs should finally count.
+    # If the order flips here, that is the finding. Plain TF on CPU, no XLA
+    # (state it). Fewer runs than the GPU loop -- Xception at 256^2 is
+    # hundreds of ms per image on a Colab CPU -- so p95 rests on ~15 samples;
+    # the median is the number to quote.
+    cpu_runs = 300
+    with tf.device("/CPU:0"):
+        x1_cpu = tf.identity(x1)
+        infer_cpu = tf.function(lambda x: model(x, training=False))
+        for _ in range(10):
+            infer_cpu(x1_cpu).numpy()
+        cpu_times = []
+        for _ in range(cpu_runs):
+            t0 = time.perf_counter()
+            infer_cpu(x1_cpu).numpy()
+            cpu_times.append((time.perf_counter() - t0) * 1000.0)
+    cpu_times = np.array(cpu_times)
+
     macs = count_macs(model)
     eff = {
         "params": int(model.count_params()),
@@ -498,6 +530,13 @@ def measure_efficiency(model, cfg, ds, warmup=50, runs=1000):
         },
         "throughput_img_per_s": round(batch_size / batch_seconds, 1),
         "throughput_batch_size": batch_size,
+        "latency_bs1_ms_cpu": {
+            "median": round(float(np.median(cpu_times)), 2),
+            "mean": round(float(cpu_times.mean()), 2),
+            "p95": round(float(np.percentile(cpu_times, 95)), 2),
+            "runs": cpu_runs,
+            "note": "plain TF on CPU, no XLA; all threads",
+        },
     }
 
     lat = eff["latency_bs1_ms"]
@@ -511,6 +550,9 @@ def measure_efficiency(model, cfg, ds, warmup=50, runs=1000):
     print(f"latency bs=1: {lat['median']:.2f} ms median | {lat['mean']:.2f} mean "
           f"| {lat['p95']:.2f} p95   (n={runs})")
     print(f"throughput  : {eff['throughput_img_per_s']:,.1f} img/s at batch {batch_size}")
+    c = eff["latency_bs1_ms_cpu"]
+    print(f"latency CPU : {c['median']:.1f} ms median | {c['p95']:.1f} p95   "
+          f"(n={cpu_runs}, {sut['cpu_threads']} threads, {sut['cpu']})")
     return eff
 
 
