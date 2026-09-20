@@ -303,7 +303,7 @@ preprocessing is timed as part of running it.
 | model | params | MACs @256² | **ms @ bs=1, L4** | ms @ bs=1, CPU | img/s @144 | peak MB @ bs=1 | test AUC, SG2 | (mix) |
 |---|---|---|---|---|---|---|---|---|
 | **this model** | 1.02M | 1.20G | **1.34** | **8.7** | 1,564 | 1,301 | **0.964** | 0.973 |
-| this model, no FFT branch | 1.01M | 1.11G | **0.99** | _pending_ | 2,098 | 1,301 | 0.953 | 0.975 |
+| this model, no FFT branch | 1.01M | 1.11G | **0.99** | **6.6** | 2,098 | 1,301 | 0.953 | 0.975 |
 | MobileNetV3-Small | 1.01M | **0.07G** | 4.71 | 18.7 | **2,684** | **181** | **0.992** (ImageNet-pretrained, fine-tuned) |
 | EfficientNet-B0 | 4.21M | 0.50G | 6.82 | 39.8 | 540 | 198 | **0.9997** (ImageNet-pretrained, fine-tuned) |
 | Xception | 21.1M | 5.95G | 4.78 | _pending_ | 377 | 560 | _pending_ |
