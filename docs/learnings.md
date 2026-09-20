@@ -19,9 +19,14 @@ the README says how things *are*, this says how we found out.
   images, not the pipeline — GANs under-produce high frequencies (Durall 2020). That is
   the signal, not a shortcut.
 - **2026-09-20 — With the resampling asymmetry removed, the same architecture scores
-  0.973 test AUC (best epoch 85 of 91, early-stopped), not 0.9995.** The gap is
-  roughly how much of the old result was preprocessing. The curve was slow and steady
-  from 0.77 — the shape of learning, not of a shortcut. Accuracy 91%, balanced.
+  0.973 test AUC (best epoch 85 of 91, early-stopped), not 0.9995.** But two things
+  changed at once — the resize fix AND the fakes went from StyleGAN2-only to a
+  StyleGAN1+2 mix — so the gap is their combined effect, not attributable to either
+  alone. Separating them needs a StyleGAN2-only run on the clean pipeline. The curve
+  was slow and steady from 0.77 — the shape of learning, not of a shortcut.
+- **2026-09-20 — A mixed fake set averages two difficulties.** StyleGAN1 has blob and
+  stronger spectral artifacts that StyleGAN2 was designed to remove; 0.973 likely
+  hides an easy SG1 number and a harder SG2 one. Report per-generator AUC.
 - **2026-09-20 — 50 epochs was too few.** The notebook's cap; val_auc was 0.945 and
   climbing at 50, 0.972 at 85. Let patience decide, not the cap.
 - **Separate folders, one generator family: 0.9995 alone proves nothing.** Baselines

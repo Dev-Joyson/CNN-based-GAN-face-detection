@@ -1,7 +1,8 @@
 # GAN-face detection: lightweight dual-branch CNN
 
 Detects StyleGAN1/StyleGAN2 fake faces vs real FFHQ faces with a **1.02M parameter**
-CNN. Both classes are native 1024² and travel the identical resize path.
+CNN. Both classes are native 1024² and travel the identical resize path. Both
+generators are the same family; a held-out generator is still the real test.
 Research angle: **efficiency** — high accuracy at low compute/latency.
 
 ## How it works
