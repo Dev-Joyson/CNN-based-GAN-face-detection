@@ -18,10 +18,12 @@ the README says how things *are*, this says how we found out.
   The residual `highfreq`/`contrast` gap survives an identical resize path, so it is the
   images, not the pipeline — GANs under-produce high frequencies (Durall 2020). That is
   the signal, not a shortcut.
-- **2026-09-19 — With the resampling asymmetry removed, the same architecture scores
-  0.947 test AUC (epoch 50, still rising), not 0.9995.** The gap is roughly how much of
-  the old result was preprocessing. The curve was slow and steady from 0.77 — the
-  shape of learning, not of a shortcut. Accuracy 87%.
+- **2026-09-20 — With the resampling asymmetry removed, the same architecture scores
+  0.973 test AUC (best epoch 85 of 91, early-stopped), not 0.9995.** The gap is
+  roughly how much of the old result was preprocessing. The curve was slow and steady
+  from 0.77 — the shape of learning, not of a shortcut. Accuracy 91%, balanced.
+- **2026-09-20 — 50 epochs was too few.** The notebook's cap; val_auc was 0.945 and
+  climbing at 50, 0.972 at 85. Let patience decide, not the cap.
 - **Separate folders, one generator family: 0.9995 alone proves nothing.** Baselines
   double as a difficulty check; a held-out generator is the real test.
 
@@ -58,10 +60,13 @@ the README says how things *are*, this says how we found out.
   → test-time background swap (with a same-class seam control) and Grad-CAM-in-face
   fraction, both on the trained model, in `evaluate.py`. Also: the "backgrounds look
   different" the panel saw may have been the resampling asymmetry itself.
-- **2026-09-19 — The trained model follows the face, measured.** Swap AUC 0.847 vs
-  control 0.934 (background-following would be ~0.07); Grad-CAM 83% in-face for fakes.
-  Background conflict costs ~0.09 AUC, does not flip it. "Real" evidence is diffuse
-  (in-face 0.54, below uniform); "fake" evidence is localized in the face.
+- **2026-09-20 — The trained model follows the face, measured.** Swap AUC 0.886 vs
+  control 0.968 (background-following would be ~0.03); Grad-CAM 86% in-face for fakes.
+  Background conflict costs ~0.08 AUC, does not flip it. Every check moved further
+  toward the face between epoch 50 and 85 — more training made it more face-focused.
+- **2026-09-20 — A reclaimed VM at the finish line costs nothing.** Best checkpoint on
+  Drive + history.csv = the run; `sort -t, -k6 -g history.csv | tail -1` finds the
+  best epoch and whether patience had already run out. It had. Evaluate, don't resume.
 - **2026-09-19 — TF "peak memory" is what it reserved, not what the model needs.**
   1.3 GB at bs=1 for a 4 MB model is cuDNN/XLA workspace. Comparable across models
   measured the same way; never quote it as a footprint. The checkpoint (12.3 MB) is

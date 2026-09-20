@@ -192,31 +192,37 @@ over the whole test set, per class. Compare to `uniform_baseline` (the ellipse's
 share of the image, ~0.55): well above it means the spatial branch attends to the
 face. Spatial branch only — the FFT branch has no image-space heatmap.
 
-**Result, test16_full at epoch 50 (2026-09-19):**
+**Result, test16_full final (best epoch 85, 2026-09-20):**
 
-| check | value | reading |
-|---|---|---|
-| plain test AUC | 0.947 | reference |
-| control (same-class composites) | 0.934 | seams cost 0.013 — benign |
-| swap, scored by face label | **0.847** | follows the face (background-following would be ~0.07) |
-| attention in face, fakes | **0.83** | vs 0.57 uniform — looks at the face to call fake |
-| attention in face, reals | 0.54 | "realness" evidence is diffuse across the whole image |
+| check | epoch 50 | **epoch 85** | reading |
+|---|---|---|---|
+| plain test AUC | 0.947 | **0.973** | reference |
+| control (same-class composites) | 0.934 | 0.968 | seams cost 0.005 — benign |
+| swap, scored by face label | 0.847 | **0.886** | follows the face (background-following would be ~0.03) |
+| attention in face, fakes | 0.83 | **0.86** | vs 0.57 uniform — looks at the face to call fake |
+| attention in face, reals | 0.54 | 0.60 | now above uniform |
 
-The decision follows the face. A conflicting background costs ~0.09 AUC; it does
-not flip the prediction. Roughly: 90% face, 10% background.
+The decision follows the face, and **every check moved further toward the face
+with more training** — the model became more face-focused, not less, as it
+improved. A conflicting background costs ~0.08 AUC and does not flip the
+prediction. Roughly: 90% face, 10% background.
 
 ### Efficiency numbers
 
 The same command also prints, and writes into `eval.json`:
 
 ```
-device      : NVIDIA L4  (TF 2.20.0, XLA)                         measured 2026-09-19
+device      : NVIDIA L4  (TF 2.20.0, XLA)                         measured 2026-09-20
 params      : 1,020,417  (4.08 MB fp32 weights; checkpoint 12.33 MB incl. optimizer)
 MACs        : 1.199 G per image at 256^2  (FLOPs ~= 2.40 G)
-peak memory : 1301 MB at bs=1 | 7319 MB at bs=144
-latency bs=1: 1.41 ms median | 1.43 mean | 1.57 p95   (n=1000)
-throughput  : 1,555 img/s at batch 144
+peak memory : 1301 MB at bs=1 | 7278 MB at bs=144
+latency bs=1: 1.34 ms median | 1.34 mean | 1.41 p95   (n=1000)   [1.41 / 1.57 on a second L4 session]
+throughput  : 1,564 img/s at batch 144
 ```
+
+Two L4 sessions gave 1.34 and 1.41 ms median — ~5% apart on identical code. That is
+the session-to-session noise floor, and why baselines must be measured in the *same*
+session as the model they are compared with, never across sessions.
 
 Peak memory is what TensorFlow *reserved* (cuDNN/XLA workspace, allocator pool), not
 what a 4 MB model strictly needs — an upper bound, comparable across models measured
@@ -282,7 +288,7 @@ the model; the test-AUC difference is what the spectrum buys for that.
 
 | experiment | role | dataset | **test AUC** | val AUC (selection) | run folder |
 |---|---|---|---|---|---|
-| **test16_full** | **headline** — full image, no mask | FFHQ 1024 + FakeMix, 20k/class | **0.9473** (epoch 50, still climbing — resume pending) | 0.9450 | `experiments/test16_full/` |
+| **test16_full** | **headline** — full image, no mask | FFHQ 1024 + FakeMix, 20k/class | **0.9728** (acc 0.91) | 0.9724 (best epoch 85 of 91, early-stopped) | `experiments/test16_full/` |
 | test16_no_fft | ablation — FFT branch removed, else identical | FFHQ 1024 + FakeMix, 20k/class | _pending_ | _pending_ | `experiments/test16_no_fft/` |
 | test13_face | control — `face_only` | FFHQ 1024 + FakeMix, 25k/class | _pending_ | 0.9995 | `experiments/test13_face/` |
 | test14_background | control — `background_only` | FFHQ 1024 + FakeMix, 20k/class | _pending_ | _rerun pending_ | `experiments/test14_background/` |
