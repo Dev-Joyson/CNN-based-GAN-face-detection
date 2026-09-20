@@ -32,6 +32,7 @@ Only touch `model.py` to change the *method*.
 | `evaluate.py` | Entry point: confusion matrix, ROC, Grad-CAM, efficiency numbers |
 | `predict.py` | Entry point: classify one image — the panel demo. Uses the training preprocessing, so it cannot drift |
 | `baselines.py` | Entry point: Xception / EfficientNet-B0 / MobileNetV3-Small on the identical task (`--model`, `--train`) |
+| `cache_sync.py` | Copy a config's tf.data caches to/from Drive, so a reclaimed VM costs minutes, not a 2-hour rebuild |
 | `distill.py` | Entry point: train this architecture on a fine-tuned baseline's probabilities (`--teacher`), same latency, more accuracy |
 | `audit_dataset.py` | Checks whether the two folders are separable by metadata alone |
 | `configs/*.yaml` | Per-experiment settings |
@@ -142,6 +143,25 @@ shut the lid for a while — it keeps running. Come back, open the terminal agai
 Refreshes itself every 30 s. (If the panel is blank in VS Code, open the same
 notebook at colab.research.google.com — it renders there.) `history.csv` in the
 run folder is the same data as a file, updated every epoch.
+
+**4b. Keep the session alive.** Colab reclaims a VM it considers idle, and a run in the
+terminal does not count as activity — four VMs have been lost during long cache builds
+this way. Run this in a notebook cell and leave it running for the whole session:
+
+```python
+import time
+while True:
+    time.sleep(60)
+```
+
+**4c. Save the caches.** After any run has built them, copy them to Drive once:
+
+```bash
+python cache_sync.py --config configs/test17_sg2.yaml --to-drive
+```
+
+On a fresh VM, `--from-drive` restores them in minutes instead of the 1–2½ hour
+rebuild. Same config, same cache key, same folder name on both sides.
 
 **5. If the VM dies anyway.** Colab deletes VMs on idle and on a maximum lifetime,
 and on Pro nothing running inside the VM can stop that. What survives is on

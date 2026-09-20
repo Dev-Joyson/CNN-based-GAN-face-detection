@@ -158,14 +158,15 @@ def main():
     splits = load_paths(cfg)
     face_mask = feathered_ellipse(cfg.img_size, cfg.mask_rx, cfg.mask_ry, cfg.mask_feather)
     train_paths, train_labels = splits["train"]
+    train_ds = cached_dataset(train_paths, train_labels, cfg, "train")   # the headline's own cache
     if not args.no_extra:
         xp, xl = extra_pool(cfg, splits)
         print(f"extra pool: {xl.count(0)} real + {xl.count(1)} fake unused by the headline")
+        # a separate cache for the extras, concatenated after: the 35k are not
+        # re-read, and the train cache stays shared with train.py
+        train_ds = train_ds.concatenate(cached_dataset(xp, xl, cfg, "extra"))
         train_paths, train_labels = train_paths + xp, train_labels + xl
-    base = {
-        "train": cached_dataset(train_paths, train_labels, cfg, "train" if args.no_extra else "train_extra"),
-        "val":   cached_dataset(*splits["val"], cfg, "val"),
-    }
+    base = {"train": train_ds, "val": cached_dataset(*splits["val"], cfg, "val")}
     print(f"train: {len(train_paths)}   val: {len(splits['val'][0])}")
 
     # --- teacher logits, once, in cache order -----------------------------------------
