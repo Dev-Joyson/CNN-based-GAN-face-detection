@@ -3,14 +3,14 @@
 #          NVIDIA release (100k-generated-images/ffhq-1024x1024/stylegan2-config-f-psi-1.0)
 #   reals: FFHQ 1024x1024
 # Replaces test16_full (StyleGAN1+2 mix, ratio unknown) as the headline. Same
-# pipeline, same 20k/class, same seed. Only the fake folder changed.
+# pipeline, same seed; 25k/class (test16 was 20k). Only the fake folder changed.
 name: test17_sg2
 
 real_dir: "/content/drive/MyDrive/Real(FFHQ)"
 fake_dir: "/content/drive/MyDrive/Fake(SG2-psi1)"
 
 mask_mode: none
-limit_per_class: 20000
+limit_per_class: 25000
 
 img_size: 256
 native_size: 512
