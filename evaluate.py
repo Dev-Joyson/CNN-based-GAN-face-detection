@@ -286,23 +286,28 @@ def attention_in_face(model, ds, face_mask, layer_name, max_images=6000):
     hw = [int(m.shape[0]), int(m.shape[1])]
     frac = {0: [], 1: []}
     seen = 0
+    # The tape keeps every activation of the backbone for the whole chunk.
+    # 144 x 256^2 through EfficientNet-B0 does not fit on 24 GB; 16 does.
+    chunk = 16
     for images, labels in ds:
-        with tf.GradientTape() as tape:
-            conv, preds = grad_model(images, training=False)
-            pf = preds[:, 0]
-            score = tf.where(pf > 0.5, pf, 1.0 - pf)          # toward the predicted class
-        grads = tape.gradient(score, conv)                    # (B, h, w, C)
-        pooled = tf.reduce_mean(grads, axis=(1, 2), keepdims=True)
-        heat = tf.nn.relu(tf.reduce_sum(conv * pooled, axis=-1))   # (B, h, w)
-        heat = tf.image.resize(heat[..., None], hw)[..., 0]        # (B, H, W)
-        total = tf.reduce_sum(heat, axis=(1, 2))
-        inside = tf.reduce_sum(heat * m, axis=(1, 2))
-        ok = total > 1e-6                                     # skip all-zero maps
-        f = (inside / tf.where(ok, total, 1.0)).numpy()
-        for fi, oki, y in zip(f, ok.numpy(), labels.numpy()):
-            if oki:
-                frac[int(y)].append(float(fi))
-        seen += len(f)
+        for i in range(0, int(images.shape[0]), chunk):
+            xb, yb = images[i:i + chunk], labels[i:i + chunk]
+            with tf.GradientTape() as tape:
+                conv, preds = grad_model(xb, training=False)
+                pf = preds[:, 0]
+                score = tf.where(pf > 0.5, pf, 1.0 - pf)      # toward the predicted class
+            grads = tape.gradient(score, conv)                # (b, h, w, C)
+            pooled = tf.reduce_mean(grads, axis=(1, 2), keepdims=True)
+            heat = tf.nn.relu(tf.reduce_sum(conv * pooled, axis=-1))   # (b, h, w)
+            heat = tf.image.resize(heat[..., None], hw)[..., 0]        # (b, H, W)
+            total = tf.reduce_sum(heat, axis=(1, 2))
+            inside = tf.reduce_sum(heat * m, axis=(1, 2))
+            ok = total > 1e-6                                 # skip all-zero maps
+            f = (inside / tf.where(ok, total, 1.0)).numpy()
+            for fi, oki, y in zip(f, ok.numpy(), yb.numpy()):
+                if oki:
+                    frac[int(y)].append(float(fi))
+            seen += len(f)
         if seen >= max_images:
             break
     return {
