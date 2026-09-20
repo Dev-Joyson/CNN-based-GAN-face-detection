@@ -203,18 +203,20 @@ face. Spatial branch only — the FFT branch has no image-space heatmap.
 | attention in face, fakes | 0.83 | 0.86 | 0.78 | vs 0.57 uniform |
 | attention in face, reals | 0.54 | 0.60 | **0.77** | on SG2, reals are judged by the face too |
 
-And against a fine-tuned baseline on the same SG2 test set:
+And against the fine-tuned baselines on the same SG2 test set:
 
-| | this model | MobileNetV3-Small (fine-tuned) |
-|---|---|---|
-| test AUC | 0.964 | **0.992** |
-| control (same-class composites) | 0.963 | 0.977 |
-| swap, scored by face label | **0.896** | 0.764 |
-| drop under a conflicting background | 0.07 | **0.21** |
-| attention in face, real / fake | 0.77 / 0.78 | 0.69 / 0.65 |
+| | this model | MobileNetV3-S | EfficientNet-B0 |
+|---|---|---|---|
+| test AUC | 0.964 | 0.992 | **0.9997** |
+| control (same-class composites) | 0.963 | 0.977 | 0.999 |
+| swap, scored by face label | 0.896 | 0.764 | 0.902 |
+| drop under a conflicting background | **0.07** | 0.21 | 0.10 |
+| attention in face, real / fake | **0.77 / 0.78** | 0.69 / 0.65 | **0.47** / 0.83 |
 
-The pretrained model is more accurate and leans far more on the background — roughly
-75% face / 25% background against ~93 / 7 for this model. Accuracy alone hides that.
+The pretrained models are more accurate and lean more on the background. MobileNet
+loses 0.21 AUC when the background conflicts; EfficientNet, when it calls an image
+*real*, puts less than half its attention inside the face — below uniform. This model
+judges both classes by the face. Accuracy alone hides that.
 
 The decision follows the face, and it did so more firmly as the data got cleaner:
 the swap number rose with training on the mix, and rose again on StyleGAN2 alone.
@@ -300,10 +302,10 @@ preprocessing is timed as part of running it.
 
 | model | params | MACs @256² | **ms @ bs=1, L4** | ms @ bs=1, CPU | img/s @144 | peak MB @ bs=1 | test AUC, SG2 | (mix) |
 |---|---|---|---|---|---|---|---|---|
-| **this model** | 1.02M | 1.20G | **1.34** | _pending_ | 1,564 | 1,301 | **0.964** | 0.973 |
+| **this model** | 1.02M | 1.20G | **1.34** | **8.7** | 1,564 | 1,301 | **0.964** | 0.973 |
 | this model, no FFT branch | 1.01M | 1.11G | **0.99** | _pending_ | 2,098 | 1,301 | 0.953 | 0.975 |
-| MobileNetV3-Small | 1.01M | **0.07G** | 4.71 | _pending_ | **2,684** | **181** | **0.992** (ImageNet-pretrained, fine-tuned) |
-| EfficientNet-B0 | 4.21M | 0.50G | 6.82 | _pending_ | 540 | 198 | _pending_ |
+| MobileNetV3-Small | 1.01M | **0.07G** | 4.71 | 18.7 | **2,684** | **181** | **0.992** (ImageNet-pretrained, fine-tuned) |
+| EfficientNet-B0 | 4.21M | 0.50G | 6.82 | 39.8 | 540 | 198 | **0.9997** (ImageNet-pretrained, fine-tuned) |
 | Xception | 21.1M | 5.95G | 4.78 | _pending_ | 377 | 560 | _pending_ |
 
 The honest reading. **Single-image latency: this model wins by 3.5–5×**, including
@@ -314,12 +316,19 @@ is five plain convs. **It loses MACs (second-worst), peak memory (worst, 7× Mob
 cause, the no-FFT model peaks identically at bs=1), and batched throughput (MobileNet's 17× fewer MACs pay off once the GPU is
 saturated).** Params: tied with MobileNetV3-Small.
 
-The claim this supports is *the lowest single-image GPU latency at ~1M parameters,
-at the cost of more compute and activation memory than mobile-oriented designs* —
-a different point on the curve, not a dominated one. The ranking is GPU-specific;
-on a CPU MobileNet's MAC advantage may reverse it — which is why the CPU column
-exists. It is measured by the same `evaluate.py` on the VM's CPU (plain TF, no XLA,
-n=300); if the order flips there, that is reported, not hidden.
+GPU latencies above are one L4 session (2026-09-20 morning); a second session gave
+1.44 / 5.06 / 8.05 ms for this model / MobileNet / EfficientNet — same order, ~5–15%
+drift, depthwise nets drifting most. **CPU column: 12-thread Xeon @ 2.2 GHz, plain
+TensorFlow, no XLA, n=300.** The order did *not* flip: this model is 2.1× faster than
+MobileNetV3 and 4.6× faster than EfficientNet-B0 on CPU too. Stock TF depthwise
+kernels are poor and the memory-bound structure hurts on both. Caveat, stated: a phone
+running TFLite/XNNPACK has depthwise convs heavily optimised and is where MobileNet was
+designed to win; that was not measured.
+
+The claim this supports is *the lowest single-image latency at ~1M parameters on both
+hardware classes measured, at the cost of more compute and activation memory than
+mobile-oriented designs, and — from scratch — 3 points of AUC against fine-tuned
+pretrained backbones.* A different point on the curve, not a dominated one.
 
 **The ablation — the FFT branch helps only when the task is hard.** Same model with
 the branch removed and nothing else changed, on both datasets:

@@ -116,6 +116,16 @@ the README says how things *are*, this says how we found out.
 - **2026-09-20 — Depthwise nets vary more across sessions than plain convs.** MobileNetV3
   4.71 → 5.48 ms between two L4 VMs; this model 1.34 → 1.42. Launch-bound kernels are
   sensitive to session state. In-session ratios only.
+- **2026-09-20 — The CPU ranking did not flip.** 12-thread Xeon, plain TF: this model
+  8.7 ms, MobileNetV3 18.7, EfficientNet-B0 39.8. I predicted MobileNet's MACs would win
+  on CPU; stock TF depthwise kernels are poor and it did not. Two hardware legs now.
+  Unmeasured and stated: TFLite/XNNPACK on a phone, where depthwise is optimised.
+- **2026-09-20 — EfficientNet-B0 fine-tuned: 0.9997 on SG2.** The ceiling is ~1.0. It
+  judges "real" by what is outside the face (in-face attention 0.47, below uniform).
+  It is the distillation teacher.
+- **2026-09-20 — A 144-image GradientTape through EfficientNet-B0 OOMs on 24 GB.** Grad-CAM
+  attention is computed in chunks of 16 now. Found after a successful fine-tune, not
+  before -- the evaluation is the first thing to test on a new backbone.
 - **Latency needs no training; accuracy does.** The efficiency half of the comparison
   can be measured before any baseline is fine-tuned.
 - **Published detectors zero-shot measure generalisation, not architecture.** CNNDetection
