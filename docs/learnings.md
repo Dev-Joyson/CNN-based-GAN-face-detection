@@ -93,12 +93,13 @@ the README says how things *are*, this says how we found out.
 - **2026-09-20 — This model is the worst of the four on peak memory at bs=1** (1.3 GB
   vs 181–560 MB): no stride-2 stem, so the first two convs run at 256²/128², plus a
   256² complex FFT tensor. Same root cause as the MACs. Say it, don't hide it.
-- **2026-09-20 — The FFT branch buys nothing in-domain.** Without it: test 0.975 at
-  0.99 ms. With: 0.973 at 1.34 ms. A first pass showed the branch +0.010 ahead — an
-  early-stopping artefact: patience 6 cut the ablation off at epoch 61 when both runs
-  sat at 0.960; with patience 15 it climbed to 0.975. Patience is short for slow noisy
-  curves; a single-seed gap of 0.01 is not a finding. Its remaining case is a held-out
-  generator.
+- **2026-09-20 — The FFT branch helps only when the task is hard.** Mix: 0.973 with vs
+  0.975 without — nothing. StyleGAN2 alone: 0.964 vs 0.953, +2 pts accuracy, best epoch
+  25 sooner, gap consistent from epoch 40 on. Where convs have an easy cue the branch
+  is redundant; where they don't, it contributes. One seed — seed 43 confirms or kills
+  it. (A first mix pass showed a spurious +0.010: patience-6 early stopping. Patience
+  is 15 now; a single-seed endpoint gap is not a finding, a 60-epoch consistent gap is
+  closer to one.)
 - **2026-09-20 — The FFT branch is 0.9% of the params and 26% of the latency.** MACs do not
   see fft2d, the complex magnitude, or that its convs run at full 256². "Cheap in
   parameters" and "cheap in time" are different claims. Without it: 0.99 ms, 4.8× MobileNet.

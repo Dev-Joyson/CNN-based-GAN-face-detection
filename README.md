@@ -288,7 +288,7 @@ preprocessing is timed as part of running it.
 | model | params | MACs @256² | **ms @ bs=1** | img/s @144 | peak MB @ bs=1 | test AUC, SG2 | (mix) |
 |---|---|---|---|---|---|---|---|
 | **this model** | 1.02M | 1.20G | **1.34** | 1,564 | 1,301 | **0.964** | 0.973 |
-| this model, no FFT branch | 1.01M | 1.11G | **0.99** | 2,098 | 1,301 | _running_ | 0.975 |
+| this model, no FFT branch | 1.01M | 1.11G | **0.99** | 2,098 | 1,301 | 0.953 | 0.975 |
 | MobileNetV3-Small | 1.01M | **0.07G** | 4.71 | **2,684** | **181** | _pending_ |
 | EfficientNet-B0 | 4.21M | 0.50G | 6.82 | 540 | 198 | _pending_ |
 | Xception | 21.1M | 5.95G | 4.78 | 377 | 560 | _pending_ |
@@ -306,29 +306,39 @@ at the cost of more compute and activation memory than mobile-oriented designs* 
 a different point on the curve, not a dominated one. The ranking is GPU-specific;
 on a CPU or phone MobileNet's MAC advantage would likely reverse it.
 
-**The ablation — the FFT branch buys nothing in-domain.** `configs/test16_no_fft.yaml`
-is the headline with the branch removed and nothing else changed. Result: **with
-0.973 / 1.34 ms, without 0.975 / 0.99 ms.** Same accuracy, 26% less latency. The
-branch is 0.9% of the parameters but a quarter of the time — `fft2d`, the magnitude
-conversion and two convs at full 256², none of which a MAC count sees. The shortcut
-checks are unchanged without it (swap 0.880 vs 0.886, attention 0.86 vs 0.86): it
-does not change where the model looks either.
+**The ablation — the FFT branch helps only when the task is hard.** Same model with
+the branch removed and nothing else changed, on both datasets:
 
-A first pass showed a 0.010 gap in the branch's favour. It was an artefact: the
-ablation was cut off by patience-6 early stopping at epoch 61, when both runs sat
-at 0.960; given patience 15 it climbed to 0.975. Patience is 15 in every config now.
+| dataset | with FFT | without | Δ AUC | best epoch (with / without) |
+|---|---|---|---|---|
+| StyleGAN1+2 mix (easy) | 0.973 | 0.975 | −0.002 | 85 / 102 |
+| **StyleGAN2 only (hard)** | **0.964** | **0.953** | **+0.011** | 89 / 114 |
 
-What this leaves open is the branch's real claim from the literature — that
-frequency features *generalise* to generators the model never saw. That is a
-held-out-generator test, not an in-domain one, and it is the only remaining reason
-to keep the branch.
+On the mix — where StyleGAN1's blob artifacts give plain convs an easy handle — the
+branch is redundant. On StyleGAN2 alone, where the audit finds no easy cue, it buys
+0.011 AUC and 2 points of accuracy (fake recall 0.88 vs 0.83), and the model reaches
+its best epoch 25 epochs sooner. The gap opened around epoch 40 and held at
+0.02–0.03 for the rest of the curve; it is not an endpoint artefact. **One seed each
+— seed 43 for both variants is the confirmation.**
+
+The cost: 0.9% of the parameters, **26% of latency** (0.37 ms — `fft2d`, the magnitude
+conversion and two convs at full 256², none of which a MAC count sees), and 26% of
+training step time. The shortcut checks are the same shape with or without it
+(swap 0.896 vs 0.883): it adds a signal, it does not change where the model looks.
+
+A first pass on the mix showed a spurious +0.010 for the branch — patience-6 early
+stopping cut the ablation off mid-climb. Patience is 15 in every config now.
+
+Still open: whether the branch *generalises* better to a generator the model never
+saw (the literature's actual claim), and whether it helps more on native-resolution
+input, where the frequencies it was designed for have not been resized away.
 
 ## Results
 
 | experiment | role | dataset | **test AUC** | val AUC (selection) | run folder |
 |---|---|---|---|---|---|
 | **test17_sg2** | **headline** — full image, no mask | FFHQ 1024 + StyleGAN2 ψ=1.0 (NVIDIA), 25k/class | **0.9636** (acc 0.90) | 0.9645 (best epoch 89 of 104, early-stopped) | `experiments/test17_sg2/` |
-| test17_sg2_no_fft | ablation — FFT branch removed | same | _running_ | | `experiments/test17_sg2_no_fft/` |
+| test17_sg2_no_fft | ablation — FFT branch removed | same | 0.9527 (acc 0.88) | 0.9503 (best epoch 114, killed at 116 while grinding) | `experiments/test17_sg2_no_fft/` |
 | test16_full | *preliminary* — StyleGAN1+2 mix, ratio unknown | FFHQ 1024 + FakeMix, 20k/class | 0.9728 (acc 0.91) | 0.9724 (best 85 of 91) | `experiments/test16_full/` |
 | test16_no_fft | *preliminary* ablation on the mix | same | 0.9751 (acc 0.91) | 0.9748 (patience 15; stopped at 101) | `experiments/test16_no_fft/` |
 | test13_face | control — `face_only` | FFHQ 1024 + FakeMix, 25k/class | _pending_ | 0.9995 | `experiments/test13_face/` |
