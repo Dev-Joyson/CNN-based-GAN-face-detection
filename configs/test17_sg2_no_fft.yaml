@@ -1,0 +1,34 @@
+# Ablation of test17_sg2: identical except the FFT branch is removed.
+# On the SG1+2 mix the branch bought nothing in-domain; SG2 alone has weaker
+# spectral artifacts, so it is run again rather than assumed.
+#   fakes: StyleGAN2 config-f, FFHQ 1024x1024, psi=1.0, seeds 0-39999, official
+#          NVIDIA release (100k-generated-images/ffhq-1024x1024/stylegan2-config-f-psi-1.0)
+#   reals: FFHQ 1024x1024
+# Replaces test16_full (StyleGAN1+2 mix, ratio unknown) as the headline. Same
+# pipeline, same 20k/class, same seed. Only the fake folder changed.
+name: test17_sg2_no_fft
+fft_branch: false
+
+real_dir: "/content/drive/MyDrive/Real(FFHQ)"
+fake_dir: "/content/drive/MyDrive/Fake(SG2-psi1)"
+
+mask_mode: none
+limit_per_class: 20000
+
+img_size: 256
+native_size: 512
+batch_size: 144
+
+epochs: 150               # let patience decide
+lr: 0.0003
+patience: 15              # 6 cut the test16 ablation off mid-climb; both runs sat at 0.960 at epoch 61
+seed: 42
+
+crop_frac_min: 0.85
+shuffle_buffer: 8192         # train split is 28000; a full-set buffer would be ~5.5 GB of
+                             # uint8 images in RAM -- too much for a standard Colab runtime.
+                             # Raise toward 28000 on a high-RAM runtime if you want the
+                             # notebook's whole-set shuffle.
+
+cache_dir: "/content/cache"
+out_dir: "/content/drive/MyDrive/Research/experiments"
