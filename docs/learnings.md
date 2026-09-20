@@ -74,6 +74,14 @@ the README says how things *are*, this says how we found out.
 - **Baselines compare on the headline task, never on a masked one.** Xception is the
   field standard (FaceForensics++); EfficientNet-B0 is the real rival; MobileNetV3 is the
   one a panel will ask about. Fine-tune fully, `preprocess_input` inside each model.
+- **2026-09-20 — MACs predicted the latency ranking wrong.** EfficientNet-B0 has half
+  this model's MACs and is 5× slower at bs=1; MobileNetV3-S has 17× fewer and is 3.5×
+  slower. Depthwise-separable = many tiny launch-bound kernels; five plain convs = few
+  fat ones. At batch 144 the order partly reverses (MobileNet 2,684 img/s vs 1,564).
+  The claim must name the regime: single-image GPU latency.
+- **2026-09-20 — This model is the worst of the four on peak memory at bs=1** (1.3 GB
+  vs 181–560 MB): no stride-2 stem, so the first two convs run at 256²/128², plus a
+  256² complex FFT tensor. Same root cause as the MACs. Say it, don't hide it.
 - **Latency needs no training; accuracy does.** The efficiency half of the comparison
   can be measured before any baseline is fine-tuned.
 - **Published detectors zero-shot measure generalisation, not architecture.** CNNDetection

@@ -280,6 +280,28 @@ the same `train()` loop. Each backbone's ImageNet preprocessing is a layer insid
 the model — the data pipeline is byte-identical for every model, and the
 preprocessing is timed as part of running it.
 
+**Efficiency, measured — one L4, one session, 2026-09-20:**
+
+| model | params | MACs @256² | **ms @ bs=1** | img/s @144 | peak MB @ bs=1 | test AUC |
+|---|---|---|---|---|---|---|
+| **this model** | 1.02M | 1.20G | **1.34** | 1,564 | 1,301 | **0.973** |
+| MobileNetV3-Small | 1.01M | **0.07G** | 4.71 | **2,684** | **181** | _pending_ |
+| EfficientNet-B0 | 4.21M | 0.50G | 6.82 | 540 | 198 | _pending_ |
+| Xception | 21.1M | 5.95G | 4.78 | 377 | 560 | _pending_ |
+
+The honest reading. **Single-image latency: this model wins by 3.5–5×**, including
+against EfficientNet-B0, which has *half* the MACs — MACs are an indirect metric
+(ShuffleNetV2); depthwise-separable nets are FLOP-cheap and GPU-hostile, this model
+is five plain convs. **It loses MACs (second-worst), peak memory (worst, 7× MobileNet
+— no stride-2 stem, so full-resolution early activations plus a 256² complex FFT
+tensor), and batched throughput (MobileNet's 17× fewer MACs pay off once the GPU is
+saturated).** Params: tied with MobileNetV3-Small.
+
+The claim this supports is *the lowest single-image GPU latency at ~1M parameters,
+at the cost of more compute and activation memory than mobile-oriented designs* —
+a different point on the curve, not a dominated one. The ranking is GPU-specific;
+on a CPU or phone MobileNet's MAC advantage would likely reverse it.
+
 **The ablation.** `configs/test16_no_fft.yaml` is the headline with the FFT
 branch removed and nothing else changed. The branch is ~9k parameters, 0.9% of
 the model; the test-AUC difference is what the spectrum buys for that.
