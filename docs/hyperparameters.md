@@ -1,41 +1,63 @@
-# Hyperparameters — where each value came from, and why
+# Hyperparameters — justified as *tried* or *cited*, nothing else
 
-One row per value that appears in a config. Three honest categories:
+The panel's standard (2026-09-21): every value is either **(a) tried** — swept
+against alternatives on this data and chosen because it won — or **(b) cited** —
+taken from a paper that reports it works, ideally on a related task. "Inherited
+from the notebook" and "reasonable default" do not qualify. This table says which
+of the two each value has, or what it needs.
 
-- **inherited** — from the original notebooks (Test11 → Test16). The choice
-  predates this repo; the justification is the notebook author's, stated here
-  as best understood, and the value is kept for comparability with every result
-  so far.
-- **principled** — chosen for a stated reason, with a source or a measurement.
-- **untuned default** — a reasonable value that was *not* swept. Say so; the
-  column on the right says what a sweep would cost.
+Status: **✓ passes**, **~ partly** (citable range, but the exact value is not from the
+paper), **✗ needs a sweep**.
 
-| parameter | value | category | why | tuned? |
+| parameter | value | status | justification (tried / cited) | what closes the gap |
 |---|---|---|---|---|
-| `img_size` | 256 | principled | Compute scales with pixels: this model is 1.2 G MACs at 256², would be 4.8 G at 512². The whole efficiency table lives at 256². Cost: the resize is a low-pass that deletes most of the GAN fingerprint (post-pipeline `highfreq` AUC 0.52) — see the native-crop experiment. | No; crop experiment tests the alternative at equal compute |
-| `native_size` | 512 | inherited | Notebook's "normalize native resolution" step, needed when reals were 512 and fakes 1024. Both are 1024 now, so it is a redundant second downsample. Kept for comparability; `native_size: 1024` (identity) is a one-line variant for the crop experiment. | No |
-| `limit_per_class` | 25,000 | constraint | Data/units budget. 20k converged smoothly (test16); 25k for the SG2 runs. The pools hold 70k / 40k; distillation uses the rest. | No; more data is lever 4 |
-| `batch_size` | 144 | inherited, constraint | The notebook's value; it is the largest batch of 256² images this model fits on a 20 GB GPU with room (17 GB used). Larger batches use the GPU better; 144 was a memory ceiling, not a search. Baselines train at 32 because Xception at 256² does not fit 144 with gradients. | No |
-| `lr` | 3e-4 | inherited | Adam with 3e-4 is the widely used from-scratch CNN default (Kingma & Ba's paper default is 1e-3; 3e-4 is the common conservative choice). Empirically fine: converged to 0.964 without divergence. The nine-epoch plateau on SG2 suggests warmup/cosine would help — that is the v2 recipe, lever 3. | No |
-| baseline `lr` | 1e-4 | principled | Fine-tuning a pretrained backbone uses a lower LR than training from scratch, to not destroy pretrained features (standard transfer-learning practice; Keras' own guide uses 1e-5–1e-4). | No |
-| `epochs` | 150 | principled | A cap that early stopping decides under. 50 (the notebook) was hit while still climbing (test16: 0.945 at 50 → 0.972 at 85). Never reached since. | n/a |
-| `patience` | 15 | measured | 6 (the notebook) cut the test16 ablation off at epoch 61 when both runs sat at 0.960; with 15 it climbed to 0.975. Slow noisy curves need a longer window. | Effectively yes (6 → 15) |
-| `seed` | 42 | convention | Any fixed value works; what matters is that it is fixed, reported, and drives both the split and the init. Seeds 43/44 are the planned ± on the headline. | n/a |
-| `crop_frac_min` | 0.85 | inherited | Test16 changed it from 0.95; random crop keeps 85–100% of the side. Mild translation/scale augmentation. | No |
-| `shuffle_buffer` | 8,192 | constraint | ~1.6 GB of cached uint8 in RAM. The notebook shuffled the whole set (fits at 16k images, not at 35k on a standard runtime). | No |
-| blur / JPEG aug | p=0.3 each, JPEG q 60–100 | inherited | Robustness to real-world degradation and a defence against a compression shortcut. Suspected of *deleting* StyleGAN2's fine artifacts in a third of training images — untested; a legitimate ablation. | No |
-| dropout | 0.4 | inherited | On the 128-unit fusion layer. Notebook value. | No |
-| mask ellipse | rx 0.38, ry 0.48, feather 0.05 | inherited | The notebook's cv2 ellipse for aligned FFHQ faces; feather avoids a hard edge. Used only by the face/background controls and the shortcut checks. | No |
-| architecture widths | 32-64-128-256-256, Dense 128, FFT 16-32 | inherited | The notebook's design. Its cost profile (no stride-2 stem → 1.2 G MACs, 1.3 GB peak) is measured and discussed; the FFT branch is ablated. | Widths: no |
-| **distill** `temperature` | 2.0 | untuned default | Hinton et al. 2015 use T in 1–20. The teacher is at 0.9997 AUC, so its probabilities sit near 0/1; T>1 spreads them so the ranking among confident cases survives. 2 is a conservative common value. | **No — sweep {1, 2, 4}: ~1 h each with caches on Drive and `init: true`** |
-| **distill** `alpha` | 0.7 | untuned default | Weight on the soft term; Hinton recommends weighting it more than the hard term. 0.5–0.9 is the usual range. | **No — sweep {0.5, 0.7, 0.9}, same cost** |
-| **distill** `extra` | false | principled | The MobileNet result showed the gap is the training regime, not the data ceiling; the unused images are labelled and free. Taken *balanced* — 15k per class, all the spare fakes — so training is 65k, evenly split (the raw leftovers are 45k/15k). Joyson chose `false` first: the clean soft-vs-hard comparison on the same 35k. `true` is the follow-up. | Both to be run |
-| **distill** `init` | false | principled | From scratch keeps "same model, soft labels vs hard" a one-variable comparison against 0.964. `true` (warm start) is cheaper and likely as good; run second. | Both to be run |
-| **distill** `teachers` | efficientnet_b0 | measured | Highest test AUC of the three (0.9997 vs 0.9987 / 0.992). Averaging all three is an option. | No |
+| `img_size` | 256 | ✓ tried + cited | Compute scales with pixels (1.2 G MACs at 256², 4.8 G at 512²); the efficiency claim needs a fixed budget. Wang et al. 2020 (CNNDetection) train on 224² crops. The native-crop experiment tests the alternative *at equal compute*. | crop experiment (planned) |
+| `native_size` | 512 | ✗ | Redundant now that both classes are 1024². No paper, no sweep. | one run with `native_size: 1024` (single resize); expect no change; then keep whichever is simpler |
+| `limit_per_class` | 25,000 | ~ | Budget. Bouthillier et al. 2021: split variance dominates; more data mostly buys stability. | lever 4 (40k) gives the second point |
+| `batch_size` | 144 | ~ constraint | Largest batch of 256² images that fits the 20 GB L4 with this model (17 GB used). Goyal et al. 2017: batch and LR scale together; at fixed LR, larger batch = better GPU use, not different optimum. | sweep {48, 96, 144} at fixed LR — 3 runs — OR state the memory constraint plainly (panels accept this) |
+| `lr` | 3e-4 | ~ | Kingma & Ba 2015 recommend Adam with 1e-3 default; 3e-4 is the widely used conservative value for from-scratch CNNs. Converged without divergence. **Not swept.** | **sweep {1e-4, 3e-4, 1e-3} — 3 runs, ~1.5 h each** (or adopt cosine+warmup, cited: Loshchilov & Hutter 2017, Goyal et al. 2017 — the v2 recipe) |
+| baseline `lr` | 1e-4 | ✓ cited | Fine-tuning a pretrained backbone: an order of magnitude below from-scratch, to preserve pretrained features (Keras transfer-learning guide uses 1e-5–1e-4; Yosinski et al. 2014). | — |
+| `epochs` | 150 | ✓ tried | A cap under early stopping; 50 was hit mid-climb (test16: 0.945 → 0.972 by 85). Never reached since. | — |
+| `patience` | 15 | ✓ tried | 6 cut the test16 ablation off at epoch 61 at 0.960; 15 let it reach 0.975. Prechelt 1998 on early-stopping criteria. | — |
+| early-stopping metric | val AUC | ✓ cited | Threshold-free; the metric reported. Prechelt 1998. | — |
+| `seed` | 42 | ✓ n/a | Not a tuned value; must be fixed and reported. Bouthillier et al. 2021: report variation across seeds. | seeds 43, 44 (planned) |
+| `crop_frac_min` | 0.85 | ✗ | Random-resized-crop is standard (Szegedy et al. 2015 use 8–100% area); 0.85 is the notebook's. | fold into the augmentation sweep below, or cite Szegedy's range and adopt a value from it |
+| blur / JPEG aug | p=0.3 each; JPEG q 60–100; blur 3×3 avg | ~ cited | **Wang et al. 2020 (CNNDetection)** use exactly these two augmentations for GAN detection: Gaussian blur σ~U[0,3] and JPEG quality~U[30,100], each with p=0.5 (also a p=0.1 variant), and show they are what makes detection generalise. Our values differ (p=0.3, q≥60, box blur). | **either adopt Wang's values (cited) or sweep {off, ours, Wang's} — 3 runs.** Suspected of deleting SG2's fine artifacts; the sweep answers that too |
+| dropout | 0.4 | ~ cited | Srivastava et al. 2014: 0.5 for fully-connected hidden units. 0.4 is the notebook's. | adopt 0.5 (cited) or sweep {0.2, 0.4, 0.5} |
+| `shuffle_buffer` | 8,192 | ✓ n/a | Engineering, not a model hyperparameter: RAM-bounded (1.6 GB). Any buffer ≥ a few batches gives adequate mixing. | — |
+| mask ellipse | rx .38, ry .48, feather .05 | ✓ n/a | Geometry of FFHQ's fixed alignment (Karras et al. 2019); chosen visually to cover the face. Used only by the controls and shortcut checks, not by the headline model. | — |
+| architecture | 32-64-128-256-256, Dense 128, FFT 16-32 | ~ | Doubling widths per stage is the VGG scheme (Simonyan & Zisserman 2014) at half width, sized to a ~1M-param budget. The FFT branch is ablated (tried). Widths and depth are not. | width/depth are design, defended by the parameter budget and the ablation; a width sweep is lever-3 territory (v2) |
+| **distill** `temperature` | 2.0 | ~ cited | **Hinton, Vinyals & Dean 2015**: temperatures 1–20 tried; for small students, 2.5–4 worked best; T>1 needed when the teacher is near 0/1 (ours: 0.9997 AUC). 2 is at the low end of their range. | **sweep {1, 2, 4} — 3 runs, ~1 h each with caches on Drive and `init: true`** |
+| **distill** `alpha` | 0.7 | ~ cited | Hinton et al. 2015: "considerably lower weight" on the hard-label term than the soft one, i.e. alpha > 0.5. 0.7 is within that, not their number. | **sweep {0.5, 0.7, 0.9} at the best T — 3 runs** |
+| **distill** `extra` | false | ✓ tried (by design) | Joyson's call: one-variable comparison vs test17 first; `true` (balanced +30k) second. | `true` run (planned) |
+| **distill** `init` | false | ✓ by design | From scratch keeps soft-vs-hard a one-variable change. `true` is the cheaper variant for the sweeps. | — |
+| **distill** `teachers` | efficientnet_b0 | ✓ tried | Highest test AUC of the three fine-tuned baselines (0.9997 / 0.9987 / 0.992). | averaging all three is a cheap extra run |
 
-## The honest summary for a panel
+## Sweep plan, in priority order (what the panel will ask about first)
 
-Most training values are the notebook's, kept for comparability, and were not
-searched. Two were changed on evidence (epoch cap, patience). The distillation
-values are literature defaults and are the ones most worth sweeping — cheap once
-the caches are in Drive. The architecture is ablated, not tuned.
+| sweep | runs | GPU h | why first |
+|---|---|---|---|
+| distill T {1,2,4} then alpha {0.5,0.9} | 5 | ~5 | the headline's improvement rests on these two numbers |
+| `lr` {1e-4, 3e-4, 1e-3} | 3 | ~4.5 | the most-asked hyperparameter; also decides whether v2's schedule is needed |
+| augmentation {off, ours, Wang 2020} | 3 | ~4.5 | citable either way; tests the "JPEG deletes the artifacts" suspicion |
+| `batch` {48, 96, 144} | 3 | ~4.5 | or accept the memory-constraint justification and skip |
+| dropout, crop range | — | — | adopt the cited values (0.5; Szegedy's range) rather than sweep |
+
+Roughly 20 GPU hours for the top three. Each sweep is a config per value, run by
+`train.py`, one row each in the results table. With caches in Drive, no run pays a
+rebuild.
+
+## References
+
+- Kingma & Ba 2015, *Adam: A Method for Stochastic Optimization*.
+- Hinton, Vinyals & Dean 2015, *Distilling the Knowledge in a Neural Network*.
+- Wang, Wang, Zhang, Owens & Efros 2020, *CNN-generated images are surprisingly easy to spot… for now* (CVPR) — blur+JPEG augmentation for GAN detection.
+- Srivastava et al. 2014, *Dropout: A Simple Way to Prevent Neural Networks from Overfitting* (JMLR).
+- Simonyan & Zisserman 2014, *Very Deep Convolutional Networks* (VGG).
+- Szegedy et al. 2015, *Going Deeper with Convolutions* — random-resized crop.
+- Goyal et al. 2017, *Accurate, Large Minibatch SGD* — batch/LR scaling, warmup.
+- Loshchilov & Hutter 2017, *SGDR* — cosine schedule.
+- Prechelt 1998, *Early Stopping — But When?*
+- Yosinski et al. 2014, *How transferable are features in deep neural networks?*
+- Bouthillier et al. 2021, *Accounting for Variance in Machine Learning Benchmarks* (MLSys).
+- Karras, Laine & Aila 2019, *A Style-Based Generator Architecture* — FFHQ alignment.
