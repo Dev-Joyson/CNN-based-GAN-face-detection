@@ -354,6 +354,19 @@ hardware classes measured, at the cost of more compute and activation memory tha
 mobile-oriented designs, and — from scratch — 3 points of AUC against fine-tuned
 pretrained backbones.* A different point on the curve, not a dominated one.
 
+**Distillation (test18 / 18c) — closed, negative, with the reason.** Two teachers,
+EfficientNet-B0 (4.2M, 0.9997) and MobileNetV3-Small (the student's size, 0.992),
+both made the from-scratch student *worse*: 0.923 and 0.901 against 0.964, and both
+students imported the teacher's background reliance (swap drop 0.21 / 0.18 vs 0.07).
+Calibrating the teacher found nothing to fix (T_cal 1.10). What was wrong is the
+setup, which the literature says fails: teacher scores computed once on clean images
+while the student trains on augmented views of them (inconsistent views — Beyer et al.
+2022), scores that are in-sample for the teacher and therefore near-hard, and a
+target that depends on background features the student is built not to use. The
+proper form — online distillation, teacher on the same augmented batch, out-of-sample
+data, long schedule — is implemented as `online: true` and reserved for whichever
+input pipeline wins the crop experiment.
+
 **The ablation — the FFT branch helps only when the task is hard.** Same model with
 the branch removed and nothing else changed, on both datasets:
 
@@ -389,7 +402,7 @@ input, where the frequencies it was designed for have not been resized away.
 | test17_sg2_no_fft | ablation — FFT branch removed | same | 0.9527 (acc 0.88) | 0.9503 (best epoch 114, killed at 116 while grinding) | `experiments/test17_sg2_no_fft/` |
 | test18_distill | distillation, raw EfficientNet-B0 teacher, T=2, same 35k | same | 0.9226 (acc 0.84) — **worse**; swap drop 0.21 | 0.9123 (best 104, killed at 111) | `experiments/test18_distill/` |
 | test18b_distill_cal | distillation, teacher calibrated first (Guo 2017) | same | not run: T_cal = 1.10 — the teacher is not miscalibrated, it is near-perfect (val 0.013 / 0.995 and right that often) | | — |
-| test18c_distill_mnv3 | distillation, **MobileNetV3-Small teacher** (student's size, 0.992) | same | _running_ | | `experiments/test18c_distill_mnv3/` |
+| test18c_distill_mnv3 | distillation, MobileNetV3-Small teacher (student's size, 0.992) | same | 0.9014 (acc 0.80) — **worse**; swap drop 0.18 | 0.904 (best 63, killed at 64) | `experiments/test18c_distill_mnv3/` |
 | test16_full | *preliminary* — StyleGAN1+2 mix, ratio unknown | FFHQ 1024 + FakeMix, 20k/class | 0.9728 (acc 0.91) | 0.9724 (best 85 of 91) | `experiments/test16_full/` |
 | test16_no_fft | *preliminary* ablation on the mix | same | 0.9751 (acc 0.91) | 0.9748 (patience 15; stopped at 101) | `experiments/test16_no_fft/` |
 | test13_face | control — `face_only` | FFHQ 1024 + FakeMix, 25k/class | _pending_ | 0.9995 | `experiments/test13_face/` |

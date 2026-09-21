@@ -142,6 +142,12 @@ the README says how things *are*, this says how we found out.
   the time. My diagnosis (saturation) was wrong. There is simply no dark knowledge on
   this task at 256² for a teacher that has solved it. What remains is the size gap
   (test18c, MobileNet teacher) or no gain at all from distillation here.
+- **2026-09-21 — Distillation closed: two teachers, both worse.** MobileNetV3 teacher
+  (the student's size): 0.901, swap drop 0.18, real-recall 0.68. With EfficientNet:
+  0.923, drop 0.21. Not a size-gap problem. The setup was the literature's failure
+  case (Beyer et al. 2022): offline clean-image scores vs augmented student views,
+  in-sample teacher labels, and a background-dependent target. Online distillation on
+  the winning pipeline is the one remaining attempt; crops first.
 - **Latency needs no training; accuracy does.** The efficiency half of the comparison
   can be measured before any baseline is fine-tuned.
 - **Published detectors zero-shot measure generalisation, not architecture.** CNNDetection
