@@ -566,8 +566,11 @@ def measure_efficiency(model, cfg, ds, warmup=50, runs=1000):
 def evaluate(cfg):
     model = load_run_model(cfg)
     ds = build_datasets(cfg)
+    # a JPEG probe writes beside the clean results, never over them
+    sfx = f"_jpeg{cfg.eval_jpeg}" if cfg.eval_jpeg else ""
 
-    print(f"=== eval {cfg.name} | mask_mode={cfg.mask_mode} ===")
+    print(f"=== eval {cfg.name} | mask_mode={cfg.mask_mode}"
+          + (f" | EVAL JPEG q={cfg.eval_jpeg} on both classes" if cfg.eval_jpeg else "") + " ===")
 
     # first, on a clean device: peak memory should reflect inference, not the
     # GradientTape that Grad-CAM allocates later
@@ -576,9 +579,9 @@ def evaluate(cfg):
     y_true, y_score = predict_split(model, ds["test"])
     y_pred = (y_score > 0.5).astype(int)
 
-    cm = plot_confusion(y_true, y_pred, os.path.join(cfg.run_dir, "confusion_matrix.png"))
-    roc_auc = plot_roc(y_true, y_score, os.path.join(cfg.run_dir, "roc.png"))
-    layer_name = plot_gradcam(model, ds["test"], os.path.join(cfg.run_dir, "gradcam.png"))
+    cm = plot_confusion(y_true, y_pred, os.path.join(cfg.run_dir, f"confusion_matrix{sfx}.png"))
+    roc_auc = plot_roc(y_true, y_score, os.path.join(cfg.run_dir, f"roc{sfx}.png"))
+    layer_name = plot_gradcam(model, ds["test"], os.path.join(cfg.run_dir, f"gradcam{sfx}.png"))
 
     face_mask = feathered_ellipse(cfg.img_size, cfg.mask_rx, cfg.mask_ry, cfg.mask_feather)
     if cfg.input_mode == "crop":
@@ -616,7 +619,9 @@ def evaluate(cfg):
         "shortcut_checks": {"attention_in_face": attention, "background_swap": swap},
         "efficiency": eff,
     }
-    with open(os.path.join(cfg.run_dir, "eval.json"), "w") as f:
+    if cfg.eval_jpeg:
+        out["eval_jpeg"] = cfg.eval_jpeg
+    with open(os.path.join(cfg.run_dir, f"eval{sfx}.json"), "w") as f:
         json.dump(out, f, indent=2)
 
     print(f"wrote figures + eval.json to {cfg.run_dir}")
@@ -626,8 +631,15 @@ def evaluate(cfg):
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--config", required=True, help="path to a configs/*.yaml")
+    ap.add_argument("--eval-jpeg", type=int, default=0, metavar="Q",
+                    help="shortcut probe: JPEG-compress every test image at quality Q (both classes) "
+                         "before scoring; writes eval_jpegQ.json beside eval.json")
     args = ap.parse_args()
-    evaluate(load_config(args.config))
+    cfg = load_config(args.config)
+    if args.eval_jpeg:
+        from dataclasses import replace
+        cfg = replace(cfg, eval_jpeg=args.eval_jpeg)
+    evaluate(cfg)
 
 
 if __name__ == "__main__":

@@ -55,6 +55,14 @@ class Config:
     input_mode: str = "resize"
     cache_size: int = 512
 
+    # EVALUATION-ONLY: JPEG-compress every val/test image at this quality (at
+    # the cached resolution, i.e. native in crop mode) before the eval view.
+    # 0 = off. Not in the cache key (applied after the cache). Used by
+    # evaluate.py --eval-jpeg Q to test whether a model is reading the
+    # reals' compression history / sensor noise instead of the fingerprint:
+    # both classes get the same compression, so that cue is flattened.
+    eval_jpeg: int = 0
+
     # training
     epochs: int = 500
     lr: float = 3e-4
@@ -274,6 +282,10 @@ def eval_view(image, cfg):
 
 
 def augment_and_mask(image, label, cfg, face_mask, training):
+    if not training and cfg.eval_jpeg:
+        # robustness probe: same compression for both classes, at the cached
+        # (native, in crop mode) resolution, before any crop
+        image = tf.image.adjust_jpeg_quality(image, cfg.eval_jpeg)
     if cfg.input_mode == "crop":
         # a random window in training, the centre one otherwise. Native pixels,
         # no resampling anywhere. random_crop_resize is skipped: it resizes.
