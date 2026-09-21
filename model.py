@@ -69,18 +69,22 @@ class Config:
     #             and whose split this config must reproduce (same data fields)
     #   teachers: list of baseline names, averaged if several
     #   temperature, alpha, extra (use the unsampled pool), init (warm-start
-    #   from the headline's checkpoint)
+    #   from the headline's checkpoint), calibrate (temperature-scale the
+    #   teacher on val first -- Guo et al. 2017 -- because a teacher at
+    #   0.003/0.999 mean probability is saturated and its raw logits are a
+    #   worse target than hard labels; seen on test18)
     distill: dict = field(default=None)
 
     def __post_init__(self):
         if self.mask_mode not in MASK_MODES:
             raise ValueError(f"mask_mode must be one of {MASK_MODES}, got {self.mask_mode!r}")
         if self.distill is not None:
-            d = {"temperature": 2.0, "alpha": 0.7, "extra": True, "init": False, **self.distill}
+            d = {"temperature": 2.0, "alpha": 0.7, "extra": True, "init": False,
+                 "calibrate": False, **self.distill}
             missing = {"headline", "teachers"} - set(d)
             if missing:
                 raise ValueError(f"distill block needs {sorted(missing)}")
-            unknown = set(d) - {"headline", "teachers", "temperature", "alpha", "extra", "init"}
+            unknown = set(d) - {"headline", "teachers", "temperature", "alpha", "extra", "init", "calibrate"}
             if unknown:
                 raise ValueError(f"distill block has unknown keys {sorted(unknown)}")
             self.distill = d

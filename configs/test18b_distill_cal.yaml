@@ -1,0 +1,45 @@
+# Test18b: test18 with the teacher CALIBRATED before distilling.
+# Test18 (raw teacher, T=2) trained slower and lower than hard labels.
+#
+# Test18: the test17 headline architecture, trained by knowledge distillation
+# from the fine-tuned EfficientNet-B0 (0.9997 on this data) instead of hard
+# labels. Same 35k training images as test17; only the training signal changes.
+# Same network, same inference latency; only the training signal changes.
+#
+# Data fields are identical to test17_sg2 so the split (and val/test) is the
+# same -- required, since the teachers were fine-tuned on that split.
+name: test18b_distill_cal
+
+real_dir: "/content/drive/MyDrive/Real(FFHQ)"
+fake_dir: "/content/drive/MyDrive/Fake(SG2-psi1)"
+
+mask_mode: none
+limit_per_class: 25000
+
+img_size: 256
+native_size: 512
+batch_size: 144
+
+epochs: 150               # let patience decide
+lr: 0.0003
+patience: 15              # 6 cut the test16 ablation off mid-climb; both runs sat at 0.960 at epoch 61
+seed: 42
+
+crop_frac_min: 0.85
+shuffle_buffer: 8192         # train split is 28000; a full-set buffer would be ~5.5 GB of
+                             # uint8 images in RAM -- too much for a standard Colab runtime.
+                             # Raise toward 28000 on a high-RAM runtime if you want the
+                             # notebook's whole-set shuffle.
+
+cache_dir: "/content/cache"
+out_dir: "/content/drive/MyDrive/Research/experiments"
+
+distill:
+  headline: test17_sg2
+  calibrate: true                # temperature-scale the teacher on val first (Guo et al. 2017);
+                                 # raw teacher is saturated (0.003/0.999) and test18 fell 6 pts behind hard labels           # teachers live in experiments/test17_sg2/baselines/
+  teachers: [efficientnet_b0]    # averaged if more than one
+  temperature: 2.0
+  alpha: 0.7                     # weight on the soft (teacher) term; 1-alpha on the hard label
+  extra: false                   # the headline's 35k only -- one variable changes vs test17: soft labels instead of hard
+  init: false                    # true = warm-start from test17_sg2's model.keras

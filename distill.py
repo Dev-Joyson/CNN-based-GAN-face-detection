@@ -111,6 +111,23 @@ def teacher_logits(teachers, base_ds, batch=144):
     return np.mean(per, axis=0).astype(np.float32)
 
 
+def fit_calibration(z_val, y_val):
+    """Temperature scaling (Guo et al. 2017): one scalar T_cal such that
+    sigmoid(z / T_cal) minimises BCE against the TRUE val labels. A teacher at
+    mean p_fake 0.003 / 0.999 is over-confident; dividing its logits by T_cal
+    turns them into probabilities that mean what they say, which is what
+    distillation needs. Fitted on val only -- never test. Grid search; the
+    objective is 1-D and smooth."""
+    y = y_val.astype(np.float32)
+    best_t, best_nll = 1.0, np.inf
+    for t in np.concatenate([np.linspace(0.5, 5, 46), np.linspace(5.5, 30, 50)]):
+        p = np.clip(1 / (1 + np.exp(-z_val / t)), EPS, 1 - EPS)
+        nll = -np.mean(y * np.log(p) + (1 - y) * np.log(1 - p))
+        if nll < best_nll:
+            best_t, best_nll = float(t), float(nll)
+    return best_t, best_nll
+
+
 def kd_dataset(base_ds, z_t, cfg, face_mask, training, shuffle):
     """(augmented image, [y, z_t]) batches, aligned by zipping in cache order."""
     zt = tf.data.Dataset.from_tensor_slices(z_t)
@@ -172,6 +189,16 @@ def distill(cfg):
         print(f"  teacher on {split}: mean p_fake real={p[y == 0].mean():.3f} fake={p[y == 1].mean():.3f}")
     del teachers
 
+    if d["calibrate"]:
+        y_val = np.array(splits["val"][1])
+        t_cal, nll = fit_calibration(z["val"], y_val)
+        raw_nll = fit_calibration(z["val"], y_val)[1] if t_cal == 1.0 else None
+        z = {k: v / t_cal for k, v in z.items()}
+        p = 1 / (1 + np.exp(-z["train"]))
+        y = np.array(train_labels)
+        print(f"calibration: T_cal={t_cal:.2f} (val NLL {nll:.4f}); teacher on train after: "
+              f"mean p_fake real={p[y == 0].mean():.3f} fake={p[y == 1].mean():.3f}")
+
     ds_train = kd_dataset(base["train"], z["train"], cfg, face_mask, training=True, shuffle=True)
     ds_val = kd_dataset(base["val"], z["val"], cfg, face_mask, training=False, shuffle=False)
 
@@ -202,7 +229,8 @@ def distill(cfg):
     clean.set_weights(student.get_weights())
     clean.save(os.path.join(cfg.run_dir, "model.keras"))
     with open(os.path.join(cfg.run_dir, "metrics.json"), "w") as f:
-        json.dump({"distill": d, "n_train": len(train_paths)}, f, indent=2)
+        json.dump({"distill": d, "n_train": len(train_paths),
+                   "t_cal": t_cal if d["calibrate"] else None}, f, indent=2)
 
     from evaluate import evaluate
     evaluate(cfg)
