@@ -563,11 +563,12 @@ def measure_efficiency(model, cfg, ds, warmup=50, runs=1000):
 
 # --------------------------------------------------------------------------- #
 
-def evaluate(cfg):
+def evaluate(cfg, tag=""):
     model = load_run_model(cfg)
     ds = build_datasets(cfg)
-    # a JPEG probe writes beside the clean results, never over them
-    sfx = f"_jpeg{cfg.eval_jpeg}" if cfg.eval_jpeg else ""
+    # probes (JPEG, a different input pipeline) write beside the clean results,
+    # never over them
+    sfx = (f"_{tag}" if tag else "") + (f"_jpeg{cfg.eval_jpeg}" if cfg.eval_jpeg else "")
 
     print(f"=== eval {cfg.name} | mask_mode={cfg.mask_mode}"
           + (f" | EVAL JPEG q={cfg.eval_jpeg} on both classes" if cfg.eval_jpeg else "") + " ===")
@@ -631,6 +632,7 @@ def evaluate(cfg):
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--config", required=True, help="path to a configs/*.yaml")
+    ap.add_argument("--tag", default="", help="suffix for outputs of a probe run (eval_<tag>.json)")
     ap.add_argument("--eval-jpeg", type=int, default=0, metavar="Q",
                     help="shortcut probe: JPEG-compress every test image at quality Q (both classes) "
                          "before scoring; writes eval_jpegQ.json beside eval.json")
@@ -639,7 +641,7 @@ def main():
     if args.eval_jpeg:
         from dataclasses import replace
         cfg = replace(cfg, eval_jpeg=args.eval_jpeg)
-    evaluate(cfg)
+    evaluate(cfg, tag=args.tag)
 
 
 if __name__ == "__main__":
