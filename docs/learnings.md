@@ -131,6 +131,12 @@ the README says how things *are*, this says how we found out.
   backbones (0.964 vs 0.992–0.9997), and the least background-dependent (swap drop 0.07
   vs 0.10–0.21). Xception is the most face-attentive (0.93) yet drops 0.12 under a
   swapped background: attention and swap measure different things.
+- **2026-09-21 — Distilling from the raw EfficientNet-B0 teacher made the student worse:
+  0.923 vs 0.964, and it imported the teacher's background reliance** (swap drop 0.21,
+  from 0.07). The teacher averages 0.003 / 0.999: saturated, no dark knowledge, and
+  matching logits of ±7–14 is a harder target than 0/1. A more accurate teacher is not
+  a better one; an informative one is. → calibrate first (test18b); if that fails, the
+  size gap is the problem and MobileNetV3 (1M params, 0.992) is the closer teacher.
 - **Latency needs no training; accuracy does.** The efficiency half of the comparison
   can be measured before any baseline is fine-tuned.
 - **Published detectors zero-shot measure generalisation, not architecture.** CNNDetection
