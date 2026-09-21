@@ -24,7 +24,7 @@ import tensorflow as tf
 from PIL import Image
 from sklearn.metrics import roc_auc_score
 
-from model import list_images, load_and_resize, load_config
+from model import eval_view, list_images, load_and_resize, load_config
 
 
 def file_features(path):
@@ -46,10 +46,14 @@ def file_features(path):
 def highfreq_energy(path, cfg):
     """High-frequency energy AFTER cfg's preprocessing.
 
-    This is the one that matters: it says whether the 512->256 normalisation
-    actually erased the two classes' different resampling histories.
+    Resize mode: says whether the 512->256 normalisation erased the classes'
+    different resampling histories. Crop mode: measured on the native 256^2
+    centre patch -- where JPEG history and sensor noise in the reals, blurred
+    away by the resize, are visible again. A high AUC here is a shortcut
+    the resize-mode audit could not see.
     """
     img, _ = load_and_resize(tf.constant(path), tf.constant(0), cfg)
+    img = eval_view(img, cfg)          # crop mode: the centre native patch the model sees
     g = tf.image.rgb_to_grayscale(tf.cast(img, tf.float32) / 255.0)[..., 0]
     mag = np.fft.fftshift(np.log1p(np.abs(tf.signal.fft2d(tf.cast(g, tf.complex64)).numpy())))
     n = cfg.img_size
