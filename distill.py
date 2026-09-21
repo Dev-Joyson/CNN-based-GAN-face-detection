@@ -223,14 +223,24 @@ def distill(cfg):
     ]
     student.fit(ds_train, validation_data=ds_val, epochs=cfg.epochs, callbacks=callbacks)
 
-    # --- save a PLAIN model (no custom loss in its config) so evaluate/predict load it ---
-    clean = compile_model(build_model(cfg), cfg)
-    clean.set_weights(student.get_weights())
-    clean.save(os.path.join(cfg.run_dir, "model.keras"))
     with open(os.path.join(cfg.run_dir, "metrics.json"), "w") as f:
         json.dump({"distill": d, "n_train": len(train_paths),
                    "t_cal": t_cal if d["calibrate"] else None}, f, indent=2)
+    finalize(cfg, student.get_weights())
 
+
+def finalize(cfg, weights=None):
+    """Write a PLAIN model.keras (no custom loss in its config, so evaluate.py
+    and predict.py load it) and evaluate. Called at the end of training, or via
+    --finalize on a run that was killed or lost its VM: the ModelCheckpoint
+    wrote best.weights.h5 after every improving epoch, so nothing is lost."""
+    clean = compile_model(build_model(cfg), cfg)
+    if weights is None:
+        clean.load_weights(os.path.join(cfg.run_dir, "best.weights.h5"))
+        print(f"finalize: loaded best.weights.h5 from {cfg.run_dir}")
+    else:
+        clean.set_weights(weights)
+    clean.save(os.path.join(cfg.run_dir, "model.keras"))
     from evaluate import evaluate
     evaluate(cfg)
 
@@ -239,10 +249,13 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--config", required=True, help="a config with a distill: block")
-    cfg = load_config(ap.parse_args().config)
+    ap.add_argument("--finalize", action="store_true",
+                    help="skip training: build model.keras from best.weights.h5 and evaluate")
+    args = ap.parse_args()
+    cfg = load_config(args.config)
     if not cfg.distill:
-        raise SystemExit(f"{ap.parse_args().config} has no distill: block")
-    distill(cfg)
+        raise SystemExit(f"{args.config} has no distill: block")
+    finalize(cfg) if args.finalize else distill(cfg)
 
 
 if __name__ == "__main__":
