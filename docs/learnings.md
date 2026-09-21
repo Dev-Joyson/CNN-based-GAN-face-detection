@@ -157,6 +157,15 @@ the README says how things *are*, this says how we found out.
   high-frequency energy does not separate the classes at 256² native patches. The
   crop model's 0.999 is reading structure, not amount — GAN fingerprint or sensor-noise
   pattern; the JPEG probe and held-out reals decide which.
+- **2026-09-21 — Native-resolution crops: 0.9994 test AUC, 99% accuracy, same 1.49 ms.**
+  The ceiling was the resize, not the model. Same network that plateaued at 0.964 on
+  downsampled input reaches EfficientNet-B0's number when the 256² is a window of
+  native pixels. Clicked at epoch 6 (resize: 9), +0.17 AUC in two epochs.
+- **2026-09-21 — And it is not a texture shortcut, on every test available here.**
+  Native audit highfreq 0.553; JPEG q95 costs 0.002 (the resize model loses 0.027);
+  q75 leaves it at 0.986, above the resize model's clean score. The crop model's
+  signal is MORE compression-robust than the resize pipeline's. Held-out reals and a
+  held-out generator remain, as confirmation.
 - **Latency needs no training; accuracy does.** The efficiency half of the comparison
   can be measured before any baseline is fine-tuned.
 - **Published detectors zero-shot measure generalisation, not architecture.** CNNDetection

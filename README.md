@@ -326,7 +326,8 @@ preprocessing is timed as part of running it.
 
 | model | params | MACs @256² | **ms @ bs=1, L4** | ms @ bs=1, CPU | img/s @144 | peak MB @ bs=1 | test AUC, SG2 | (mix) |
 |---|---|---|---|---|---|---|---|---|
-| **this model** | 1.02M | 1.20G | **1.34** | **8.7** | 1,564 | 1,301 | **0.964** | 0.973 |
+| **this model, native crops (test19)** | 1.02M | 1.20G | **1.49** | **8.6** | 1,564 | 1,301 | **0.9994** | — |
+| this model, resize pipeline (test17) | 1.02M | 1.20G | 1.34 | 8.7 | 1,564 | 1,301 | 0.964 | 0.973 |
 | this model, no FFT branch | 1.01M | 1.11G | **0.99** | **6.6** | 2,098 | 1,301 | 0.953 | 0.975 |
 | MobileNetV3-Small | 1.01M | **0.07G** | 4.71 | 18.7 | **2,684** | **181** | **0.992** (ImageNet-pretrained, fine-tuned) |
 | EfficientNet-B0 | 4.21M | 0.50G | 6.82 | 39.8 | 540 | 198 | **0.9997** (ImageNet-pretrained, fine-tuned) |
@@ -367,13 +368,33 @@ proper form — online distillation, teacher on the same augmented batch, out-of
 data, long schedule — is implemented as `online: true` and reserved for whichever
 input pipeline wins the crop experiment.
 
-**Native-resolution crops (test19).** Every from-scratch result at 256² tops out
-around 0.96 and every pretrained one at 0.99+; the audit says the post-resize image
-has almost no high-frequency separation left (0.52). `input_mode: crop` feeds the
-same model 256² windows of the *native* 1024² pixels instead — no bicubic anywhere.
-Same input size, same latency. If the ceiling was the resize, this moves it; if it
-was the model, it does not. `cache_size: 512` first (face core, 27 GB cache); 768
-keeps the hair. The swap/attention checks need a whole face and are skipped here.
+**Native-resolution crops (test19) — the ceiling was the resize.** Every
+from-scratch result at 256² topped out around 0.96 and every pretrained one at 0.99+;
+the audit said the post-resize image had almost no high-frequency separation left
+(0.52). `input_mode: crop` feeds the same model 256² windows of the *native* 1024²
+pixels instead — no bicubic anywhere. Same input size, same model, same latency
+(1.49 ms GPU, 8.6 ms CPU). Result: **test AUC 0.9994, accuracy 99%** — EfficientNet-B0's
+number from a 1M-param network trained from scratch. It escaped the cold-start
+plateau in 6 epochs where the resize model took 9, and jumped 0.17 AUC in two.
+
+**Is it a shortcut?** At native resolution the reals carry sensor noise and a
+Flickr-JPEG past that the fakes lack — a model could read "photograph" instead of
+"generated". Three checks:
+
+| check | result | reading |
+|---|---|---|
+| native-res audit, `highfreq` | AUC 0.553 | raw fine-detail *amount* does not separate the classes |
+| JPEG q95 on both classes before scoring | 0.9994 → **0.9976** | −0.002; the resize model drops −0.027 under the same treatment |
+| JPEG q75 (social-media grade) | 0.9994 → **0.9862** | still above the resize model's *clean* 0.964 |
+
+Compression flattens sensor noise and overwrites compression history for both classes
+equally; a model reading those collapses at q75. This one lost 0.013, and is *more*
+robust to compression than the resize pipeline. The signal is structure that survives
+re-encoding — a generator fingerprint's profile, not a camera's. Still to run: reals
+from a second source (CelebA-HQ) and a held-out generator; both are confirmation
+now rather than rescue. The whole-face checks (swap, attention) do not apply to
+patches; the resize-mode results stand for those. `cache_size: 768` (the hair) is
+the follow-up.
 
 **The ablation — the FFT branch helps only when the task is hard.** Same model with
 the branch removed and nothing else changed, on both datasets:
@@ -406,12 +427,12 @@ input, where the frequencies it was designed for have not been resized away.
 
 | experiment | role | dataset | **test AUC** | val AUC (selection) | run folder |
 |---|---|---|---|---|---|
-| **test17_sg2** | **headline** — full image, no mask | FFHQ 1024 + StyleGAN2 ψ=1.0 (NVIDIA), 25k/class | **0.9636** (acc 0.90) | 0.9645 (best epoch 89 of 104, early-stopped) | `experiments/test17_sg2/` |
+| **test19_sg2_crop** | **headline** — native-resolution 256² crops, no resampling | FFHQ 1024 + StyleGAN2 ψ=1.0 (NVIDIA), 25k/class | **0.9994** (acc 0.99) | 0.9994 (~50 epochs incl. a resume; first run's history lost to a VM) | `experiments/test19_sg2_crop/` |
+| test17_sg2 | headline, resize pipeline (1024→512→256) | same | 0.9636 (acc 0.90) | 0.9645 (best epoch 89 of 104, early-stopped) | `experiments/test17_sg2/` |
 | test17_sg2_no_fft | ablation — FFT branch removed | same | 0.9527 (acc 0.88) | 0.9503 (best epoch 114, killed at 116 while grinding) | `experiments/test17_sg2_no_fft/` |
 | test18_distill | distillation, raw EfficientNet-B0 teacher, T=2, same 35k | same | 0.9226 (acc 0.84) — **worse**; swap drop 0.21 | 0.9123 (best 104, killed at 111) | `experiments/test18_distill/` |
 | test18b_distill_cal | distillation, teacher calibrated first (Guo 2017) | same | not run: T_cal = 1.10 — the teacher is not miscalibrated, it is near-perfect (val 0.013 / 0.995 and right that often) | | — |
 | test18c_distill_mnv3 | distillation, MobileNetV3-Small teacher (student's size, 0.992) | same | 0.9014 (acc 0.80) — **worse**; swap drop 0.18 | 0.904 (best 63, killed at 64) | `experiments/test18c_distill_mnv3/` |
-| test19_sg2_crop | **native-resolution crops** — no resampling; 256² windows of the 1024² pixels, centre 512² cached | same | _pending_ | | `experiments/test19_sg2_crop/` |
 | test16_full | *preliminary* — StyleGAN1+2 mix, ratio unknown | FFHQ 1024 + FakeMix, 20k/class | 0.9728 (acc 0.91) | 0.9724 (best 85 of 91) | `experiments/test16_full/` |
 | test16_no_fft | *preliminary* ablation on the mix | same | 0.9751 (acc 0.91) | 0.9748 (patience 15; stopped at 101) | `experiments/test16_no_fft/` |
 | test13_face | control — `face_only` | FFHQ 1024 + FakeMix, 25k/class | _pending_ | 0.9995 | `experiments/test13_face/` |
