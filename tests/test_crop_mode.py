@@ -25,7 +25,7 @@ def _png(tmp_path):
 
 def test_cached_image_is_an_exact_centre_slice(tmp_path):
     path, img = _png(tmp_path)
-    cfg = Config(name="u", real_dir="-", fake_dir="-", input_mode="crop",
+    cfg = Config(name="u", real_dir="-", fake_dir="-", input_mode="crop", mask_mode="none",
                  cache_size=CACHE, img_size=IMG, native_size=SRC)
     cached, _ = load_and_resize(tf.constant(path), tf.constant(0), cfg)
     off = (SRC - CACHE) // 2
@@ -34,7 +34,7 @@ def test_cached_image_is_an_exact_centre_slice(tmp_path):
 
 def test_eval_view_is_an_exact_centre_slice_of_the_cache(tmp_path):
     path, img = _png(tmp_path)
-    cfg = Config(name="u", real_dir="-", fake_dir="-", input_mode="crop",
+    cfg = Config(name="u", real_dir="-", fake_dir="-", input_mode="crop", mask_mode="none",
                  cache_size=CACHE, img_size=IMG, native_size=SRC)
     cached, _ = load_and_resize(tf.constant(path), tf.constant(0), cfg)
     view = eval_view(cached, cfg).numpy()
