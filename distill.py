@@ -192,7 +192,6 @@ def distill(cfg):
     if d["calibrate"]:
         y_val = np.array(splits["val"][1])
         t_cal, nll = fit_calibration(z["val"], y_val)
-        raw_nll = fit_calibration(z["val"], y_val)[1] if t_cal == 1.0 else None
         z = {k: v / t_cal for k, v in z.items()}
         p = 1 / (1 + np.exp(-z["train"]))
         y = np.array(train_labels)

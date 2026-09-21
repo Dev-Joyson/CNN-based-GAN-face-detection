@@ -35,9 +35,9 @@ cache_dir: "/content/cache"
 out_dir: "/content/drive/MyDrive/Research/experiments"
 
 distill:
-  headline: test17_sg2
+  headline: test17_sg2           # teachers live in experiments/test17_sg2/baselines/
   calibrate: true                # temperature-scale the teacher on val first (Guo et al. 2017);
-                                 # raw teacher is saturated (0.003/0.999) and test18 fell 6 pts behind hard labels           # teachers live in experiments/test17_sg2/baselines/
+                                 # raw teacher is saturated (0.003/0.999) and test18 fell 6 pts behind hard labels
   teachers: [efficientnet_b0]    # averaged if more than one
   temperature: 2.0
   alpha: 0.7                     # weight on the soft (teacher) term; 1-alpha on the hard label
