@@ -326,7 +326,8 @@ preprocessing is timed as part of running it.
 
 | model | params | MACs @256² | **ms @ bs=1, L4** | ms @ bs=1, CPU | img/s @144 | peak MB @ bs=1 | test AUC, SG2 | (mix) |
 |---|---|---|---|---|---|---|---|---|
-| **this model, native crops (test19)** | 1.02M | 1.20G | **1.49** | **8.6** | 1,564 | 1,301 | **0.9994** | — |
+| **this model, native crops, no FFT (headline)** | 1.01M | 1.11G | **0.99** | **6.6** | 2,098 | 1,301 | **0.9996** | — |
+| this model, native crops, with FFT (test19) | 1.02M | 1.20G | 1.49 | 8.6 | 1,564 | 1,301 | 0.9994 | — |
 | this model, resize pipeline (test17) | 1.02M | 1.20G | 1.34 | 8.7 | 1,564 | 1,301 | 0.964 | 0.973 |
 | this model, no FFT branch | 1.01M | 1.11G | **0.99** | **6.6** | 2,098 | 1,301 | 0.953 | 0.975 |
 | MobileNetV3-Small | 1.01M | **0.07G** | 4.71 | 18.7 | **2,684** | **181** | **0.992** (ImageNet-pretrained, fine-tuned) |
@@ -384,8 +385,8 @@ Flickr-JPEG past that the fakes lack — a model could read "photograph" instead
 | check | result | reading |
 |---|---|---|
 | native-res audit, `highfreq` | AUC 0.553 | raw fine-detail *amount* does not separate the classes |
-| JPEG q95 on both classes before scoring | 0.9994 → **0.9976** | −0.002; the resize model drops −0.027 under the same treatment |
-| JPEG q75 (social-media grade) | 0.9994 → **0.9862** | still above the resize model's *clean* 0.964 |
+| JPEG q95 on both classes before scoring | 0.9994 → **0.9976** (no-FFT: 0.9996 → 0.9984) | −0.002; the resize model drops −0.027 under the same treatment |
+| JPEG q75 (social-media grade) | 0.9994 → **0.9862** (no-FFT: 0.9864) | still above the resize model's *clean* 0.964 |
 
 Compression flattens sensor noise and overwrites compression history for both classes
 equally; a model reading those collapses at q75. This one lost 0.013, and is *more*
@@ -401,15 +402,18 @@ the branch removed and nothing else changed, on both datasets:
 
 | dataset | with FFT | without | Δ AUC | best epoch (with / without) |
 |---|---|---|---|---|
-| StyleGAN1+2 mix (easy) | 0.973 | 0.975 | −0.002 | 85 / 102 |
-| **StyleGAN2 only (hard)** | **0.964** | **0.953** | **+0.011** | 89 / 114 |
+| StyleGAN1+2 mix (easy), resize | 0.973 | 0.975 | −0.002 | 85 / 102 |
+| **StyleGAN2 only (hard), resize** | **0.964** | **0.953** | **+0.011** | 89 / 114 |
+| StyleGAN2, **native crops** | 0.9994 | **0.9996** | −0.0002 | ~50 / 73 |
 
 On the mix — where StyleGAN1's blob artifacts give plain convs an easy handle — the
-branch is redundant. On StyleGAN2 alone, where the audit finds no easy cue, it buys
-0.011 AUC and 2 points of accuracy (fake recall 0.88 vs 0.83), and the model reaches
-its best epoch 25 epochs sooner. The gap opened around epoch 40 and held at
-0.02–0.03 for the rest of the curve; it is not an endpoint artefact. **One seed each
-— seed 43 for both variants is the confirmation.**
+branch is redundant. On downsampled StyleGAN2, where the audit finds no easy cue, it
+buys 0.011 AUC and 2 points of accuracy. **On native crops it buys nothing again:
+same AUC, same JPEG robustness (q95 0.9984 vs 0.9976, q75 0.9864 vs 0.9862).** The
+pattern: a frequency branch helps only when the input pipeline has removed most of
+the signal; give the spatial branch native pixels and it is redundant at 26% of the
+latency. Its one remaining exam is generalisation to an unseen generator. The
+no-FFT crop model is the headline.
 
 The cost: 0.9% of the parameters, **26% of latency** (0.37 ms — `fft2d`, the magnitude
 conversion and two convs at full 256², none of which a MAC count sees), and 26% of
@@ -427,7 +431,8 @@ input, where the frequencies it was designed for have not been resized away.
 
 | experiment | role | dataset | **test AUC** | val AUC (selection) | run folder |
 |---|---|---|---|---|---|
-| **test19_sg2_crop** | **headline** — native-resolution 256² crops, no resampling | FFHQ 1024 + StyleGAN2 ψ=1.0 (NVIDIA), 25k/class | **0.9994** (acc 0.99) | 0.9994 (~50 epochs incl. a resume; first run's history lost to a VM) | `experiments/test19_sg2_crop/` |
+| **test19_sg2_crop_no_fft** | **headline** — native-resolution crops, spatial branch only | FFHQ 1024 + StyleGAN2 ψ=1.0 (NVIDIA), 25k/class | **0.9996** (acc 0.99) | 0.9996 (best epoch 73, killed at 81 flat) | `experiments/test19_sg2_crop_no_fft/` |
+| test19_sg2_crop | native crops, with FFT branch | same | 0.9994 (acc 0.99) | 0.9994 (~50 epochs incl. a resume; first run's history lost to a VM) | `experiments/test19_sg2_crop/` |
 | test17_sg2 | headline, resize pipeline (1024→512→256) | same | 0.9636 (acc 0.90) | 0.9645 (best epoch 89 of 104, early-stopped) | `experiments/test17_sg2/` |
 | test17_sg2_no_fft | ablation — FFT branch removed | same | 0.9527 (acc 0.88) | 0.9503 (best epoch 114, killed at 116 while grinding) | `experiments/test17_sg2_no_fft/` |
 | test18_distill | distillation, raw EfficientNet-B0 teacher, T=2, same 35k | same | 0.9226 (acc 0.84) — **worse**; swap drop 0.21 | 0.9123 (best 104, killed at 111) | `experiments/test18_distill/` |

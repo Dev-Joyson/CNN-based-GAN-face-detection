@@ -166,6 +166,11 @@ the README says how things *are*, this says how we found out.
   q75 leaves it at 0.986, above the resize model's clean score. The crop model's
   signal is MORE compression-robust than the resize pipeline's. Held-out reals and a
   held-out generator remain, as confirmation.
+- **2026-09-21 — On native crops the FFT branch buys nothing: 0.9996 without vs 0.9994
+  with, identical JPEG robustness.** Three-row ablation: 0 on the easy mix, +0.011 on
+  downsampled SG2, 0 on native SG2. A frequency branch helps only when the pipeline
+  has starved the spatial branch. Headline is now the five-conv no-FFT crop model:
+  1.01M params, 0.9996, 0.99 ms GPU / 6.6 ms CPU.
 - **Latency needs no training; accuracy does.** The efficiency half of the comparison
   can be measured before any baseline is fine-tuned.
 - **Published detectors zero-shot measure generalisation, not architecture.** CNNDetection
