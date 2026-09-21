@@ -137,6 +137,11 @@ the README says how things *are*, this says how we found out.
   matching logits of ±7–14 is a harder target than 0/1. A more accurate teacher is not
   a better one; an informative one is. → calibrate first (test18b); if that fails, the
   size gap is the problem and MobileNetV3 (1M params, 0.992) is the closer teacher.
+- **2026-09-21 — The teacher is not over-confident; it is near-perfect.** Temperature
+  scaling on val gave T_cal = 1.10: when EfficientNet says 0.995 it is right 99.5% of
+  the time. My diagnosis (saturation) was wrong. There is simply no dark knowledge on
+  this task at 256² for a teacher that has solved it. What remains is the size gap
+  (test18c, MobileNet teacher) or no gain at all from distillation here.
 - **Latency needs no training; accuracy does.** The efficiency half of the comparison
   can be measured before any baseline is fine-tuned.
 - **Published detectors zero-shot measure generalisation, not architecture.** CNNDetection

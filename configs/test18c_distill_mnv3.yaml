@@ -1,0 +1,44 @@
+# Test18c: test18 with a teacher at the STUDENT'S size. Tests whether the
+# teacher-student gap, not the teacher's confidence, is what hurt test18.
+#
+# Test18: the test17 headline architecture, trained by knowledge distillation
+# from the fine-tuned EfficientNet-B0 (0.9997 on this data) instead of hard
+# labels. Same 35k training images as test17; only the training signal changes.
+# Same network, same inference latency; only the training signal changes.
+#
+# Data fields are identical to test17_sg2 so the split (and val/test) is the
+# same -- required, since the teachers were fine-tuned on that split.
+name: test18c_distill_mnv3
+
+real_dir: "/content/drive/MyDrive/Real(FFHQ)"
+fake_dir: "/content/drive/MyDrive/Fake(SG2-psi1)"
+
+mask_mode: none
+limit_per_class: 25000
+
+img_size: 256
+native_size: 512
+batch_size: 144
+
+epochs: 150               # let patience decide
+lr: 0.0003
+patience: 15              # 6 cut the test16 ablation off mid-climb; both runs sat at 0.960 at epoch 61
+seed: 42
+
+crop_frac_min: 0.85
+shuffle_buffer: 8192         # train split is 28000; a full-set buffer would be ~5.5 GB of
+                             # uint8 images in RAM -- too much for a standard Colab runtime.
+                             # Raise toward 28000 on a high-RAM runtime if you want the
+                             # notebook's whole-set shuffle.
+
+cache_dir: "/content/cache"
+out_dir: "/content/drive/MyDrive/Research/experiments"
+
+distill:
+  headline: test17_sg2           # teachers live in experiments/test17_sg2/baselines/
+  teachers: [mobilenet_v3_small] # 1.01M params, 0.992 -- the student's own size; EfficientNet (4.2M, 0.9997)
+                                 # made the student worse (test18: 0.923) and calibration found nothing to fix (T_cal 1.10)
+  temperature: 2.0
+  alpha: 0.7                     # weight on the soft (teacher) term; 1-alpha on the hard label
+  extra: false                   # the headline's 35k only -- one variable changes vs test17: soft labels instead of hard
+  init: false                    # true = warm-start from test17_sg2's model.keras

@@ -38,10 +38,10 @@ data**, **✗ nothing yet**.
 | architecture | 32-64-128-256-256, Dense 128, FFT 16-32 | ~ | Doubling widths per stage is the VGG scheme (Simonyan & Zisserman 2014) at half width, sized to a ~1M-param budget. The FFT branch is ablated (tried). Widths and depth are not. | width/depth are design, defended by the parameter budget and the ablation; a width sweep is lever-3 territory (v2) |
 | **distill** `temperature` | 2.0 | ~ cited | **Hinton, Vinyals & Dean 2015**: temperatures 1–20 tried; for small students, 2.5–4 worked best; T>1 needed when the teacher is near 0/1 (ours: 0.9997 AUC). 2 is at the low end of their range. | **sweep {1, 2, 4} — 3 runs, ~1 h each with caches on Drive and `init: true`** |
 | **distill** `alpha` | 0.7 | ~ cited | Hinton et al. 2015: "considerably lower weight" on the hard-label term than the soft one, i.e. alpha > 0.5. 0.7 is within that, not their number. | **sweep {0.5, 0.7, 0.9} at the best T — 3 runs** |
-| **distill** `calibrate` | true (18b) | ~ cited | Guo et al. 2017, temperature scaling: fit one scalar on val so the teacher's probabilities match its accuracy. Motivated by a measurement: the raw teacher averages 0.003 / 0.999, and test18 (raw, T=2) ran 6 points behind hard labels at matched epochs. | test18 (raw) vs test18b (calibrated) is the check |
+| **distill** `calibrate` | false | ✓ tried | Guo et al. 2017 temperature scaling was fitted on val: **T_cal = 1.10** — the teacher is not miscalibrated; its 0.013 / 0.995 on unseen val is accurate. Calibration has nothing to fix, so 18b was not run. | measured |
 | **distill** `extra` | false | ✓ tried (by design) | Joyson's call: one-variable comparison vs test17 first; `true` (balanced +30k) second. | `true` run (planned) |
 | **distill** `init` | false | ✓ by design | From scratch keeps soft-vs-hard a one-variable change. `true` is the cheaper variant for the sweeps. | — |
-| **distill** `teachers` | efficientnet_b0 | ✓ tried | Highest test AUC of the three fine-tuned baselines (0.9997 / 0.9987 / 0.992). | averaging all three is a cheap extra run |
+| **distill** `teachers` | mobilenet_v3_small (18c) | ✓ tried | EfficientNet-B0 (highest AUC, 4.2M params) made the student *worse* (0.923 vs 0.964) and imported its background reliance. Cho & Hariharan 2019: larger teachers do not make better students; Mirzadeh et al. 2020: the teacher-student gap matters. MobileNetV3-Small is the student's size (1.01M) at 0.992. | test18 vs test18c is the check |
 
 ## Sweep / sensitivity plan, in priority order (what the panel will ask about first)
 
