@@ -38,7 +38,7 @@ from dataclasses import replace
 import numpy as np
 import tensorflow as tf
 
-from model import (augment_and_mask, build_model, cached_dataset, compile_model,
+from model import (HistoryCSV, augment_and_mask, build_model, cached_dataset, compile_model,
                    feathered_ellipse, list_images, load_config, load_paths)
 
 EPS = 1e-6
@@ -218,7 +218,7 @@ def distill(cfg):
                                            save_best_only=True, save_weights_only=True),
         tf.keras.callbacks.EarlyStopping(monitor="val_auc", mode="max",
                                         patience=cfg.patience, restore_best_weights=True),
-        tf.keras.callbacks.CSVLogger(os.path.join(cfg.run_dir, "history.csv")),
+        HistoryCSV(os.path.join(cfg.run_dir, "history.csv")),
         tf.keras.callbacks.TensorBoard(log_dir=os.path.join(cfg.run_dir, "tb"), write_graph=False),
     ]
     student.fit(ds_train, validation_data=ds_val, epochs=cfg.epochs, callbacks=callbacks)

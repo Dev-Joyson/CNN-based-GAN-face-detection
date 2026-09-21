@@ -148,6 +148,11 @@ the README says how things *are*, this says how we found out.
   case (Beyer et al. 2022): offline clean-image scores vs augmented student views,
   in-sample teacher labels, and a background-dependent target. Online distillation on
   the winning pipeline is the one remaining attempt; crops first.
+- **2026-09-21 — A file held open for the whole run never reaches Drive.** Colab's
+  mount uploads on close. CSVLogger keeps history.csv open; the fifth lost VM left a
+  0-byte history for test19 after ~42 epochs. Checkpoints survived because each save
+  closes its file. → HistoryCSV callback: append and close every epoch. Anything
+  long-running that writes to Drive must close between writes.
 - **Latency needs no training; accuracy does.** The efficiency half of the comparison
   can be measured before any baseline is fine-tuned.
 - **Published detectors zero-shot measure generalisation, not architecture.** CNNDetection

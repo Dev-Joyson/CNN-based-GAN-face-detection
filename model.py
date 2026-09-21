@@ -436,6 +436,29 @@ def compile_model(model, cfg):
 # Training
 # --------------------------------------------------------------------------- #
 
+class HistoryCSV(tf.keras.callbacks.Callback):
+    """Per-epoch history, appended and CLOSED every epoch.
+
+    Keras' CSVLogger holds the file open for the whole run. Colab's Drive
+    mount uploads a file when it is closed, so a run that loses its VM leaves
+    a 0-byte history.csv on Drive -- test19 lost ~42 epochs of record that
+    way. model.keras survived because each checkpoint save closes its file.
+    Same columns as CSVLogger, so evaluate/sort commands are unchanged."""
+    def __init__(self, path, append=False):
+        super().__init__()
+        self.path, self.append = path, append
+
+    def on_epoch_end(self, epoch, logs=None):
+        logs = logs or {}
+        keys = sorted(logs)
+        new = not (self.append and os.path.exists(self.path) and os.path.getsize(self.path) > 0)
+        with open(self.path, "a" if not new else "w") as f:
+            if new:
+                f.write("epoch," + ",".join(keys) + "\n")
+            f.write(f"{epoch}," + ",".join(f"{float(logs[k]):.6g}" for k in keys) + "\n")
+        self.append = True
+
+
 def train(cfg, resume=False, build_fn=None):
     """Train from scratch, or -- with resume=True -- pick up a run the VM lost.
 
@@ -478,7 +501,7 @@ def train(cfg, resume=False, build_fn=None):
         tf.keras.callbacks.EarlyStopping(monitor='val_auc', mode='max',
                                         patience=cfg.patience,
                                         restore_best_weights=True),
-        tf.keras.callbacks.CSVLogger(history_csv, append=initial_epoch > 0),
+        HistoryCSV(history_csv, append=initial_epoch > 0),
         # live curves: %tensorboard --logdir <out_dir> in a notebook cell
         tf.keras.callbacks.TensorBoard(log_dir=os.path.join(cfg.run_dir, "tb"),
                                        write_graph=False),
