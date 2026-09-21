@@ -326,7 +326,7 @@ preprocessing is timed as part of running it.
 
 | model | params | MACs @256² | **ms @ bs=1, L4** | ms @ bs=1, CPU | img/s @144 | peak MB @ bs=1 | test AUC, SG2 | (mix) |
 |---|---|---|---|---|---|---|---|---|
-| **this model, native crops, no FFT (headline)** | 1.01M | 1.11G | **0.99** | **6.6** | 2,098 | 1,301 | **0.9996** | — |
+| **this model, native crops, no FFT (headline)** | 1.01M | 1.11G | **1.02** | **8.4** | 2,098 | 1,301 | **0.9996** | — |
 | this model, native crops, with FFT (test19) | 1.02M | 1.20G | 1.49 | 8.6 | 1,564 | 1,301 | 0.9994 | — |
 | this model, resize pipeline (test17) | 1.02M | 1.20G | 1.34 | 8.7 | 1,564 | 1,301 | 0.964 | 0.973 |
 | this model, no FFT branch | 1.01M | 1.11G | **0.99** | **6.6** | 2,098 | 1,301 | 0.953 | 0.975 |
@@ -342,9 +342,14 @@ is five plain convs. **It loses MACs (second-worst), peak memory (worst, 7× Mob
 cause, the no-FFT model peaks identically at bs=1), and batched throughput (MobileNet's 17× fewer MACs pay off once the GPU is
 saturated).** Params: tied with MobileNetV3-Small.
 
-GPU latencies above are one L4 session (2026-09-20 morning); a second session gave
-1.44 / 5.06 / 8.05 ms for this model / MobileNet / EfficientNet — same order, ~5–15%
-drift, depthwise nets drifting most. **CPU column: 12-thread Xeon @ 2.2 GHz, plain
+GPU latencies for the four baselines and the resize rows are one L4 session
+(2026-09-20 morning); the two crop rows are a third session (2026-09-21: 1.49 with
+FFT, 1.02 without — same network as the resize rows, so the same latency by
+construction, and measured to be). A second session gave 1.44 / 5.06 / 8.05 ms for
+this model / MobileNet / EfficientNet — same order, ~5–15% drift, depthwise nets
+drifting most. **The CPU column is less stable than the GPU one:** the FFT branch's
+CPU cost measured 24% on one VM (6.6 vs 8.7) and 2% on another (8.4 vs 8.6). Quote
+CPU numbers as same-session pairs only; the GPU column carries the claim. **CPU column: 12-thread Xeon @ 2.2 GHz, plain
 TensorFlow, no XLA, n=300.** The order did *not* flip: this model is 2.1× faster than
 MobileNetV3 and 4.6× faster than EfficientNet-B0 on CPU too. Stock TF depthwise
 kernels are poor and the memory-bound structure hurts on both. Caveat, stated: a phone

@@ -171,6 +171,9 @@ the README says how things *are*, this says how we found out.
   downsampled SG2, 0 on native SG2. A frequency branch helps only when the pipeline
   has starved the spatial branch. Headline is now the five-conv no-FFT crop model:
   1.01M params, 0.9996, 0.99 ms GPU / 6.6 ms CPU.
+- **2026-09-21 — CPU latency on Colab varies by VM more than GPU latency does.** The
+  FFT branch's CPU cost read 24% on one Xeon VM and 2% on another; its GPU cost read
+  26% and 32%. Never compare CPU numbers across sessions; the GPU column is the claim.
 - **Latency needs no training; accuracy does.** The efficiency half of the comparison
   can be measured before any baseline is fine-tuned.
 - **Published detectors zero-shot measure generalisation, not architecture.** CNNDetection
