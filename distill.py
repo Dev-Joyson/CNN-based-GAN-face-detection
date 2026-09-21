@@ -2,9 +2,11 @@
 """Knowledge distillation: train this architecture to match a fine-tuned
 baseline's probabilities instead of the hard labels.
 
-    python distill.py --config configs/test17_sg2.yaml --teacher efficientnet_b0
-    python distill.py --config configs/test17_sg2.yaml --teacher efficientnet_b0 --teacher mobilenet_v3_small
-    python distill.py --config configs/test17_sg2.yaml --teacher efficientnet_b0 --no-extra --init
+    python train.py --config configs/test18_distill.yaml
+
+The config is the headline's data fields (so the split is identical) plus a
+`distill:` block naming the headline, the teachers, and the settings.
+train.py sees the block and comes here.
 
 Why: the same 1M-param network reaches 0.964 from scratch on 35k images;
 a fine-tuned EfficientNet-B0 reaches 0.9997 on the same data because it
@@ -23,11 +25,9 @@ the student sees augmented views with that fixed target.
 Loss (Hinton et al. 2015, binary form):
     alpha * T^2 * BCE(sigmoid(z_s/T), sigmoid(z_t/T))  +  (1-alpha) * BCE(p_s, y)
 
-Output: experiments/<name>/ (default test18_distill -- the experiment
-numbering continues from the test17 headline) -- the student's own
-model.keras (a plain build_model, loadable by evaluate.py and predict.py),
-history.csv, metrics.json with the distillation settings, then the full
-evaluate() block.
+Output: experiments/<name>/ -- the student's own model.keras (a plain
+build_model, loadable by evaluate.py and predict.py), history.csv,
+metrics.json with the distillation settings, then the full evaluate() block.
 """
 
 import argparse
@@ -122,51 +122,36 @@ def kd_dataset(base_ds, z_t, cfg, face_mask, training, shuffle):
 
 # --------------------------------------------------------------------------- #
 
-def main():
-    ap = argparse.ArgumentParser(description=__doc__,
-                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--config", required=True, help="the HEADLINE config (data, split, student arch)")
-    ap.add_argument("--teacher", action="append", required=True,
-                    help="baseline name under experiments/<headline>/baselines/; repeat to average")
-    ap.add_argument("--temperature", type=float, default=2.0)
-    ap.add_argument("--alpha", type=float, default=0.7, help="weight on the soft (teacher) term")
-    ap.add_argument("--no-extra", action="store_true", help="train on the headline's 35k only")
-    ap.add_argument("--init", action="store_true",
-                    help="warm-start the student from the headline's model.keras instead of scratch")
-    ap.add_argument("--name", default="test18_distill",
-                    help="run name -> experiments/<name>/ (default test18_distill)")
-    args = ap.parse_args()
-
-    cfg = load_config(args.config)
-    tag = "+".join(args.teacher) + ("" if args.no_extra else "+extra") + ("+init" if args.init else "")
-    scfg = replace(cfg, name=args.name)
-    os.makedirs(scfg.run_dir, exist_ok=True)
+def distill(cfg):
+    d = cfg.distill
+    hcfg = replace(cfg, name=d["headline"], distill=None)      # the headline: same data, its run dir
+    os.makedirs(cfg.run_dir, exist_ok=True)
     tf.keras.utils.set_random_seed(cfg.seed)
-    print(f"=== distill -> {scfg.run_dir}\n    teachers={args.teacher} T={args.temperature} "
-          f"alpha={args.alpha} extra={not args.no_extra} init={args.init}")
+    print(f"=== {cfg.name}: distill from {d['teachers']} of {hcfg.name} -> {cfg.run_dir}\n"
+          f"    T={d['temperature']} alpha={d['alpha']} extra={d['extra']} init={d['init']}")
 
     # --- teachers ----------------------------------------------------------------
     teachers = []
-    for name in args.teacher:
-        path = os.path.join(cfg.out_dir, cfg.name, "baselines", name, "model.keras")
+    for name in d["teachers"]:
+        path = os.path.join(hcfg.run_dir, "baselines", name, "model.keras")
         if not os.path.exists(path):
             raise FileNotFoundError(f"teacher not trained: {path}  (run baselines.py --train)")
         teachers.append(tf.keras.models.load_model(path, safe_mode=False))
         print(f"teacher {name}: {teachers[-1].count_params():,} params")
 
-    # --- data: headline splits (+ extra), same caches ---------------------------------
-    splits = load_paths(cfg)
+    # --- data: the headline's splits (+ extra), the headline's caches ---------------
+    splits = load_paths(hcfg)
     face_mask = feathered_ellipse(cfg.img_size, cfg.mask_rx, cfg.mask_ry, cfg.mask_feather)
     train_paths, train_labels = splits["train"]
-    train_ds = cached_dataset(train_paths, train_labels, cfg, "train")   # the headline's own cache
-    if not args.no_extra:
-        xp, xl = extra_pool(cfg, splits)
+    train_ds = cached_dataset(train_paths, train_labels, hcfg, "train")   # the headline's own cache
+    if d["extra"]:
+        xp, xl = extra_pool(hcfg, splits)
         print(f"extra pool: {xl.count(0)} real + {xl.count(1)} fake unused by the headline")
         # a separate cache for the extras, concatenated after: the 35k are not
         # re-read, and the train cache stays shared with train.py
-        train_ds = train_ds.concatenate(cached_dataset(xp, xl, cfg, "extra"))
+        train_ds = train_ds.concatenate(cached_dataset(xp, xl, hcfg, "extra"))
         train_paths, train_labels = train_paths + xp, train_labels + xl
-    base = {"train": train_ds, "val": cached_dataset(*splits["val"], cfg, "val")}
+    base = {"train": train_ds, "val": cached_dataset(*splits["val"], hcfg, "val")}
     print(f"train: {len(train_paths)}   val: {len(splits['val'][0])}")
 
     # --- teacher logits, once, in cache order -----------------------------------------
@@ -184,38 +169,45 @@ def main():
 
     # --- student -------------------------------------------------------------------------
     student = build_model(cfg)
-    if args.init:
-        src = os.path.join(cfg.run_dir, "model.keras")
+    if d["init"]:
+        src = os.path.join(hcfg.run_dir, "model.keras")
         student.set_weights(tf.keras.models.load_model(src, safe_mode=False).get_weights())
         print(f"student initialised from {src}")
     student.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=cfg.lr),
-                    loss=make_kd_loss(args.temperature, args.alpha),
+                    loss=make_kd_loss(d["temperature"], d["alpha"]),
                     metrics=[HardAccuracy(name="accuracy"), HardAUC(name="auc")])
     student.summary()
 
-    weights = os.path.join(scfg.run_dir, "best.weights.h5")
+    weights = os.path.join(cfg.run_dir, "best.weights.h5")
     callbacks = [
         tf.keras.callbacks.ModelCheckpoint(weights, monitor="val_auc", mode="max",
                                            save_best_only=True, save_weights_only=True),
         tf.keras.callbacks.EarlyStopping(monitor="val_auc", mode="max",
                                         patience=cfg.patience, restore_best_weights=True),
-        tf.keras.callbacks.CSVLogger(os.path.join(scfg.run_dir, "history.csv")),
-        tf.keras.callbacks.TensorBoard(log_dir=os.path.join(scfg.run_dir, "tb"), write_graph=False),
+        tf.keras.callbacks.CSVLogger(os.path.join(cfg.run_dir, "history.csv")),
+        tf.keras.callbacks.TensorBoard(log_dir=os.path.join(cfg.run_dir, "tb"), write_graph=False),
     ]
     student.fit(ds_train, validation_data=ds_val, epochs=cfg.epochs, callbacks=callbacks)
 
     # --- save a PLAIN model (no custom loss in its config) so evaluate/predict load it ---
     clean = compile_model(build_model(cfg), cfg)
     clean.set_weights(student.get_weights())
-    clean.save(os.path.join(scfg.run_dir, "model.keras"))
-    with open(os.path.join(scfg.run_dir, "metrics.json"), "w") as f:
-        json.dump({"distill": {"tag": tag, "headline": cfg.name,
-                               "teachers": args.teacher, "temperature": args.temperature,
-                               "alpha": args.alpha, "extra": not args.no_extra, "init": args.init,
-                               "n_train": len(train_paths)}}, f, indent=2)
+    clean.save(os.path.join(cfg.run_dir, "model.keras"))
+    with open(os.path.join(cfg.run_dir, "metrics.json"), "w") as f:
+        json.dump({"distill": d, "n_train": len(train_paths)}, f, indent=2)
 
     from evaluate import evaluate
-    evaluate(scfg)
+    evaluate(cfg)
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--config", required=True, help="a config with a distill: block")
+    cfg = load_config(ap.parse_args().config)
+    if not cfg.distill:
+        raise SystemExit(f"{ap.parse_args().config} has no distill: block")
+    distill(cfg)
 
 
 if __name__ == "__main__":

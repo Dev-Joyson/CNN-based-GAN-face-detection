@@ -12,7 +12,7 @@ import json
 import os
 import random
 from collections import Counter
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from glob import glob
 
 import tensorflow as tf
@@ -64,9 +64,26 @@ class Config:
     cache_dir: str = "/content/cache"     # keyed by limit_per_class, NOT mask_mode
     out_dir: str = "experiments"
 
+    # knowledge distillation (train.py dispatches to distill.py when set):
+    #   headline: run whose baselines/<teacher>/model.keras are the teachers
+    #             and whose split this config must reproduce (same data fields)
+    #   teachers: list of baseline names, averaged if several
+    #   temperature, alpha, extra (use the unsampled pool), init (warm-start
+    #   from the headline's checkpoint)
+    distill: dict = field(default=None)
+
     def __post_init__(self):
         if self.mask_mode not in MASK_MODES:
             raise ValueError(f"mask_mode must be one of {MASK_MODES}, got {self.mask_mode!r}")
+        if self.distill is not None:
+            d = {"temperature": 2.0, "alpha": 0.7, "extra": True, "init": False, **self.distill}
+            missing = {"headline", "teachers"} - set(d)
+            if missing:
+                raise ValueError(f"distill block needs {sorted(missing)}")
+            unknown = set(d) - {"headline", "teachers", "temperature", "alpha", "extra", "init"}
+            if unknown:
+                raise ValueError(f"distill block has unknown keys {sorted(unknown)}")
+            self.distill = d
 
     @property
     def run_dir(self):

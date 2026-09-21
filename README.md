@@ -33,7 +33,7 @@ Only touch `model.py` to change the *method*.
 | `predict.py` | Entry point: classify one image — the panel demo. Uses the training preprocessing, so it cannot drift |
 | `baselines.py` | Entry point: Xception / EfficientNet-B0 / MobileNetV3-Small on the identical task (`--model`, `--train`) |
 | `cache_sync.py` | Copy a config's tf.data caches to/from Drive, so a reclaimed VM costs minutes, not a 2-hour rebuild |
-| `distill.py` | Entry point: train this architecture on a fine-tuned baseline's probabilities (`--teacher`), same latency, more accuracy |
+| `distill.py` | Knowledge distillation; `train.py` dispatches here for any config with a `distill:` block (`configs/test18_distill.yaml`) |
 | `audit_dataset.py` | Checks whether the two folders are separable by metadata alone |
 | `configs/*.yaml` | Per-experiment settings |
 | `tests/` | Two guard tests (see below) |

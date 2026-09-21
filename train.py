@@ -14,7 +14,11 @@ def main():
     args = ap.parse_args()
 
     cfg = load_config(args.config)
-    train(cfg, resume=args.resume)
+    if cfg.distill:
+        from distill import distill
+        distill(cfg)
+    else:
+        train(cfg, resume=args.resume)
 
 
 if __name__ == "__main__":
