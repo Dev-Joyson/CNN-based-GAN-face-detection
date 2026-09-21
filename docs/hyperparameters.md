@@ -1,13 +1,22 @@
 # Hyperparameters — justified as *tried* or *cited*, nothing else
 
-The panel's standard (2026-09-21): every value is either **(a) tried** — swept
-against alternatives on this data and chosen because it won — or **(b) cited** —
-taken from a paper that reports it works, ideally on a related task. "Inherited
-from the notebook" and "reasonable default" do not qualify. This table says which
-of the two each value has, or what it needs.
+The panel's standard (2026-09-21): a value is justified only by **evidence on this
+data**. A paper's value worked on *their* data; citing it is a justified starting
+point, not a justified value. So every tunable has one of three answers:
 
-Status: **✓ passes**, **~ partly** (citable range, but the exact value is not from the
-paper), **✗ needs a sweep**.
+1. **Swept** — {a, b, c} run on this data; the winner is used, and the numbers are here.
+2. **Cited + sensitivity-checked** — taken from paper P, then its neighbours run on
+   this data and shown to give the same result within seed noise. Two extra runs,
+   and it *is* evidence on this data.
+3. **Not a choice** — a hardware constraint (batch = what fits), or not a
+   hyperparameter at all (seed, shuffle buffer).
+
+"The paper said so", "the default", "the notebook had it" are not answers. The
+table records which of the three each value has — with the numbers once run — or
+what it still needs.
+
+Status: **✓ passes** (1, 2 or 3 with numbers), **~ cited, not yet checked on this
+data**, **✗ nothing yet**.
 
 | parameter | value | status | justification (tried / cited) | what closes the gap |
 |---|---|---|---|---|
@@ -16,10 +25,10 @@ paper), **✗ needs a sweep**.
 | `limit_per_class` | 25,000 | ~ | Budget. Bouthillier et al. 2021: split variance dominates; more data mostly buys stability. | lever 4 (40k) gives the second point |
 | `batch_size` | 144 | ~ constraint | Largest batch of 256² images that fits the 20 GB L4 with this model (17 GB used). Goyal et al. 2017: batch and LR scale together; at fixed LR, larger batch = better GPU use, not different optimum. | sweep {48, 96, 144} at fixed LR — 3 runs — OR state the memory constraint plainly (panels accept this) |
 | `lr` | 3e-4 | ~ | Kingma & Ba 2015 recommend Adam with 1e-3 default; 3e-4 is the widely used conservative value for from-scratch CNNs. Converged without divergence. **Not swept.** | **sweep {1e-4, 3e-4, 1e-3} — 3 runs, ~1.5 h each** (or adopt cosine+warmup, cited: Loshchilov & Hutter 2017, Goyal et al. 2017 — the v2 recipe) |
-| baseline `lr` | 1e-4 | ✓ cited | Fine-tuning a pretrained backbone: an order of magnitude below from-scratch, to preserve pretrained features (Keras transfer-learning guide uses 1e-5–1e-4; Yosinski et al. 2014). | — |
+| baseline `lr` | 1e-4 | ~ cited | Fine-tuning a pretrained backbone: an order of magnitude below from-scratch, to preserve pretrained features (Keras transfer-learning guide uses 1e-5–1e-4; Yosinski et al. 2014). | — |
 | `epochs` | 150 | ✓ tried | A cap under early stopping; 50 was hit mid-climb (test16: 0.945 → 0.972 by 85). Never reached since. | — |
 | `patience` | 15 | ✓ tried | 6 cut the test16 ablation off at epoch 61 at 0.960; 15 let it reach 0.975. Prechelt 1998 on early-stopping criteria. | — |
-| early-stopping metric | val AUC | ✓ cited | Threshold-free; the metric reported. Prechelt 1998. | — |
+| early-stopping metric | val AUC | ✓ (3) | Threshold-free; the metric reported. Prechelt 1998. | — |
 | `seed` | 42 | ✓ n/a | Not a tuned value; must be fixed and reported. Bouthillier et al. 2021: report variation across seeds. | seeds 43, 44 (planned) |
 | `crop_frac_min` | 0.85 | ✗ | Random-resized-crop is standard (Szegedy et al. 2015 use 8–100% area); 0.85 is the notebook's. | fold into the augmentation sweep below, or cite Szegedy's range and adopt a value from it |
 | blur / JPEG aug | p=0.3 each; JPEG q 60–100; blur 3×3 avg | ~ cited | **Wang et al. 2020 (CNNDetection)** use exactly these two augmentations for GAN detection: Gaussian blur σ~U[0,3] and JPEG quality~U[30,100], each with p=0.5 (also a p=0.1 variant), and show they are what makes detection generalise. Our values differ (p=0.3, q≥60, box blur). | **either adopt Wang's values (cited) or sweep {off, ours, Wang's} — 3 runs.** Suspected of deleting SG2's fine artifacts; the sweep answers that too |
@@ -33,7 +42,10 @@ paper), **✗ needs a sweep**.
 | **distill** `init` | false | ✓ by design | From scratch keeps soft-vs-hard a one-variable change. `true` is the cheaper variant for the sweeps. | — |
 | **distill** `teachers` | efficientnet_b0 | ✓ tried | Highest test AUC of the three fine-tuned baselines (0.9997 / 0.9987 / 0.992). | averaging all three is a cheap extra run |
 
-## Sweep plan, in priority order (what the panel will ask about first)
+## Sweep / sensitivity plan, in priority order (what the panel will ask about first)
+
+Each "~" row needs at least a sensitivity check (the value ± one neighbour) to become
+"✓". Record the numbers in the table when they exist.
 
 | sweep | runs | GPU h | why first |
 |---|---|---|---|
