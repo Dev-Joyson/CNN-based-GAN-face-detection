@@ -153,6 +153,10 @@ the README says how things *are*, this says how we found out.
   0-byte history for test19 after ~42 epochs. Checkpoints survived because each save
   closes its file. → HistoryCSV callback: append and close every epoch. Anything
   long-running that writes to Drive must close between writes.
+- **2026-09-21 — Native-resolution audit is clean too: highfreq AUC 0.553.** Raw
+  high-frequency energy does not separate the classes at 256² native patches. The
+  crop model's 0.999 is reading structure, not amount — GAN fingerprint or sensor-noise
+  pattern; the JPEG probe and held-out reals decide which.
 - **Latency needs no training; accuracy does.** The efficiency half of the comparison
   can be measured before any baseline is fine-tuned.
 - **Published detectors zero-shot measure generalisation, not architecture.** CNNDetection

@@ -459,6 +459,11 @@ held-out generator is the real test.
 | contrast | 61.3 | 56.8 | 0.63 |
 | highfreq (post-pipeline) | 1.73 | 1.65 | 0.62 |
 
+**And at native resolution** (the crop pipeline's actual input, 2026-09-21): `highfreq`
+0.553 (real 0.75 / fake 0.69), brightness 0.51, contrast 0.51. No trivial cue there
+either — whatever the crop model reads is in the *structure* of the fine detail, not
+its amount.
+
 Verdict: no single property beats 0.63. The resolution asymmetry of the earlier
 data (reals 512, fakes 1024) is gone. The mild `highfreq`/`contrast` gap — fakes
 slightly smoother — survives an identical resize path for both classes, so it is
