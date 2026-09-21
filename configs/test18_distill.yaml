@@ -1,6 +1,6 @@
 # Test18: the test17 headline architecture, trained by knowledge distillation
 # from the fine-tuned EfficientNet-B0 (0.9997 on this data) instead of hard
-# labels, plus 30k of the images that test17 never sampled (15k per class).
+# labels. Same 35k training images as test17; only the training signal changes.
 # Same network, same inference latency; only the training signal changes.
 #
 # Data fields are identical to test17_sg2 so the split (and val/test) is the
@@ -36,5 +36,5 @@ distill:
   teachers: [efficientnet_b0]    # averaged if more than one
   temperature: 2.0
   alpha: 0.7                     # weight on the soft (teacher) term; 1-alpha on the hard label
-  extra: true                    # add the unsampled leftovers, balanced: 15k real + 15k fake (all the spare fakes)
+  extra: false                   # the headline's 35k only -- one variable changes vs test17: soft labels instead of hard
   init: false                    # true = warm-start from test17_sg2's model.keras
