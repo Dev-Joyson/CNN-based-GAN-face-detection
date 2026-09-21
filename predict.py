@@ -14,11 +14,12 @@ import os
 
 import tensorflow as tf
 
-from model import apply_mask, feathered_ellipse, load_and_resize, load_config
+from model import apply_mask, eval_view, feathered_ellipse, load_and_resize, load_config
 
 
 def preprocess(path, cfg, face_mask):
     image, _ = load_and_resize(tf.constant(path), tf.constant(0), cfg)   # uint8, as cached
+    image = eval_view(image, cfg)                                          # centre window in crop mode
     image = tf.cast(image, tf.float32) / 255.0
     image = apply_mask(image, face_mask, cfg.mask_mode)                    # identity for `none`
     return tf.clip_by_value(image, 0.0, 1.0)[tf.newaxis]                  # (1, H, W, 3)

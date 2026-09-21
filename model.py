@@ -39,8 +39,21 @@ class Config:
 
     # data / model geometry
     img_size: int = 256
-    native_size: int = 512                # normalize native resolution first
+    native_size: int = 512                # resize mode: intermediate resize before img_size
     batch_size: int = 144
+
+    # input_mode -- how a 256^2 input is made from a 1024^2 image:
+    #   resize: 1024 -> native_size -> img_size, bicubic. Two low-passes; the
+    #           GAN fingerprint above img_size's Nyquist is gone before the
+    #           model sees a pixel (post-pipeline highfreq AUC 0.52 on SG2).
+    #   crop:   NO resampling. Cache the centre cache_size^2 at native pixels;
+    #           train on random img_size^2 windows of it, evaluate on the
+    #           centre window. Same input size, same model, same latency --
+    #           only where the pixels come from changes. cache_size trades
+    #           coverage (hair, background) against cache size and per-epoch
+    #           disk read: 512 -> 27 GB, 768 -> 62 GB, 1024 -> 157 GB.
+    input_mode: str = "resize"
+    cache_size: int = 512
 
     # training
     epochs: int = 500
@@ -78,6 +91,13 @@ class Config:
     def __post_init__(self):
         if self.mask_mode not in MASK_MODES:
             raise ValueError(f"mask_mode must be one of {MASK_MODES}, got {self.mask_mode!r}")
+        if self.input_mode not in ("resize", "crop"):
+            raise ValueError(f"input_mode must be resize or crop, got {self.input_mode!r}")
+        if self.input_mode == "crop" and self.mask_mode != "none":
+            raise ValueError("crop mode: a 256^2 patch of a 1024^2 face is not a whole "
+                             "aligned face, so the ellipse mask does not apply; mask_mode must be none")
+        if self.input_mode == "crop" and self.cache_size < self.img_size:
+            raise ValueError("crop mode: cache_size must be >= img_size")
         if self.distill is not None:
             d = {"temperature": 2.0, "alpha": 0.7, "extra": True, "init": False,
                  "calibrate": False, **self.distill}
@@ -104,6 +124,8 @@ class Config:
         ident = f"{self.real_dir}|{self.fake_dir}".encode()
         tag = hashlib.sha1(ident).hexdigest()[:8]
         key = f"n{self.limit_per_class}_i{self.img_size}_n{self.native_size}_s{self.seed}_{tag}"
+        if self.input_mode == "crop":
+            key += f"_crop{self.cache_size}"          # a different cache: native pixels, no resize
         return os.path.join(self.cache_dir, key, split)
 
 
@@ -225,6 +247,12 @@ def load_and_resize(path, label, cfg):
     # keeps a static (H, W, 3) rather than a (frames, H, W, 3) for GIF-like input
     image = tf.io.decode_image(image, channels=3, expand_animations=False)
 
+    if cfg.input_mode == "crop":
+        # centre cache_size^2 at native pixels. resize_with_crop_or_pad crops;
+        # it never interpolates. (Pads only if an image is smaller -- none are.)
+        image = tf.image.resize_with_crop_or_pad(image, cfg.cache_size, cfg.cache_size)
+        return tf.cast(image, tf.uint8), label
+
     # Normalize native resolution (fix resolution bias), then resize to model input
     image = tf.image.resize(image, [cfg.native_size, cfg.native_size],
                             method=tf.image.ResizeMethod.BICUBIC)
@@ -236,12 +264,27 @@ def load_and_resize(path, label, cfg):
     return image, label
 
 
+def eval_view(image, cfg):
+    """The evaluation-time input: in crop mode the centre img_size^2 window of
+    the cached region; in resize mode the cached image is already it. Shared
+    by the val/test pipeline and predict.py so the demo cannot drift."""
+    if cfg.input_mode == "crop":
+        return tf.image.resize_with_crop_or_pad(image, cfg.img_size, cfg.img_size)
+    return image
+
+
 def augment_and_mask(image, label, cfg, face_mask, training):
+    if cfg.input_mode == "crop":
+        # a random window in training, the centre one otherwise. Native pixels,
+        # no resampling anywhere. random_crop_resize is skipped: it resizes.
+        image = (tf.image.random_crop(image, [cfg.img_size, cfg.img_size, 3])
+                 if training else eval_view(image, cfg))
     image = tf.cast(image, tf.float32) / 255.0     # float conversion AFTER cache
 
     if training:
-        image = random_crop_resize(image, cfg.img_size, cfg.crop_frac_min)
-        image = tf.clip_by_value(image, 0.0, 1.0)   # bicubic overshoots again
+        if cfg.input_mode == "resize":
+            image = random_crop_resize(image, cfg.img_size, cfg.crop_frac_min)
+            image = tf.clip_by_value(image, 0.0, 1.0)   # bicubic overshoots again
         image = random_blur(image)
         image = tf.cond(tf.random.uniform([]) < 0.3,
                         lambda: random_jpeg(image),

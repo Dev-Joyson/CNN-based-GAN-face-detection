@@ -581,11 +581,15 @@ def evaluate(cfg):
     layer_name = plot_gradcam(model, ds["test"], os.path.join(cfg.run_dir, "gradcam.png"))
 
     face_mask = feathered_ellipse(cfg.img_size, cfg.mask_rx, cfg.mask_ry, cfg.mask_feather)
-    attention = attention_in_face(model, ds["test"], face_mask, layer_name) if layer_name else None
-    if cfg.mask_mode == "none":
-        swap = swap_test(model, ds["test"], face_mask)
+    if cfg.input_mode == "crop":
+        note = "input_mode=crop: a 256^2 native patch is not a whole face; the ellipse does not apply"
+        attention, swap = None, {"skipped": note}
     else:
-        swap = {"skipped": f"mask_mode={cfg.mask_mode}: masked images have no background to swap"}
+        attention = attention_in_face(model, ds["test"], face_mask, layer_name) if layer_name else None
+        if cfg.mask_mode == "none":
+            swap = swap_test(model, ds["test"], face_mask)
+        else:
+            swap = {"skipped": f"mask_mode={cfg.mask_mode}: masked images have no background to swap"}
     print("shortcut checks:")
     print(f"  attention in face : real {attention['real']}  fake {attention['fake']}  "
           f"(uniform {attention['uniform_baseline']})" if attention else "  attention: n/a")

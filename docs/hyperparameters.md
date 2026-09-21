@@ -21,6 +21,8 @@ data**, **✗ nothing yet**.
 | parameter | value | status | justification (tried / cited) | what closes the gap |
 |---|---|---|---|---|
 | `img_size` | 256 | ✓ tried + cited | Compute scales with pixels (1.2 G MACs at 256², 4.8 G at 512²); the efficiency claim needs a fixed budget. Wang et al. 2020 (CNNDetection) train on 224² crops. The native-crop experiment tests the alternative *at equal compute*. | crop experiment (planned) |
+| `input_mode` | crop (test19) | ✓ tried (by design) | The resize is a low-pass that deletes the fingerprint (post-pipeline highfreq 0.52). Crop mode is the controlled test: same input size and latency, native pixels. Patch-based forensics: Chai et al. 2020. | test17 vs test19 is the check |
+| `cache_size` | 512 | constraint, then tried | Per-epoch disk read scales with it: 512 → 27 GB, 768 → 62 GB, 1024 → 157 GB. 512 is the cheapest test of the hypothesis; 768 (hair) follows if 512 helps. | 768 run if 512 wins |
 | `native_size` | 512 | ✗ | Redundant now that both classes are 1024². No paper, no sweep. | one run with `native_size: 1024` (single resize); expect no change; then keep whichever is simpler |
 | `limit_per_class` | 25,000 | ~ | Budget. Bouthillier et al. 2021: split variance dominates; more data mostly buys stability. | lever 4 (40k) gives the second point |
 | `batch_size` | 144 | ~ constraint | Largest batch of 256² images that fits the 20 GB L4 with this model (17 GB used). Goyal et al. 2017: batch and LR scale together; at fixed LR, larger batch = better GPU use, not different optimum. | sweep {48, 96, 144} at fixed LR — 3 runs — OR state the memory constraint plainly (panels accept this) |

@@ -36,7 +36,7 @@ Only touch `model.py` to change the *method*.
 | `distill.py` | Knowledge distillation; `train.py` dispatches here for any config with a `distill:` block (`configs/test18_distill.yaml`) |
 | `audit_dataset.py` | Checks whether the two folders are separable by metadata alone |
 | `configs/*.yaml` | Per-experiment settings |
-| `tests/` | Two guard tests (see below) |
+| `tests/` | Three guard tests (see below) |
 | `conftest.py` | Puts the repo root on `sys.path` so bare `pytest tests -q` can import `model` |
 | `requirements-dev.txt` | Laptop install (CPU-only) for tests + audit; `requirements.txt` is the training env |
 | `docs/` | `learnings.md` — one line per thing we found out; `hyperparameters.md` — where every config value came from and whether it was tuned; `research-repo-practice.md` — sourced notes on how this repo should be run |
@@ -367,6 +367,14 @@ proper form — online distillation, teacher on the same augmented batch, out-of
 data, long schedule — is implemented as `online: true` and reserved for whichever
 input pipeline wins the crop experiment.
 
+**Native-resolution crops (test19).** Every from-scratch result at 256² tops out
+around 0.96 and every pretrained one at 0.99+; the audit says the post-resize image
+has almost no high-frequency separation left (0.52). `input_mode: crop` feeds the
+same model 256² windows of the *native* 1024² pixels instead — no bicubic anywhere.
+Same input size, same latency. If the ceiling was the resize, this moves it; if it
+was the model, it does not. `cache_size: 512` first (face core, 27 GB cache); 768
+keeps the hair. The swap/attention checks need a whole face and are skipped here.
+
 **The ablation — the FFT branch helps only when the task is hard.** Same model with
 the branch removed and nothing else changed, on both datasets:
 
@@ -403,6 +411,7 @@ input, where the frequencies it was designed for have not been resized away.
 | test18_distill | distillation, raw EfficientNet-B0 teacher, T=2, same 35k | same | 0.9226 (acc 0.84) — **worse**; swap drop 0.21 | 0.9123 (best 104, killed at 111) | `experiments/test18_distill/` |
 | test18b_distill_cal | distillation, teacher calibrated first (Guo 2017) | same | not run: T_cal = 1.10 — the teacher is not miscalibrated, it is near-perfect (val 0.013 / 0.995 and right that often) | | — |
 | test18c_distill_mnv3 | distillation, MobileNetV3-Small teacher (student's size, 0.992) | same | 0.9014 (acc 0.80) — **worse**; swap drop 0.18 | 0.904 (best 63, killed at 64) | `experiments/test18c_distill_mnv3/` |
+| test19_sg2_crop | **native-resolution crops** — no resampling; 256² windows of the 1024² pixels, centre 512² cached | same | _pending_ | | `experiments/test19_sg2_crop/` |
 | test16_full | *preliminary* — StyleGAN1+2 mix, ratio unknown | FFHQ 1024 + FakeMix, 20k/class | 0.9728 (acc 0.91) | 0.9724 (best 85 of 91) | `experiments/test16_full/` |
 | test16_no_fft | *preliminary* ablation on the mix | same | 0.9751 (acc 0.91) | 0.9748 (patience 15; stopped at 101) | `experiments/test16_no_fft/` |
 | test13_face | control — `face_only` | FFHQ 1024 + FakeMix, 25k/class | _pending_ | 0.9995 | `experiments/test13_face/` |
@@ -472,6 +481,8 @@ Root `conftest.py` exists solely so the bare command works: pytest's default
   would transform colour, not space. Checked against `numpy.fft.fft2`.
 - `test_mask_applied.py` — val and test batches really are masked. Catches the
   `if training:` indentation bug above.
+- `test_crop_mode.py` — `input_mode: crop` never resamples: the cache is an exact
+  slice of the file and the eval view an exact slice of the cache.
 
 Both verified to fail when those bugs are reintroduced.
 
