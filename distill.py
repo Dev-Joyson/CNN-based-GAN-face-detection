@@ -83,14 +83,22 @@ class HardAccuracy(tf.keras.metrics.BinaryAccuracy):
 # --------------------------------------------------------------------------- #
 
 def extra_pool(cfg, splits):
-    """Images in the folders that the headline did not sample. Labels are the
-    folder's; these are not unlabeled, they are unused."""
+    """Images in the folders that the headline did not sample, BALANCED: the
+    same number from each class, seeded. Labels are the folder's; these are
+    not unlabeled, they are unused. The folders are 70k / 40k, so the
+    leftovers after a 25k draw are 45k / 15k -- taking all of them would make
+    training 62.5k real vs 32.5k fake."""
+    import random
     used = set()
     for paths, _ in splits.values():
         used.update(paths)
     real = [p for p in list_images(cfg.real_dir) if p not in used]
     fake = [p for p in list_images(cfg.fake_dir) if p not in used]
-    return real + fake, [0] * len(real) + [1] * len(fake)
+    n = min(len(real), len(fake))
+    rng = random.Random(cfg.seed)
+    real = sorted(rng.sample(real, n)) if len(real) > n else real
+    fake = sorted(rng.sample(fake, n)) if len(fake) > n else fake
+    return real + fake, [0] * n + [1] * n
 
 
 def teacher_logits(teachers, base_ds, batch=144):
@@ -146,7 +154,7 @@ def distill(cfg):
     train_ds = cached_dataset(train_paths, train_labels, hcfg, "train")   # the headline's own cache
     if d["extra"]:
         xp, xl = extra_pool(hcfg, splits)
-        print(f"extra pool: {xl.count(0)} real + {xl.count(1)} fake unused by the headline")
+        print(f"extra pool: {xl.count(0)} real + {xl.count(1)} fake unused by the headline (balanced)")
         # a separate cache for the extras, concatenated after: the 35k are not
         # re-read, and the train cache stays shared with train.py
         train_ds = train_ds.concatenate(cached_dataset(xp, xl, hcfg, "extra"))
