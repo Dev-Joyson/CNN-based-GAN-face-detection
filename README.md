@@ -407,9 +407,9 @@ model above; the research answer is scale augmentation at training time (windows
 at 1×, ½×, ¼×), which costs nothing at inference. Gragnaniello et al. 2021 report the
 same failure mode for detectors on social-media re-uploads; it is the field's open
 problem, not this model's alone. The signal is structure that survives
-re-encoding — a generator fingerprint's profile, not a camera's. Still to run: reals
-from a second source (CelebA-HQ) and a held-out generator; both are confirmation
-now rather than rescue. The whole-face checks (swap, attention) do not apply to
+re-encoding — a generator fingerprint's profile, not a camera's. Held-out generator: run —
+StyleGAN3-T gives AUC 0.70 for both models (see *Held-out generator* under Results);
+the fingerprint is SG2-specific. Still to run: reals from a second source (CelebA-HQ). The whole-face checks (swap, attention) do not apply to
 patches; the resize-mode results stand for those. `cache_size: 768` (the hair) is
 the follow-up.
 
@@ -479,6 +479,44 @@ test13's val figure is a record of the original notebook run — there is no run
 folder behind it, so retrain before citing it anywhere. The old test14 run is
 excluded: its mask line sat inside `if training:`, so val/test went unmasked and
 it degenerated.
+
+### Held-out generator: StyleGAN3-T
+
+```bash
+python heldout.py --config configs/test19_sg2_crop_no_fft.yaml --fake-dir "/content/drive/MyDrive/Fake(SG3-T-psi1)" --tag sg3t
+python heldout.py --config configs/test19_sg2_crop.yaml        --fake-dir "/content/drive/MyDrive/Fake(SG3-T-psi1)" --tag sg3t
+```
+
+1,500 images from the official NVIDIA `stylegan3-t-ffhq-1024x1024.pkl` (ψ=1.0,
+seeds 100000–101499, reference PyTorch ops) against 1,500 FFHQ reals the models never
+sampled. Same native-crop eval view as the test set. Writes `eval_heldout_sg3t.json`
+in each run folder (2026-09-22, L4).
+
+| model | in-distribution test AUC (SG2) | **SG3-T AUC** | acc@0.5 | fake recall | mean p_fake real / fake |
+|---|---|---|---|---|---|
+| test19_sg2_crop_no_fft (headline) | 0.9996 | **0.703** | 0.529 | 0.064 | 0.012 / 0.081 |
+| test19_sg2_crop (with FFT) | 0.9994 | **0.711** | 0.526 | 0.056 | 0.012 / 0.077 |
+
+**Neither model transfers.** Both score 94% of StyleGAN3 faces as real; the 0.70 AUC is
+a weak ranking signal with no usable threshold. Unseen FFHQ reals are still scored
+correctly (p_fake 0.012), so the failure is entirely on the fake side: the fingerprint
+learned from StyleGAN2 is not present in StyleGAN3. That is by design of the
+generator — Karras et al. (NeurIPS 2021) built StyleGAN3 to be alias-free, removing
+exactly the upsampling artifacts StyleGAN2 leaves. The same collapse is reported for
+every single-generator detector in Wang et al. (CVPR 2020) and Gragnaniello et al.
+(ICME 2021); it is the known generalisation gap, not a property of this model.
+
+**The FFT branch does not close the gap either** (0.711 vs 0.703, inside the noise of
+1,500 samples). Fourth row of the ablation: 0 on the mix, +0.011 on resized SG2, 0 on
+native SG2, +0.008 on a held-out generator. The frequency branch is dropped from the
+headline on every axis measured.
+
+What the claim is, stated exactly: in-distribution detection of StyleGAN2 at
+1.01M parameters and ~1 ms, competitive with detectors 4–20× larger on the same
+task. Cross-generator generalisation is out of scope and reported honestly as 0.70;
+fixing it (multi-generator training, Wang 2020's augmentation set at scale) is future
+work, and the baselines are expected to share the gap — worth measuring once they
+are fine-tuned on the crop pipeline.
 
 ## Is the dataset honest?
 

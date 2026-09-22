@@ -179,6 +179,15 @@ the README says how things *are*, this says how we found out.
   Operating condition = native-resolution input, stated. Size routing (resize model
   below ~512 px) is the stopgap; scale augmentation is the fix. Same failure mode
   Gragnaniello 2021 report for social-media re-uploads.
+- **2026-09-22 — Held-out StyleGAN3-T: AUC 0.70, fake recall 6%, both models.** The
+  SG2 fingerprint the crop model reads is absent from StyleGAN3 — Karras 2021 designed
+  it alias-free, removing the upsampling artifacts SG2 leaves. Unseen FFHQ reals still
+  score 0.012, so the failure is one-sided: unseen fakes look real. Matches the
+  cross-generator collapse Wang 2020 / Gragnaniello 2021 report; the claim stays
+  in-distribution, the gap is stated, not hidden.
+- **2026-09-22 — The FFT branch does not generalise either: 0.711 vs 0.703.** Fourth
+  ablation row, same verdict. A frequency branch trained on one generator learns that
+  generator's spectrum; it is not a generator-agnostic prior. Dropped on every axis.
 - **Latency needs no training; accuracy does.** The efficiency half of the comparison
   can be measured before any baseline is fine-tuned.
 - **Published detectors zero-shot measure generalisation, not architecture.** CNNDetection
