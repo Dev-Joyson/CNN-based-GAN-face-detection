@@ -31,6 +31,7 @@ Only touch `model.py` to change the *method*.
 | `train.py` | Entry point: train (`--config`) |
 | `evaluate.py` | Entry point: confusion matrix, ROC, Grad-CAM, efficiency numbers |
 | `predict.py` | Entry point: classify one image — the panel demo. Uses the training preprocessing, so it cannot drift |
+| `heldout.py` | Score a trained model on a generator or real source it never saw (`--fake-dir` / `--real-dir`); the generalisation test and the FFT branch's last exam |
 | `baselines.py` | Entry point: Xception / EfficientNet-B0 / MobileNetV3-Small on the identical task (`--model`, `--train`) |
 | `cache_sync.py` | Copy a config's tf.data caches to/from Drive, so a reclaimed VM costs minutes, not a 2-hour rebuild |
 | `distill.py` | Knowledge distillation; `train.py` dispatches here for any config with a `distill:` block (`configs/test18_distill.yaml`) |
