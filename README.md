@@ -393,9 +393,19 @@ Flickr-JPEG past that the fakes lack — a model could read "photograph" instead
 | JPEG q95 on both classes before scoring | 0.9994 → **0.9976** (no-FFT: 0.9996 → 0.9984) | −0.002; the resize model drops −0.027 under the same treatment |
 | JPEG q75 (social-media grade) | 0.9994 → **0.9862** (no-FFT: 0.9864) | still above the resize model's *clean* 0.964 |
 
+| **whole face downscaled to 256² (the resize pipeline's input)** | **0.5563** | **chance** — the fingerprint is scale-specific; shrink the image and it is gone |
+
 Compression flattens sensor noise and overwrites compression history for both classes
 equally; a model reading those collapses at q75. This one lost 0.013, and is *more*
-robust to compression than the resize pipeline. The signal is structure that survives
+robust to compression than the resize pipeline. But downscaling removes the evidence
+entirely: the crop model is at chance on the same faces shrunk to 256². **Operating
+condition of the headline: native-resolution input.** Robust to recompression, not to
+resizing. For platform-resized images (Instagram ~1080 px, WhatsApp smaller) the
+current answer is size routing — the resize model (0.964) below ~512 px, the crop
+model above; the research answer is scale augmentation at training time (windows drawn
+at 1×, ½×, ¼×), which costs nothing at inference. Gragnaniello et al. 2021 report the
+same failure mode for detectors on social-media re-uploads; it is the field's open
+problem, not this model's alone. The signal is structure that survives
 re-encoding — a generator fingerprint's profile, not a camera's. Still to run: reals
 from a second source (CelebA-HQ) and a held-out generator; both are confirmation
 now rather than rescue. The whole-face checks (swap, attention) do not apply to
