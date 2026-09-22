@@ -393,7 +393,7 @@ Flickr-JPEG past that the fakes lack — a model could read "photograph" instead
 | JPEG q95 on both classes before scoring | 0.9994 → **0.9976** (no-FFT: 0.9996 → 0.9984) | −0.002; the resize model drops −0.027 under the same treatment |
 | JPEG q75 (social-media grade) | 0.9994 → **0.9862** (no-FFT: 0.9864) | still above the resize model's *clean* 0.964 |
 
-| **whole face downscaled to 256² (the resize pipeline's input)** | **0.5563** | **chance** — the fingerprint is scale-specific; shrink the image and it is gone |
+| **whole face downscaled to 256² (the resize pipeline's input)** | **0.5563** (with FFT: 0.5902) | **chance** — the fingerprint is scale-specific; shrink the image and it is gone. The FFT branch does not buy scale robustness either |
 
 Compression flattens sensor noise and overwrites compression history for both classes
 equally; a model reading those collapses at q75. This one lost 0.013, and is *more*
