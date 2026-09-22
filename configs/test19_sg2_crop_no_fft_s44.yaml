@@ -1,0 +1,46 @@
+# Seed 44 of the HEADLINE (no-FFT native crops). Same config, one number
+# changed. New split, new init, new cache (seed is in the key).
+#
+# Ablation of test19: identical except the FFT branch is removed. On the
+# resize pipeline the branch bought +0.011 on SG2 -- while looking at a
+# spectrum whose high band the resize had already deleted. Native crops are
+# the first input where the FFT sees the frequencies it was designed for.
+#
+# Test19: test17 with NO resampling. The 256^2 input is a window of native
+# 1024^2 pixels instead of the whole face shrunk to 256^2. Same model, same
+# input size, same latency. Tests whether the accuracy ceiling at 256^2 is the
+# model's capacity or what the bicubic resize deleted (post-pipeline highfreq
+# AUC 0.52 on SG2 -- the fingerprint above 256's Nyquist is gone).
+#
+# cache_size 512 first: the cheapest test of the question. If it helps, 768
+# (hair) is the follow-up. Per-epoch disk read scales with cache_size^2.
+# The whole-face shortcut checks (swap, attention) do not apply to patches
+# and are skipped; the resize-mode results stand for those.
+name: test19_sg2_crop_no_fft_s44
+fft_branch: false
+
+real_dir: "/content/drive/MyDrive/Real(FFHQ)"
+fake_dir: "/content/drive/MyDrive/Fake(SG2-psi1)"
+
+mask_mode: none
+limit_per_class: 25000
+
+img_size: 256
+native_size: 512            # unused in crop mode
+input_mode: crop
+cache_size: 512             # centre 512^2 at native pixels; 768 keeps the hair, 1024 everything -- see model.Config
+batch_size: 144
+
+epochs: 150               # let patience decide
+lr: 0.0003
+patience: 15              # 6 cut the test16 ablation off mid-climb; both runs sat at 0.960 at epoch 61
+seed: 44                 # the +- on the headline: seed drives the split AND the init (Bouthillier 2021)
+
+crop_frac_min: 0.85
+shuffle_buffer: 8192         # train split is 28000; a full-set buffer would be ~5.5 GB of
+                             # uint8 images in RAM -- too much for a standard Colab runtime.
+                             # Raise toward 28000 on a high-RAM runtime if you want the
+                             # notebook's whole-set shuffle.
+
+cache_dir: "/content/cache"
+out_dir: "/content/drive/MyDrive/Research/experiments"
