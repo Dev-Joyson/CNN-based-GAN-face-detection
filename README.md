@@ -337,7 +337,7 @@ comparable to the headline.
 | this model, resize pipeline (test17) | 1.02M | 1.20G | 1.34 | 8.7 | 1,564 | 1,301 | 0.964 (mix 0.973) | — |
 | this model, no FFT branch, resize pipeline | 1.01M | 1.11G | **0.99** | **6.6** | 2,098 | 1,301 | 0.953 (mix 0.975) | — |
 | MobileNetV3-Small | 1.01M | **0.07G** | 4.71 | 18.7 | **2,684** | **181** | 0.992 (ImageNet-pretrained, fine-tuned) | **0.9999** (acc 0.998; test20, 2026-09-23) |
-| EfficientNet-B0 | 4.21M | 0.50G | 6.82 | 39.8 | 540 | 198 | 0.9997 (ImageNet-pretrained, fine-tuned) | _running_ |
+| EfficientNet-B0 | 4.21M | 0.50G | 6.82 | 39.8 | 540 | 198 | 0.9997 (ImageNet-pretrained, fine-tuned) | **1.0000** (0.999999; acc 0.999; early-stopped ep 19; test20, 2026-09-23) |
 | Xception | 21.1M | 5.95G | 4.78 | 65.0 | 377 | 560 | 0.9987 (ImageNet-pretrained, fine-tuned, stopped early at a 0.999 plateau) | _pending_ |
 
 The honest reading. **Single-image latency: this model wins by 3.5–5×**, including

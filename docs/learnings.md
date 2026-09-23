@@ -196,6 +196,12 @@ the README says how things *are*, this says how we found out.
   rests on the resources columns — 4.7× lower bs=1 latency at equal params — and on
   from-scratch parity with a fine-tuned ImageNet backbone. EfficientNet-B0 and Xception
   on crops follow.
+- **2026-09-23 — EfficientNet-B0 on crops: test AUC 1.0000 (0.999999), acc 0.999,
+  early-stopped at epoch 19 with val AUC pinned at 1.0 from epoch 1.** Same test20 run
+  folder. On native pixels the SG2 fingerprint is effectively separable for any
+  ImageNet backbone; the crop pipeline has removed the accuracy axis as a
+  differentiator between models. What remains to compare is resources (7× the
+  headline's bs=1 latency, 4.2× the params) and generalisation (StyleGAN3-T, todo 2).
 - **Latency needs no training; accuracy does.** The efficiency half of the comparison
   can be measured before any baseline is fine-tuned.
 - **Published detectors zero-shot measure generalisation, not architecture.** CNNDetection
