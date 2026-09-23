@@ -188,6 +188,14 @@ the README says how things *are*, this says how we found out.
 - **2026-09-22 — The FFT branch does not generalise either: 0.711 vs 0.703.** Fourth
   ablation row, same verdict. A frequency branch trained on one generator learns that
   generator's spectrum; it is not a generator-agnostic prior. Dropped on every axis.
+- **2026-09-23 — Native crops lift the pretrained baselines too: MobileNetV3-Small
+  0.992 (resize) → 0.9999 (crop), acc 0.998, val AUC 1.0000 by epoch 30, no plateau
+  (0.987 after one epoch).** test20_crop_baselines, same cache/split as the headline.
+  The resize was the ceiling for everyone, not just the from-scratch model. On the
+  crop pipeline the headline (0.9996) no longer leads MobileNet on accuracy; the claim
+  rests on the resources columns — 4.7× lower bs=1 latency at equal params — and on
+  from-scratch parity with a fine-tuned ImageNet backbone. EfficientNet-B0 and Xception
+  on crops follow.
 - **Latency needs no training; accuracy does.** The efficiency half of the comparison
   can be measured before any baseline is fine-tuned.
 - **Published detectors zero-shot measure generalisation, not architecture.** CNNDetection

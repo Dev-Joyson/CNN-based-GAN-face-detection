@@ -76,11 +76,13 @@ branch, native-resolution 256² crops. Test AUC 0.9996, 1.01M params, ~1 ms on L
 
 ## Still to do, in order
 
-1. **Baselines on the crop pipeline** (accuracy column only re-runs):
-   `nohup python -u baselines.py --config configs/test19_sg2_crop_no_fft.yaml --model mobilenet_v3_small --train > /content/bl_mnv3.log 2>&1 &`
-   then `efficientnet_b0`, then `xception`. ~30 epochs each at batch 32. Started by
-   Joyson on 2026-09-22; check `experiments/test19_sg2_crop_no_fft/baselines/<model>/`
-   for `eval.json` before re-running. Record in README Baselines + learnings.
+1. **Baselines on the crop pipeline** (accuracy column only re-runs), under
+   `configs/test20_crop_baselines.yaml` (headline config renamed; same cache key):
+   `nohup python -u baselines.py --config configs/test20_crop_baselines.yaml --model efficientnet_b0 --train > /content/bl_effb0.log 2>&1 &`
+   then `xception`. ~30 epochs each at batch 32, ~70 min. **mobilenet_v3_small done
+   2026-09-23: test AUC 0.9999** (README Baselines, learnings). Check
+   `experiments/test20_crop_baselines/baselines/<model>/` for `eval.json` before
+   re-running; `--resume` if `model.keras` exists without it.
 2. **Baselines on StyleGAN3-T**: `heldout.py` needs a `--model <baseline>` option
    (loads the baseline's checkpoint instead of the headline's) — not written yet.
    Answers whether the generalisation gap is shared by the big models (expected yes).

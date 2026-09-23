@@ -323,17 +323,22 @@ the same `train()` loop. Each backbone's ImageNet preprocessing is a layer insid
 the model — the data pipeline is byte-identical for every model, and the
 preprocessing is timed as part of running it.
 
-**Efficiency, measured — one L4, one session, 2026-09-20:**
+**Efficiency, measured — one L4, one session, 2026-09-20.** The accuracy columns are
+two pipelines: *resize* (1024→512→256, the baselines' original fine-tunes) and *crop*
+(native 256² windows, the headline's pipeline; `configs/test20_crop_baselines.yaml`,
+same data/split/cache as the headline, batch 32 / lr 1e-4 / 30 epochs, run folder
+`experiments/test20_crop_baselines/baselines/<model>/`). Only the crop column is
+comparable to the headline.
 
-| model | params | MACs @256² | **ms @ bs=1, L4** | ms @ bs=1, CPU | img/s @144 | peak MB @ bs=1 | test AUC, SG2 | (mix) |
+| model | params | MACs @256² | **ms @ bs=1, L4** | ms @ bs=1, CPU | img/s @144 | peak MB @ bs=1 | test AUC, SG2 (resize) | test AUC, SG2 (**crop**) |
 |---|---|---|---|---|---|---|---|---|
-| **this model, native crops, no FFT (headline)** | 1.01M | 1.11G | **1.02** | **8.4** | 2,098 | 1,301 | **0.9996** | — |
-| this model, native crops, with FFT (test19) | 1.02M | 1.20G | 1.49 | 8.6 | 1,564 | 1,301 | 0.9994 | — |
-| this model, resize pipeline (test17) | 1.02M | 1.20G | 1.34 | 8.7 | 1,564 | 1,301 | 0.964 | 0.973 |
-| this model, no FFT branch | 1.01M | 1.11G | **0.99** | **6.6** | 2,098 | 1,301 | 0.953 | 0.975 |
-| MobileNetV3-Small | 1.01M | **0.07G** | 4.71 | 18.7 | **2,684** | **181** | **0.992** (ImageNet-pretrained, fine-tuned) |
-| EfficientNet-B0 | 4.21M | 0.50G | 6.82 | 39.8 | 540 | 198 | **0.9997** (ImageNet-pretrained, fine-tuned) |
-| Xception | 21.1M | 5.95G | 4.78 | 65.0 | 377 | 560 | 0.9987 (ImageNet-pretrained, fine-tuned, stopped early at a 0.999 plateau) |
+| **this model, native crops, no FFT (headline)** | 1.01M | 1.11G | **1.02** | **8.4** | 2,098 | 1,301 | — | **0.9996** |
+| this model, native crops, with FFT (test19) | 1.02M | 1.20G | 1.49 | 8.6 | 1,564 | 1,301 | — | 0.9994 |
+| this model, resize pipeline (test17) | 1.02M | 1.20G | 1.34 | 8.7 | 1,564 | 1,301 | 0.964 (mix 0.973) | — |
+| this model, no FFT branch, resize pipeline | 1.01M | 1.11G | **0.99** | **6.6** | 2,098 | 1,301 | 0.953 (mix 0.975) | — |
+| MobileNetV3-Small | 1.01M | **0.07G** | 4.71 | 18.7 | **2,684** | **181** | 0.992 (ImageNet-pretrained, fine-tuned) | **0.9999** (acc 0.998; test20, 2026-09-23) |
+| EfficientNet-B0 | 4.21M | 0.50G | 6.82 | 39.8 | 540 | 198 | 0.9997 (ImageNet-pretrained, fine-tuned) | _running_ |
+| Xception | 21.1M | 5.95G | 4.78 | 65.0 | 377 | 560 | 0.9987 (ImageNet-pretrained, fine-tuned, stopped early at a 0.999 plateau) | _pending_ |
 
 The honest reading. **Single-image latency: this model wins by 3.5–5×**, including
 against EfficientNet-B0, which has *half* the MACs — MACs are an indirect metric
