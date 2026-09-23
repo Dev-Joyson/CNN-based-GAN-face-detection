@@ -52,9 +52,11 @@ branch, native-resolution 256² crops. Test AUC 0.9996, 1.01M params, ~1 ms on L
   `/content/drive/MyDrive/Fake(SG2-psi1)`, StyleGAN3 held-out
   `/content/drive/MyDrive/Fake(SG3-T-psi1)` (1,500 imgs), outputs
   `/content/drive/MyDrive/Research/experiments/<config>/`, local cache `/content/cache`.
-  These are on **Joyson's Google Drive**. A teammate's Colab mounts their own Drive, so
-  Joyson must share those folders and the teammate adds shortcuts to My Drive under the
-  same names, or the configs' paths get edited.
+  The whole group works from **one shared Colab Pro account and one Drive**, so these
+  paths resolve unchanged for everyone. Consequences: compute units are shared (one
+  long GPU job at a time, coordinate before starting one), and a second person
+  connecting can attach to the same running VM — check `ps aux | grep python` and
+  `tail` the `/content/*.log` files before assuming the machine is idle.
 - Crop cache (~33 GB) is synced to Drive; on a fresh VM run
   `python cache_sync.py --config configs/test19_sg2_crop.yaml --from-drive` (≈20 min)
   before any crop-pipeline training, or it re-decodes 50k PNGs.
