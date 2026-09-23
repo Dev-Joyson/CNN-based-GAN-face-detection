@@ -69,20 +69,18 @@ branch, native-resolution 256² crops. Test AUC 0.9996, 1.01M params, ~1 ms on L
 - Headline + FFT ablation on crops (test19), resize pipeline (test17), preliminary
   mix (test16), distillation (test18, 18c), on-resize probes, JPEG probes, native and
   post-resize dataset audits, StyleGAN3-T held-out (both models, 2026-09-22).
-- Baselines fine-tuned and evaluated on the **resize** pipeline only (README
-  "Baselines"): MobileNet 0.992, Xception 0.9987, EffNet 0.9997. Their efficiency
-  numbers are final; their accuracy numbers are not comparable to the crop headline.
+- Baselines fine-tuned on both pipelines (README "Baselines"): resize MobileNet
+  0.992 / Xception 0.9987 / EffNet 0.9997; **crop (test20) 0.9999 / 1.0000 / 1.0000**.
+  Efficiency numbers final. On crops accuracy saturates for all four models.
 - Efficiency table for all four models on L4 + Xeon CPU (final).
 
 ## Still to do, in order
 
-1. **Baselines on the crop pipeline** (accuracy column only re-runs), under
-   `configs/test20_crop_baselines.yaml` (headline config renamed; same cache key):
-   `nohup python -u baselines.py --config configs/test20_crop_baselines.yaml --model xception --train > /content/bl_xcep.log 2>&1 &`
-   ~30 epochs at batch 32, ~70 min. **Done 2026-09-23: mobilenet_v3_small 0.9999,
-   efficientnet_b0 1.0000** (README Baselines, learnings). Xception running. Check
-   `experiments/test20_crop_baselines/baselines/<model>/` for `eval.json` before
-   re-running; `--resume` if `model.keras` exists without it.
+1. ~~Baselines on the crop pipeline~~ **done 2026-09-23** under
+   `configs/test20_crop_baselines.yaml` (headline config renamed; same cache key),
+   `experiments/test20_crop_baselines/baselines/<model>/`: MobileNetV3-Small 0.9999,
+   EfficientNet-B0 1.0000, Xception 1.0000 (test AUC). Accuracy saturates on native
+   pixels for every model; see README Baselines "Crop column, read honestly".
 2. **Baselines on StyleGAN3-T**: `heldout.py` needs a `--model <baseline>` option
    (loads the baseline's checkpoint instead of the headline's) — not written yet.
    Answers whether the generalisation gap is shared by the big models (expected yes).

@@ -330,6 +330,15 @@ same data/split/cache as the headline, batch 32 / lr 1e-4 / 30 epochs, run folde
 `experiments/test20_crop_baselines/baselines/<model>/`). Only the crop column is
 comparable to the headline.
 
+**Crop column, read honestly (2026-09-23).** On native pixels every model saturates:
+headline 0.9996, MobileNetV3-Small 0.9999, EfficientNet-B0 and Xception 1.0000. The
+resize was the ceiling for all of them, not only the from-scratch model, so accuracy
+no longer separates the four. What the claim rests on is (a) a from-scratch 1M-param
+network reaching parity with fine-tuned ImageNet backbones on the same task, and
+(b) the resource columns: 4.7× / 7× / 4.7× lower bs=1 GPU latency than MobileNet /
+EfficientNet / Xception at equal or fewer parameters. Whether the baselines share the
+StyleGAN3-T generalisation gap is the open question (`heldout.py --model`, planned).
+
 | model | params | MACs @256² | **ms @ bs=1, L4** | ms @ bs=1, CPU | img/s @144 | peak MB @ bs=1 | test AUC, SG2 (resize) | test AUC, SG2 (**crop**) |
 |---|---|---|---|---|---|---|---|---|
 | **this model, native crops, no FFT (headline)** | 1.01M | 1.11G | **1.02** | **8.4** | 2,098 | 1,301 | — | **0.9996** |
@@ -338,7 +347,7 @@ comparable to the headline.
 | this model, no FFT branch, resize pipeline | 1.01M | 1.11G | **0.99** | **6.6** | 2,098 | 1,301 | 0.953 (mix 0.975) | — |
 | MobileNetV3-Small | 1.01M | **0.07G** | 4.71 | 18.7 | **2,684** | **181** | 0.992 (ImageNet-pretrained, fine-tuned) | **0.9999** (acc 0.998; test20, 2026-09-23) |
 | EfficientNet-B0 | 4.21M | 0.50G | 6.82 | 39.8 | 540 | 198 | 0.9997 (ImageNet-pretrained, fine-tuned) | **1.0000** (0.999999; acc 0.999; early-stopped ep 19; test20, 2026-09-23) |
-| Xception | 21.1M | 5.95G | 4.78 | 65.0 | 377 | 560 | 0.9987 (ImageNet-pretrained, fine-tuned, stopped early at a 0.999 plateau) | _pending_ |
+| Xception | 21.1M | 5.95G | 4.78 | 65.0 | 377 | 560 | 0.9987 (ImageNet-pretrained, fine-tuned, stopped early at a 0.999 plateau) | **1.0000** (0.999999; acc 0.9995; early-stopped ep 27; test20, 2026-09-23) |
 
 The honest reading. **Single-image latency: this model wins by 3.5–5×**, including
 against EfficientNet-B0, which has *half* the MACs — MACs are an indirect metric

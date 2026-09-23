@@ -202,6 +202,12 @@ the README says how things *are*, this says how we found out.
   ImageNet backbone; the crop pipeline has removed the accuracy axis as a
   differentiator between models. What remains to compare is resources (7× the
   headline's bs=1 latency, 4.2× the params) and generalisation (StyleGAN3-T, todo 2).
+- **2026-09-23 — Xception on crops: test AUC 1.0000 (0.999999), acc 0.9995, early-stopped
+  at epoch 27.** Crop-pipeline baselines complete: 0.9999 / 1.0000 / 1.0000 vs headline
+  0.9996. Accuracy is saturated for every architecture on native SG2 pixels; the
+  in-distribution comparison is now resources only, and the differentiating experiment
+  is generalisation (StyleGAN3-T for the baselines). Do not present the crop AUCs as a
+  ranking -- the gaps are inside one seed's noise.
 - **Latency needs no training; accuracy does.** The efficiency half of the comparison
   can be measured before any baseline is fine-tuned.
 - **Published detectors zero-shot measure generalisation, not architecture.** CNNDetection
