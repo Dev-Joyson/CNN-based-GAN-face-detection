@@ -1,0 +1,35 @@
+# Test20: the three baselines (MobileNetV3-Small, EfficientNet-B0, Xception)
+# fine-tuned on the CROP pipeline, so their accuracy is comparable to the
+# test19 headline (0.9996). Byte-identical to test19_sg2_crop_no_fft.yaml
+# except the name: same data, split, seed and cache key, so the restored
+# test19 crop cache is reused as-is. Only the run folder differs:
+#   experiments/test20_crop_baselines/baselines/<model>/
+# Run with baselines.py --config configs/test20_crop_baselines.yaml
+# --model <name> --train (batch 32, lr 1e-4, 30 epochs -- the baseline recipe).
+# Efficiency numbers are unchanged from the resize-pipeline table; only the
+# test-AUC column is new.
+name: test20_crop_baselines
+fft_branch: false
+
+real_dir: "/content/drive/MyDrive/Real(FFHQ)"
+fake_dir: "/content/drive/MyDrive/Fake(SG2-psi1)"
+
+mask_mode: none
+limit_per_class: 25000
+
+img_size: 256
+native_size: 512            # unused in crop mode
+input_mode: crop
+cache_size: 512
+batch_size: 144             # eval batch; baselines.py trains at --batch 32
+
+epochs: 150
+lr: 0.0003                  # headline value; baselines.py overrides with --lr 1e-4
+patience: 15
+seed: 42
+
+crop_frac_min: 0.85
+shuffle_buffer: 8192
+
+cache_dir: "/content/cache"
+out_dir: "/content/drive/MyDrive/Research/experiments"
