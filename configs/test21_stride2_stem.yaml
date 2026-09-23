@@ -1,0 +1,41 @@
+# Test21: the headline (test19_sg2_crop_no_fft) with a stride-2 first conv.
+# Identical data, split, seed, cache and recipe; only stem_stride changes.
+#
+# Why: the headline is the fastest of the four models on GPU and CPU but has
+# the worst peak memory (1.3 GB at bs=1) and 16x MobileNet's MACs, because its
+# first block runs 32 channels at the full 256^2. Stride 2 there halves every
+# feature map after it: ~4x fewer MACs, ~4x less activation memory, the same
+# 1.01M parameters. Gragnaniello et al. 2021 say early downsampling destroys
+# the GAN fingerprint -- the reason the stem was stride 1 -- but that was never
+# tested on this data. Either outcome is a result: accuracy holds -> lightest
+# on every column; accuracy drops -> the measured justification for the
+# full-resolution stem. Cache key unchanged: the restored test19 cache is reused.
+name: test21_stride2_stem
+stem_stride: 2
+fft_branch: false
+
+real_dir: "/content/drive/MyDrive/Real(FFHQ)"
+fake_dir: "/content/drive/MyDrive/Fake(SG2-psi1)"
+
+mask_mode: none
+limit_per_class: 25000
+
+img_size: 256
+native_size: 512            # unused in crop mode
+input_mode: crop
+cache_size: 512             # centre 512^2 at native pixels; 768 keeps the hair, 1024 everything -- see model.Config
+batch_size: 144
+
+epochs: 150               # let patience decide
+lr: 0.0003
+patience: 15              # 6 cut the test16 ablation off mid-climb; both runs sat at 0.960 at epoch 61
+seed: 42
+
+crop_frac_min: 0.85
+shuffle_buffer: 8192         # train split is 28000; a full-set buffer would be ~5.5 GB of
+                             # uint8 images in RAM -- too much for a standard Colab runtime.
+                             # Raise toward 28000 on a high-RAM runtime if you want the
+                             # notebook's whole-set shuffle.
+
+cache_dir: "/content/cache"
+out_dir: "/content/drive/MyDrive/Research/experiments"

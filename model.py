@@ -71,6 +71,13 @@ class Config:
 
     # architecture
     fft_branch: bool = True               # False = spatial branch only (the ablation)
+    # stride of the first conv. 1 = the first block runs at the full 256^2 with
+    # 32 channels -- where most of the model's MACs and its 1.3 GB peak memory
+    # go. Gragnaniello et al. (ICME 2021) argue early downsampling destroys the
+    # GAN fingerprint, which is the reason for 1; that claim has not been tested
+    # on this data. 2 halves every feature map after it (~4x fewer MACs, ~4x
+    # less activation memory, same parameter count). Not in the cache key.
+    stem_stride: int = 1
 
     # augmentation (train split only)
     crop_frac_min: float = 0.85           # Test16: random crop keeps 85-100% of the side
@@ -385,8 +392,8 @@ def fft_layer(x):
     return mag[..., tf.newaxis]                # (B, H, W, 1)
 
 
-def conv_block(x, filters, name=None):
-    x = layers.Conv2D(filters, 3, padding='same', activation='relu', name=name)(x)
+def conv_block(x, filters, name=None, stride=1):
+    x = layers.Conv2D(filters, 3, strides=stride, padding='same', activation='relu', name=name)(x)
     return layers.MaxPooling2D()(x)
 
 
@@ -394,7 +401,7 @@ def build_model(cfg):
     input_img = layers.Input(shape=(cfg.img_size, cfg.img_size, 3))
 
     # Spatial branch -- fixed names so Grad-CAM can ask for "spatial_conv_5"
-    x = conv_block(input_img, 32, name="spatial_conv_1")
+    x = conv_block(input_img, 32, name="spatial_conv_1", stride=cfg.stem_stride)
     x = conv_block(x, 64, name="spatial_conv_2")
     x = conv_block(x, 128, name="spatial_conv_3")
     x = conv_block(x, 256, name="spatial_conv_4")

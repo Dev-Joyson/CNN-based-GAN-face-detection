@@ -6,6 +6,8 @@ generator, or a real-image source, that they never trained on.
         --fake-dir "/content/drive/MyDrive/Fake(SG3-T-psi1)" --tag sg3t
     python heldout.py --config configs/test19_sg2_crop_no_fft.yaml \\
         --real-dir "/content/drive/MyDrive/CelebA-HQ" --tag celebahq
+    python heldout.py --config configs/test20_crop_baselines.yaml --model efficientnet_b0 \\
+        --fake-dir "/content/drive/MyDrive/Fake(SG3-T-psi1)" --tag sg3t
 
 --config names the trained model (its run dir) and the input pipeline it
 expects (crop / resize, cache size). --fake-dir and/or --real-dir name the
@@ -50,13 +52,17 @@ def main():
     ap.add_argument("--config", required=True, help="the trained model's config")
     ap.add_argument("--fake-dir", help="held-out generator's images (default: config's fake_dir, unsampled part)")
     ap.add_argument("--real-dir", help="held-out real source (default: config's real_dir, unsampled part)")
+    ap.add_argument("--model", help="score this baseline (experiments/<name>/baselines/<model>/) instead of the headline")
     ap.add_argument("--n", type=int, default=1500, help="images per class")
     ap.add_argument("--tag", required=True, help="eval_heldout_<tag>.json")
     args = ap.parse_args()
 
     cfg = load_config(args.config)
-    ckpt = os.path.join(cfg.run_dir, "model.keras")
-    model = tf.keras.models.load_model(ckpt, safe_mode=False)
+    # a baseline lives under the headline's run dir; its ImageNet preprocessing is a
+    # layer inside model.keras, so it takes the same pipeline output as the headline
+    run_dir = os.path.join(cfg.run_dir, "baselines", args.model) if args.model else cfg.run_dir
+    model_name = f"{cfg.name}/baselines/{args.model}" if args.model else cfg.name
+    model = tf.keras.models.load_model(os.path.join(run_dir, "model.keras"), safe_mode=False)
 
     # everything the headline touched -- the held-out set must not overlap it
     used = set()
@@ -86,16 +92,16 @@ def main():
     acc = float(((y_score > 0.5) == (y_true == 1)).mean())
     p_real, p_fake = y_score[y_true == 0], y_score[y_true == 1]
     out = {
-        "model": cfg.name, "tag": args.tag, "n_per_class": n,
+        "model": model_name, "tag": args.tag, "n_per_class": n,
         "real_dir": args.real_dir or cfg.real_dir, "fake_dir": args.fake_dir or cfg.fake_dir,
         "auc": round(auc, 4), "accuracy_at_0.5": round(acc, 4),
         "mean_p_fake": {"real": round(float(p_real.mean()), 4), "fake": round(float(p_fake.mean()), 4)},
         "fake_recall_at_0.5": round(float((p_fake > 0.5).mean()), 4),
         "real_recall_at_0.5": round(float((p_real < 0.5).mean()), 4),
     }
-    with open(os.path.join(cfg.run_dir, f"eval_heldout_{args.tag}.json"), "w") as f:
+    with open(os.path.join(run_dir, f"eval_heldout_{args.tag}.json"), "w") as f:
         json.dump(out, f, indent=2)
-    print(f"{cfg.name} on {args.tag}:  AUC {auc:.4f}   acc@0.5 {acc:.3f}   "
+    print(f"{model_name} on {args.tag}:  AUC {auc:.4f}   acc@0.5 {acc:.3f}   "
           f"mean p_fake real={p_real.mean():.3f} fake={p_fake.mean():.3f}   "
           f"fake recall {out['fake_recall_at_0.5']:.3f}")
 

@@ -337,7 +337,7 @@ no longer separates the four. What the claim rests on is (a) a from-scratch 1M-p
 network reaching parity with fine-tuned ImageNet backbones on the same task, and
 (b) the resource columns: 4.7× / 7× / 4.7× lower bs=1 GPU latency than MobileNet /
 EfficientNet / Xception at equal or fewer parameters. Whether the baselines share the
-StyleGAN3-T generalisation gap is the open question (`heldout.py --model`, planned).
+StyleGAN3-T generalisation gap is the open question (`heldout.py --model <baseline>`, written, unrun).
 
 | model | params | MACs @256² | **ms @ bs=1, L4** | ms @ bs=1, CPU | img/s @144 | peak MB @ bs=1 | test AUC, SG2 (resize) | test AUC, SG2 (**crop**) |
 |---|---|---|---|---|---|---|---|---|

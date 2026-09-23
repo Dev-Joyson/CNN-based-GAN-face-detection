@@ -81,17 +81,26 @@ branch, native-resolution 256² crops. Test AUC 0.9996, 1.01M params, ~1 ms on L
    `experiments/test20_crop_baselines/baselines/<model>/`: MobileNetV3-Small 0.9999,
    EfficientNet-B0 1.0000, Xception 1.0000 (test AUC). Accuracy saturates on native
    pixels for every model; see README Baselines "Crop column, read honestly".
-2. **Baselines on StyleGAN3-T**: `heldout.py` needs a `--model <baseline>` option
-   (loads the baseline's checkpoint instead of the headline's) — not written yet.
-   Answers whether the generalisation gap is shared by the big models (expected yes).
-3. **Seeds 43 and 44** of the headline: `configs/test19_sg2_crop_no_fft_s43/_s44.yaml`
-   via `train.py`, then `evaluate.py`; report mean ± std of test AUC.
-4. **Held-out reals** (CelebA-HQ 1024) with `heldout.py --real-dir … --tag celebahq`.
-5. **Sensitivity checks** on the crop pipeline for `docs/hyperparameters.md`:
+2. **Baselines on StyleGAN3-T** (written 2026-09-24, unrun; ~5 min each, no training):
+   `python heldout.py --config configs/test20_crop_baselines.yaml --model <mobilenet_v3_small|efficientnet_b0|xception> --fake-dir "/content/drive/MyDrive/Fake(SG3-T-psi1)" --tag sg3t`
+   Answers whether the 0.70 generalisation gap is shared by the big models. If a
+   baseline scores well above 0.70, that is a real weakness of ours to report.
+3. **Stride-2 stem, test21** (`configs/test21_stride2_stem.yaml`, written 2026-09-24,
+   unrun): the headline with `stem_stride: 2` — same 1.01M params, 0.28 G MACs instead
+   of 1.11 G, ~4× less activation memory. The headline is fastest on latency but worst
+   on peak memory and 16× MobileNet's MACs; this run decides whether it is lightest on
+   every column, or documents why the full-res stem is needed (Gragnaniello 2021).
+   `train.py` then `evaluate.py`; then the JPEG probe (`--eval-jpeg 95`) and
+   `heldout.py … --tag sg3t` on it, so it is compared on every axis the headline was.
+4. **Seeds 43 and 44** of whichever stem wins: `configs/test19_sg2_crop_no_fft_s43/_s44.yaml`
+   (edit `stem_stride` if test21 wins) via `train.py`, then `evaluate.py`; report
+   mean ± std of test AUC.
+5. **Held-out reals** (CelebA-HQ 1024) with `heldout.py --real-dir … --tag celebahq`.
+6. **Sensitivity checks** on the crop pipeline for `docs/hyperparameters.md`:
    lr {1e-4, 1e-3}, augmentation {off, Wang 2020's}. One run each, note the number.
-6. Controls test13_face / test14_background are `_pending_` in README; only re-run
+7. Controls test13_face / test14_background are `_pending_` in README; only re-run
    if the panel asks again about background dependence (crops make them moot).
-7. Not planned unless time: `cache_size: 768`, online distillation, scale
+8. Not planned unless time: `cache_size: 768`, online distillation, scale
    augmentation, BN+cosine recipe. Listed as future work.
 
 ## Gotchas already paid for
