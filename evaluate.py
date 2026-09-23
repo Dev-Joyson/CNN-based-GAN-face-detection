@@ -393,6 +393,20 @@ def count_macs(model):
     return int(macs)
 
 
+def activation_memory_mb(model):
+    """Analytic activation footprint at bs=1, fp32: the largest single output
+    tensor, and the sum over every layer's output (the bound if nothing were
+    freed). Hardware- and allocator-independent, so it says what the measured
+    peak cannot: how much of it is the network and how much is the runtime."""
+    sizes = []
+    for layer in _iter_layers(model):
+        outs = layer.output if isinstance(layer.output, (list, tuple)) else [layer.output]
+        for o in outs:
+            shape = [d if d is not None else 1 for d in o.shape]
+            sizes.append(int(np.prod(shape)) * 4)
+    return {"largest_tensor": round(max(sizes) / 1e6, 2), "sum_all": round(sum(sizes) / 1e6, 2)}
+
+
 def _iter_layers(model):
     """Layers, descending into nested models -- Keras applications wrapped in
     a head are a Model inside a Model."""
@@ -473,11 +487,22 @@ def measure_efficiency(model, cfg, ds, warmup=50, runs=1000):
     infer = tf.function(lambda x: model(x, training=False))
 
     # single image: the latency number, and the memory number that matters for
-    # a "how much does it need to run" claim
+    # a "how much does it need to run" claim.
+    #
+    # Two peaks, because the first calls are not inference: tf.function traces
+    # and cuDNN autotunes, trying every conv algorithm -- including FFT/Winograd
+    # variants whose scratch workspace for a 256^2 x 32-channel conv runs to
+    # hundreds of MB. A peak read over the warmup is the largest autotune trial,
+    # not the model (it read 1.3 GB for a 4 MB model). So: read that number and
+    # keep it (incl_autotune), then reset and read the peak over the timed loop
+    # alone -- weights + live activations + the chosen algorithm's workspace,
+    # which is what a deployed process holds.
     reset_peak()
     x1 = images[:1]
     for _ in range(warmup):
         infer(x1).numpy()
+    peak_bs1_autotune = _peak_memory_mb()
+    reset_peak()
     times = []
     for _ in range(runs):
         t0 = time.perf_counter()
@@ -492,6 +517,8 @@ def measure_efficiency(model, cfg, ds, warmup=50, runs=1000):
     batch_size = int(images.shape[0])
     for _ in range(3):
         infer(images).numpy()
+    peak_batch_autotune = _peak_memory_mb()
+    reset_peak()
     t0 = time.perf_counter()
     for _ in range(10):
         infer(images).numpy()
@@ -527,7 +554,15 @@ def measure_efficiency(model, cfg, ds, warmup=50, runs=1000):
         # ~3x that -- it carries Adam's two moment tensors for resuming training.
         "weights_mb_fp32": round(int(model.count_params()) * 4 / 1e6, 2),
         "checkpoint_file_mb": round(os.path.getsize(os.path.join(cfg.run_dir, "model.keras")) / 1e6, 2),
-        "peak_gpu_memory_mb": {"bs1": peak_bs1, f"bs{batch_size}": peak_batch},
+        "peak_gpu_memory_mb": {
+            "bs1": peak_bs1, f"bs{batch_size}": peak_batch,
+            "bs1_incl_autotune": peak_bs1_autotune, f"bs{batch_size}_incl_autotune": peak_batch_autotune,
+            "note": "bs1/bsN: peak over the timed loop after warmup (weights + activations + "
+                    "chosen conv workspace). *_incl_autotune: peak over the warmup, i.e. the "
+                    "largest cuDNN autotune trial -- the number reported before 2026-09-24",
+        },
+        # hardware-independent: what the network's tensors occupy at bs=1, fp32
+        "activation_mb_bs1": activation_memory_mb(model),
         "latency_bs1_ms": {
             "median": round(float(np.median(times)), 3),
             "mean": round(float(times.mean()), 3),
@@ -551,7 +586,11 @@ def measure_efficiency(model, cfg, ds, warmup=50, runs=1000):
           f"checkpoint {eff['checkpoint_file_mb']} MB incl. optimizer)")
     print(f"MACs        : {macs / 1e9:.3f} G per image at {cfg.img_size}^2  "
           f"(FLOPs ~= {2 * macs / 1e9:.2f} G)")
-    print(f"peak memory : {peak_bs1} MB at bs=1 | {peak_batch} MB at bs={batch_size}")
+    act = eff["activation_mb_bs1"]
+    print(f"peak memory : {peak_bs1} MB at bs=1 | {peak_batch} MB at bs={batch_size}   "
+          f"(incl. autotune: {peak_bs1_autotune} | {peak_batch_autotune})")
+    print(f"activations : {act['largest_tensor']} MB largest tensor | {act['sum_all']} MB all, "
+          f"at bs=1 fp32 (analytic)")
     print(f"latency bs=1: {lat['median']:.2f} ms median | {lat['mean']:.2f} mean "
           f"| {lat['p95']:.2f} p95   (n={runs})")
     print(f"throughput  : {eff['throughput_img_per_s']:,.1f} img/s at batch {batch_size}")

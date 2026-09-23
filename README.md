@@ -267,9 +267,27 @@ Two L4 sessions gave 1.34 and 1.41 ms median — ~5% apart on identical code. Th
 the session-to-session noise floor, and why baselines must be measured in the *same*
 session as the model they are compared with, never across sessions.
 
-Peak memory is what TensorFlow *reserved* (cuDNN/XLA workspace, allocator pool), not
-what a 4 MB model strictly needs — an upper bound, comparable across models measured
-identically on the same machine, not an absolute footprint.
+**Peak memory: the 1,301 MB above is wrong as a footprint, and the column is being
+re-measured (2026-09-24).** The counter was reset *before* the warmup loop, which is
+where cuDNN autotunes — it tries every conv algorithm, including FFT/Winograd variants
+whose scratch workspace for a 256²×32-channel conv runs to hundreds of MB — so the
+"peak" was the largest autotune trial, not the model. `measure_efficiency` now reports
+both: `bs1_incl_autotune` (the old number) and `bs1` (peak over the timed loop after
+warmup: weights + live activations + the chosen algorithm's workspace, what a running
+process holds). It also writes an analytic, hardware-independent `activation_mb_bs1`.
+Those analytic numbers, at bs=1 fp32:
+
+| model | weights | all activations | largest tensor |
+|---|---|---|---|
+| **this model (no FFT)** | 4.0 MB | **20.8 MB** | 8.4 MB |
+| MobileNetV3-Small | 4.1 MB | 28.7 MB | 1.2 MB |
+| EfficientNet-B0 | 16.9 MB | 131.9 MB | 6.4 MB |
+| Xception | 84.5 MB | 181.9 MB | 8.0 MB |
+
+The network's own footprint is the smallest of the four. What the old column ranked was
+cuDNN's appetite for scratch on a large-spatial conv, which is real on a GPU but is a
+runtime property, and one a stride-2 stem (test21) shrinks 4×. The measured `bs1`
+column must be re-taken for all four models in one session before it is quoted.
 
 `eval.json` also carries a `system_under_test` block — GPU, TF version, platform,
 mixed-precision policy, git SHA, timestamp, warmup and run count. Colab states its
@@ -339,7 +357,7 @@ network reaching parity with fine-tuned ImageNet backbones on the same task, and
 EfficientNet / Xception at equal or fewer parameters. Whether the baselines share the
 StyleGAN3-T generalisation gap is the open question (`heldout.py --model <baseline>`, written, unrun).
 
-| model | params | MACs @256² | **ms @ bs=1, L4** | ms @ bs=1, CPU | img/s @144 | peak MB @ bs=1 | test AUC, SG2 (resize) | test AUC, SG2 (**crop**) |
+| model | params | MACs @256² | **ms @ bs=1, L4** | ms @ bs=1, CPU | img/s @144 | peak MB @ bs=1 (incl. autotune — superseded, see *Peak memory* above) | test AUC, SG2 (resize) | test AUC, SG2 (**crop**) |
 |---|---|---|---|---|---|---|---|---|
 | **this model, native crops, no FFT (headline)** | 1.01M | 1.11G | **1.02** | **8.4** | 2,098 | 1,301 | — | **0.9996** |
 | this model, native crops, with FFT (test19) | 1.02M | 1.20G | 1.49 | 8.6 | 1,564 | 1,301 | — | 0.9994 |

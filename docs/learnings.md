@@ -208,6 +208,14 @@ the README says how things *are*, this says how we found out.
   in-distribution comparison is now resources only, and the differentiating experiment
   is generalisation (StyleGAN3-T for the baselines). Do not present the crop AUCs as a
   ranking -- the gaps are inside one seed's noise.
+- **2026-09-24 — The 1.3 GB "peak memory" was cuDNN autotune scratch, not the model.**
+  The peak counter was reset before warmup; warmup is where cuDNN tries every conv
+  algorithm, and the largest trial's workspace for a 256²×32 conv is what got recorded.
+  Analytic footprint at bs=1 fp32: this model 4 MB weights + 21 MB activations — the
+  smallest of the four (MobileNet 29 MB, EffNet 132, Xception 182 activations). Fix:
+  read the peak over the timed loop after warmup, keep the autotune number as a
+  separate field, write the analytic number too. Re-measure all four in one session.
+  Lesson: a memory "peak" is meaningless without stating *when* the counter was reset.
 - **Latency needs no training; accuracy does.** The efficiency half of the comparison
   can be measured before any baseline is fine-tuned.
 - **Published detectors zero-shot measure generalisation, not architecture.** CNNDetection

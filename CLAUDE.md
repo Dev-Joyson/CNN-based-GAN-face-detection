@@ -72,7 +72,8 @@ branch, native-resolution 256² crops. Test AUC 0.9996, 1.01M params, ~1 ms on L
 - Baselines fine-tuned on both pipelines (README "Baselines"): resize MobileNet
   0.992 / Xception 0.9987 / EffNet 0.9997; **crop (test20) 0.9999 / 1.0000 / 1.0000**.
   Efficiency numbers final. On crops accuracy saturates for all four models.
-- Efficiency table for all four models on L4 + Xeon CPU (final).
+- Efficiency table for all four models on L4 + Xeon CPU (final, except the peak-memory
+  column, which is being re-measured — see todo 2).
 
 ## Still to do, in order
 
@@ -81,7 +82,14 @@ branch, native-resolution 256² crops. Test AUC 0.9996, 1.01M params, ~1 ms on L
    `experiments/test20_crop_baselines/baselines/<model>/`: MobileNetV3-Small 0.9999,
    EfficientNet-B0 1.0000, Xception 1.0000 (test AUC). Accuracy saturates on native
    pixels for every model; see README Baselines "Crop column, read honestly".
-2. **Baselines on StyleGAN3-T** (written 2026-09-24, unrun; ~5 min each, no training):
+2. **Re-measure peak memory for all four models in ONE session** (2026-09-24; the old
+   column was autotune scratch — README *Peak memory*). No training, ~5 min each:
+   `python evaluate.py --config configs/test19_sg2_crop_no_fft.yaml`,
+   `python evaluate.py --config configs/test19_sg2_crop.yaml`, then
+   `python baselines.py --config configs/test20_crop_baselines.yaml --model <m> --eval-only`
+   for the three baselines. Quote `peak_gpu_memory_mb.bs1` and `activation_mb_bs1`
+   from each `eval.json`; replace the README table's memory column.
+2b. **Baselines on StyleGAN3-T** (written 2026-09-24, unrun; ~5 min each, no training):
    `python heldout.py --config configs/test20_crop_baselines.yaml --model <mobilenet_v3_small|efficientnet_b0|xception> --fake-dir "/content/drive/MyDrive/Fake(SG3-T-psi1)" --tag sg3t`
    Answers whether the 0.70 generalisation gap is shared by the big models. If a
    baseline scores well above 0.70, that is a real weakness of ours to report.
