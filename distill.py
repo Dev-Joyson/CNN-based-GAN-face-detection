@@ -38,7 +38,7 @@ from dataclasses import replace
 import numpy as np
 import tensorflow as tf
 
-from model import (HistoryCSV, augment_and_mask, build_model, cached_dataset, compile_model,
+from model import (HistoryCSV, augment_and_mask, build_datasets, build_model, cached_dataset, compile_model,
                    feathered_ellipse, list_images, load_config, load_paths)
 
 EPS = 1e-6
@@ -147,8 +147,130 @@ def kd_dataset(base_ds, z_t, cfg, face_mask, training, shuffle):
 
 # --------------------------------------------------------------------------- #
 
+# --------------------------------------------------------------------------- #
+# Online distillation: teacher and student see the SAME augmented batch
+# --------------------------------------------------------------------------- #
+
+class OnlineKD(tf.keras.Model):
+    """Student trained against a frozen teacher's logits computed in-graph on the
+    identical augmented view -- Beyer et al. 2022's "consistent teaching". The
+    offline path (test18) labelled clean cached images once and trained the
+    student on augmented ones: an inconsistent target, and it lost to hard
+    labels. Here nothing is precomputed. Val/test: hard labels only."""
+
+    def __init__(self, student, teachers, temperature, alpha):
+        super().__init__()
+        self.student, self.teachers = student, list(teachers)
+        for t in self.teachers:
+            t.trainable = False
+        self.temperature, self.alpha = float(temperature), float(alpha)
+        self.bce = tf.keras.losses.BinaryCrossentropy()
+        self.loss_tracker = tf.keras.metrics.Mean(name="loss")
+        self.acc = tf.keras.metrics.BinaryAccuracy(name="accuracy")
+        self.auc = tf.keras.metrics.AUC(name="auc")
+
+    @property
+    def metrics(self):
+        return [self.loss_tracker, self.acc, self.auc]
+
+    def call(self, x, training=False):
+        return self.student(x, training=training)
+
+    def teacher_logit(self, x):
+        return tf.add_n([_logit(t(x, training=False)) for t in self.teachers]) / len(self.teachers)
+
+    def _track(self, loss, y, p):
+        self.loss_tracker.update_state(loss)
+        self.acc.update_state(y, p)
+        self.auc.update_state(y, p)
+        return {m.name: m.result() for m in self.metrics}
+
+    def train_step(self, data):
+        x, y = data
+        y = tf.cast(tf.reshape(y, [-1, 1]), tf.float32)
+        z_t = self.teacher_logit(x)
+        T = self.temperature
+        with tf.GradientTape() as tape:
+            p = self.student(x, training=True)
+            soft = self.bce(tf.sigmoid(z_t / T), tf.sigmoid(_logit(p) / T))
+            hard = self.bce(y, p)
+            loss = self.alpha * T * T * soft + (1.0 - self.alpha) * hard
+        grads = tape.gradient(loss, self.student.trainable_variables)
+        self.optimizer.apply_gradients(zip(grads, self.student.trainable_variables))
+        return self._track(loss, y, p)
+
+    def test_step(self, data):
+        x, y = data
+        y = tf.cast(tf.reshape(y, [-1, 1]), tf.float32)
+        p = self.student(x, training=False)
+        return self._track(self.bce(y, p), y, p)
+
+
+class StudentCheckpoint(tf.keras.callbacks.Callback):
+    """Save the STUDENT's weights (not the wrapper's, which carry the teacher)
+    on every val_auc improvement, so finalize() and --finalize work unchanged."""
+    def __init__(self, path):
+        super().__init__()
+        self.path, self.best = path, -1.0
+
+    def on_epoch_end(self, epoch, logs=None):
+        v = (logs or {}).get("val_auc")
+        if v is not None and v > self.best:
+            self.best = v
+            self.model.student.save_weights(self.path)
+
+
+def _load_teachers(hcfg, names):
+    teachers = []
+    for name in names:
+        path = os.path.join(hcfg.run_dir, "baselines", name, "model.keras")
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"teacher not trained: {path}  (run baselines.py --train)")
+        teachers.append(tf.keras.models.load_model(path, safe_mode=False))
+        print(f"teacher {name}: {teachers[-1].count_params():,} params")
+    return teachers
+
+
+def distill_online(cfg):
+    d = cfg.distill
+    if d["extra"] or d["calibrate"]:
+        raise ValueError("online distillation: extra/calibrate are offline-path options")
+    hcfg = replace(cfg, name=d["headline"], distill=None)   # where the teachers live
+    os.makedirs(cfg.run_dir, exist_ok=True)
+    tf.keras.utils.set_random_seed(cfg.seed)
+    print(f"=== {cfg.name}: ONLINE distill from {d['teachers']} of {hcfg.name} -> {cfg.run_dir}\n"
+          f"    T={d['temperature']} alpha={d['alpha']} init={d['init']}  aug={cfg.aug} scale_aug={cfg.scale_aug}")
+
+    teachers = _load_teachers(hcfg, d["teachers"])
+    ds = build_datasets(cfg)            # the standard augmented pipeline; same cache key as the headline
+
+    student = build_model(cfg)
+    if d["init"]:
+        src = os.path.join(hcfg.run_dir, "model.keras")
+        student.set_weights(tf.keras.models.load_model(src, safe_mode=False).get_weights())
+        print(f"student initialised from {src}")
+    kd = OnlineKD(student, teachers, d["temperature"], d["alpha"])
+    kd.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=cfg.lr))
+    student.summary()
+
+    callbacks = [
+        StudentCheckpoint(os.path.join(cfg.run_dir, "best.weights.h5")),
+        tf.keras.callbacks.EarlyStopping(monitor="val_auc", mode="max",
+                                        patience=cfg.patience, restore_best_weights=True),
+        HistoryCSV(os.path.join(cfg.run_dir, "history.csv")),
+        tf.keras.callbacks.TensorBoard(log_dir=os.path.join(cfg.run_dir, "tb"), write_graph=False),
+    ]
+    kd.fit(ds["train"], validation_data=ds["val"], epochs=cfg.epochs, callbacks=callbacks)
+
+    with open(os.path.join(cfg.run_dir, "metrics.json"), "w") as f:
+        json.dump({"distill": d}, f, indent=2)
+    finalize(cfg, student.get_weights())
+
+
 def distill(cfg):
     d = cfg.distill
+    if d["online"]:
+        return distill_online(cfg)
     hcfg = replace(cfg, name=d["headline"], distill=None)      # the headline: same data, its run dir
     os.makedirs(cfg.run_dir, exist_ok=True)
     tf.keras.utils.set_random_seed(cfg.seed)

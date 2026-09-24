@@ -89,6 +89,13 @@ class Config:
     #       p=0.5, JPEG q~U[30,100] p=0.5. Their finding: this is what made a
     #       ProGAN detector generalise to unseen generators. Not in the cache key.
     aug: str = "ours"
+    # crop mode only: training windows drawn at (img_size*f)^2 native pixels and
+    # bicubic-resized to img_size^2, f uniform over this list; None = native
+    # windows only (the headline). [1, 2] shows the model the same content at
+    # full and half scale, the view a 1024->512 downscale gives, at zero
+    # inference cost. Targets the on-resize failure (0.556 = chance). f=4 would
+    # need cache_size 1024. Eval unchanged (centre native window). Not in the key.
+    scale_aug: list = field(default=None)
     crop_frac_min: float = 0.85           # Test16: random crop keeps 85-100% of the side
     shuffle_buffer: int = 4096            # images held for shuffling; Test16 used the whole train set
 
@@ -117,6 +124,13 @@ class Config:
         return list(self.fake_dir) if isinstance(self.fake_dir, (list, tuple)) else [self.fake_dir]
 
     def __post_init__(self):
+        if self.scale_aug:
+            if self.input_mode != "crop":
+                raise ValueError("scale_aug is a crop-mode augmentation")
+            if any((not isinstance(f, int)) or f < 1 for f in self.scale_aug):
+                raise ValueError(f"scale_aug factors must be ints >= 1, got {self.scale_aug}")
+            if self.img_size * max(self.scale_aug) > self.cache_size:
+                raise ValueError(f"scale_aug {self.scale_aug}: img_size*f exceeds cache_size {self.cache_size}")
         if self.aug not in ("ours", "wang"):
             raise ValueError(f"aug must be ours or wang, got {self.aug!r}")
         if self.fake_mix is not None:
@@ -135,11 +149,11 @@ class Config:
             raise ValueError("crop mode: cache_size must be >= img_size")
         if self.distill is not None:
             d = {"temperature": 2.0, "alpha": 0.7, "extra": True, "init": False,
-                 "calibrate": False, **self.distill}
+                 "calibrate": False, "online": False, **self.distill}
             missing = {"headline", "teachers"} - set(d)
             if missing:
                 raise ValueError(f"distill block needs {sorted(missing)}")
-            unknown = set(d) - {"headline", "teachers", "temperature", "alpha", "extra", "init", "calibrate"}
+            unknown = set(d) - {"headline", "teachers", "temperature", "alpha", "extra", "init", "calibrate", "online"}
             if unknown:
                 raise ValueError(f"distill block has unknown keys {sorted(unknown)}")
             self.distill = d
@@ -292,6 +306,20 @@ def random_gaussian_blur(image, sigma_max=3.0, radius=9):
     return tf.nn.depthwise_conv2d(image[None], kernel, [1, 1, 1, 1], "SAME")[0]
 
 
+def random_scale_window(image, img_size, factors):
+    """Crop-mode scale augmentation: a (img_size*f)^2 native window, bicubic-
+    resized to img_size^2, f uniform over `factors`. f=1 is the plain native
+    window. uint8 in, uint8 out (this runs before the float conversion)."""
+    def window(f):
+        w = tf.image.random_crop(image, [img_size * f, img_size * f, 3])
+        if f == 1:
+            return w
+        w = tf.image.resize(w, [img_size, img_size], method=tf.image.ResizeMethod.BICUBIC)
+        return tf.cast(tf.clip_by_value(w, 0.0, 255.0), tf.uint8)
+    idx = tf.random.uniform([], 0, len(factors), dtype=tf.int32)
+    return tf.switch_case(idx, [lambda f=f: window(f) for f in factors])
+
+
 def random_crop_resize(image, img_size, crop_frac_min):
     crop_frac = tf.random.uniform([], crop_frac_min, 1.0)
     h = tf.shape(image)[0]
@@ -345,8 +373,11 @@ def augment_and_mask(image, label, cfg, face_mask, training):
     if cfg.input_mode == "crop":
         # a random window in training, the centre one otherwise. Native pixels,
         # no resampling anywhere. random_crop_resize is skipped: it resizes.
-        image = (tf.image.random_crop(image, [cfg.img_size, cfg.img_size, 3])
-                 if training else eval_view(image, cfg))
+        if training and cfg.scale_aug:
+            image = random_scale_window(image, cfg.img_size, cfg.scale_aug)
+        else:
+            image = (tf.image.random_crop(image, [cfg.img_size, cfg.img_size, 3])
+                     if training else eval_view(image, cfg))
     image = tf.cast(image, tf.float32) / 255.0     # float conversion AFTER cache
 
     if training:

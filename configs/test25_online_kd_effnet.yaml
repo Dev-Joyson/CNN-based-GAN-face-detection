@@ -1,0 +1,50 @@
+# Test25: ONLINE distillation of the headline from EfficientNet-B0 fine-tuned
+# on the same crop pipeline (test20; 1.0000 in-distribution, 0.993 on
+# StyleGAN3-T -- the baseline that generalises). Teacher and student see the
+# identical augmented batch, in-graph (Beyer et al. 2022, "consistent
+# teaching"); nothing is precomputed. The offline attempt (test18) labelled
+# clean images once and trained on augmented ones -- an inconsistent target --
+# and lost to hard labels (0.923 vs 0.964 on the resize pipeline).
+#
+# Question: can a big pretrained model's cross-generator behaviour be
+# transferred into a 1M from-scratch model at zero inference cost?
+# T=2, alpha=0.7: Hinton et al. 2015's range, not tuned here (see
+# docs/hyperparameters.md; sweep {1,2,4} if this run is close).
+# Same cache key as the headline. Selection on SG3-R; SG3-T scored once.
+name: test25_online_kd_effnet
+fft_branch: false
+
+real_dir: "/content/drive/MyDrive/Real(FFHQ)"
+fake_dir: "/content/drive/MyDrive/Fake(SG2-psi1)"
+
+mask_mode: none
+limit_per_class: 25000
+
+img_size: 256
+native_size: 512            # unused in crop mode
+input_mode: crop
+cache_size: 512             # centre 512^2 at native pixels; 768 keeps the hair, 1024 everything -- see model.Config
+batch_size: 144
+
+epochs: 150               # let patience decide
+lr: 0.0003
+patience: 15              # 6 cut the test16 ablation off mid-climb; both runs sat at 0.960 at epoch 61
+seed: 42
+
+crop_frac_min: 0.85
+shuffle_buffer: 8192         # train split is 28000; a full-set buffer would be ~5.5 GB of
+                             # uint8 images in RAM -- too much for a standard Colab runtime.
+                             # Raise toward 28000 on a high-RAM runtime if you want the
+                             # notebook's whole-set shuffle.
+
+cache_dir: "/content/cache"
+out_dir: "/content/drive/MyDrive/Research/experiments"
+
+distill:
+  headline: test20_crop_baselines   # teachers live in experiments/test20_crop_baselines/baselines/
+  teachers: [efficientnet_b0]
+  temperature: 2.0
+  alpha: 0.7
+  extra: false
+  init: false
+  online: true

@@ -602,7 +602,11 @@ held-out set; a second unseen set (StyleGAN3-R) selects between runs so SG3-T is
 scored once. Configs: `test22_sg2_crop_wang_aug.yaml` (`aug: wang`, same cache as the
 headline) and `test23_sg2_sg1_crop.yaml` (`fake_dir` list + `fake_mix: [15000, 10000]`,
 the FakeMix manifest's ratio; StyleGAN1 folder `Research/Dataset New/FakeSG1`,
-provenance to be recorded under *Data*).
+provenance to be recorded under *Data*); `test24_sg2_crop_scale_aug.yaml` (`scale_aug:
+[1, 2]`, native and half-scale training windows, for the on-resize failure); and
+`test25_online_kd_effnet.yaml` (`distill.online: true` — teacher and student see the
+same augmented batch, the corrected version of the failed offline test18). All at the
+headline's latency and memory by construction.
 
 ## Is the dataset honest?
 

@@ -105,12 +105,16 @@ branch, native-resolution 256² crops. Test AUC 0.9996, 1.01M params, ~1 ms on L
    ≥10,000 images — verify, and record the SG1 set's provenance/ψ under README Data).
    Run: `train.py` → `evaluate.py` → `heldout.py --fake-dir "…/Fake(SG3-R-psi1)" --tag sg3r`;
    compare to the headline scored on sg3r; the winner (if any) is scored on sg3t once.
-   (iii) **scale augmentation** — training windows drawn at 1×, ½×, ¼× of native
-   (config knob to write), targets the downscaled-input failure; (iv) **online
+   (iii) **scale augmentation** — `scale_aug: [1, 2]`, windows at native and half
+   scale (¼ would need cache_size 1024; stated), `configs/test24_sg2_crop_scale_aug.yaml`
+   (written 2026-09-25), targets the downscaled-input failure; (iv) **online
    distillation** from EfficientNet-B0 (the baseline that generalises, 0.993 on SG3-T):
-   teacher and student see the identical augmented view, in-graph, no offline logits
-   (`online: true` in the distill block — to write; the offline attempt test18 failed
-   for view inconsistency). Order: (i) test22 → (ii) test23 → (iii) → combine the
+   `distill.online: true`, teacher and student see the identical augmented batch
+   in-graph (`OnlineKD` in distill.py; `StudentCheckpoint` saves student-only weights so
+   `--finalize` works), `configs/test25_online_kd_effnet.yaml` (written 2026-09-25;
+   needs `experiments/test20_crop_baselines/baselines/efficientnet_b0/model.keras`, which
+   exists). All four configs are on the stride-1 stem; if stride 2 wins the seeds, add
+   `stem_stride: 2` to each before running. Order: (i) test22 → (ii) test23 → (iii) → combine the
    winners → (iv). Select on SG3-R, score SG3-T once per model. Also score each on the
    on-resize probe (`--tag on_resize`) since (iii) targets it.
 3. ~~Stride-2 stem, test21~~ **trained + evaluated 2026-09-24**: test AUC 0.9990

@@ -66,3 +66,33 @@ def test_single_folder_cache_key_unchanged(tmp_path):
 def test_unknown_aug_rejected(tmp_path):
     with pytest.raises(ValueError):
         _cfg(tmp_path, fake_dir="/f", aug="strong")
+
+
+def test_scale_window_shapes_and_validation(tmp_path):
+    from model import random_scale_window
+    img = tf.cast(tf.random.uniform([512, 512, 3]) * 255, tf.uint8)
+    for _ in range(6):
+        out = random_scale_window(img, 256, [1, 2])
+        assert out.shape == (256, 256, 3) and out.dtype == tf.uint8
+    with pytest.raises(ValueError):
+        _cfg(tmp_path, fake_dir="/f", scale_aug=[1, 4])          # 256*4 > cache 512
+    with pytest.raises(ValueError):
+        Config(name="u", real_dir="-", fake_dir="/f", input_mode="resize", mask_mode="none", scale_aug=[1, 2])
+
+
+def test_online_kd_trains_student_only():
+    from distill import OnlineKD
+    tf.random.set_seed(0)
+    student = tf.keras.Sequential([tf.keras.layers.Input((8, 8, 3)), tf.keras.layers.Flatten(),
+                                   tf.keras.layers.Dense(1, activation="sigmoid")])
+    teacher = tf.keras.Sequential([tf.keras.layers.Input((8, 8, 3)), tf.keras.layers.Flatten(),
+                                   tf.keras.layers.Dense(1, activation="sigmoid")])
+    t_before = [w.numpy().copy() for w in teacher.weights]
+    s_before = [w.numpy().copy() for w in student.weights]
+    kd = OnlineKD(student, [teacher], temperature=2.0, alpha=0.7)
+    kd.compile(optimizer=tf.keras.optimizers.Adam(1e-2))
+    x = tf.random.uniform([16, 8, 8, 3]); y = tf.cast(tf.random.uniform([16]) > 0.5, tf.int32)
+    hist = kd.fit(tf.data.Dataset.from_tensor_slices((x, y)).batch(8), epochs=2, verbose=0)
+    assert all(np.array_equal(a, b.numpy()) for a, b in zip(t_before, teacher.weights)), "teacher moved"
+    assert any(not np.array_equal(a, b.numpy()) for a, b in zip(s_before, student.weights)), "student did not move"
+    assert "auc" in hist.history and "loss" in hist.history
