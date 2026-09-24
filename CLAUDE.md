@@ -102,16 +102,18 @@ branch, native-resolution 256² crops. Test AUC 0.9996, 1.01M params, ~1 ms on L
    Run: `train.py` → `evaluate.py` → `heldout.py --fake-dir "…/Fake(SG3-R-psi1)" --tag sg3r`;
    compare to the headline scored on sg3r; the winner (if any) is scored on sg3t once.
    If both help, test24 = both.
-3. **Stride-2 stem, test21** (`configs/test21_stride2_stem.yaml`, written 2026-09-24,
-   unrun): the headline with `stem_stride: 2` — same 1.01M params, 0.28 G MACs instead
-   of 1.11 G, ~4× less activation memory. The headline is fastest on latency but worst
-   on peak memory and 16× MobileNet's MACs; this run decides whether it is lightest on
-   every column, or documents why the full-res stem is needed (Gragnaniello 2021).
-   `train.py` then `evaluate.py`; then the JPEG probe (`--eval-jpeg 95`) and
-   `heldout.py … --tag sg3t` on it, so it is compared on every axis the headline was.
-4. **Seeds 43 and 44** of whichever stem wins: `configs/test19_sg2_crop_no_fft_s43/_s44.yaml`
-   (edit `stem_stride` if test21 wins) via `train.py`, then `evaluate.py`; report
-   mean ± std of test AUC.
+3. ~~Stride-2 stem, test21~~ **trained + evaluated 2026-09-24**: test AUC 0.9990
+   (acc 0.984) vs headline 0.9996; 0.28 G MACs, CPU 4.0 ms, 158 MB bs=1, 1.0 GB bs=144,
+   5,547 img/s; GPU bs=1 unchanged. Best epoch 129 of 150 (plateaued). **Still to do on
+   it**: JPEG probe (`evaluate.py --config configs/test21_stride2_stem.yaml --eval-jpeg 95 --tag jpeg95`)
+   and `heldout.py --config configs/test21_stride2_stem.yaml --fake-dir "…/Fake(SG3-T-psi1)" --tag sg3t`
+   (once), so it is compared on every axis. **Headline decision pending the seeds**: if
+   0.0006 AUC is within seed noise, stride 2 is the better headline (lightest on every
+   column but MACs vs MobileNet).
+4. **Seeds 43 and 44** — now decide the headline. Run them for BOTH stems if budget
+   allows (stride 1: `configs/test19_sg2_crop_no_fft_s43/_s44.yaml`; stride 2: copies
+   with `stem_stride: 2`, to be written), else stride 2 first since it trains at 27 s/epoch.
+   Report mean ± std of test AUC per stem; the cheaper stem wins a tie.
 5. **Held-out reals** (CelebA-HQ 1024) with `heldout.py --real-dir … --tag celebahq`.
 6. **Sensitivity checks** on the crop pipeline for `docs/hyperparameters.md`:
    lr {1e-4, 1e-3}, augmentation {off, Wang 2020's}. One run each, note the number.

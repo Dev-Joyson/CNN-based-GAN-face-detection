@@ -303,7 +303,17 @@ At bs=1 the headline holds 171 MB against MobileNet's 152 — within 12%, and be
 EfficientNet and Xception. The 7× gap was the autotune search. What survives, honestly:
 at **batch 144** this model peaks at 2.8 GB against MobileNet's 0.67 GB, because its
 full-resolution early activations scale with the batch — the throughput regime is where
-the full-res stem costs, and where test21 would show. GPU latencies this session are
+the full-res stem costs.
+
+**The stride-2 stem (test21, 2026-09-24) removes most of that cost.** Same 1.01M
+parameters, first conv at stride 2: 0.28 G MACs (from 1.11), 158 MB at bs=1 (below
+MobileNet), 1.0 GB at bs=144 (from 2.8), 5,547 img/s (from 2,092), CPU 4.0 ms against
+the headline's 6.4 in the same session; GPU bs=1 latency unchanged at 0.97 ms (that
+layer was never the GPU's bottleneck). Price: test AUC 0.9990 vs 0.9996, accuracy 0.984
+vs 0.99, and ~130 epochs to converge against ~10 — Gragnaniello et al. 2021's claim
+that early downsampling hurts is measurable here, but as a slower climb to nearly the
+same place, not a ceiling. Whether 0.0006 AUC is a real gap or seed noise is what the
+seed runs decide; if it is noise, the cheaper stem is the better headline. GPU latencies this session are
 within 5% of the table's (0.96 / 1.45 / 4.81 / 7.10 / 4.84 vs 1.02 / 1.49 / 4.71 /
 6.82 / 4.78): the session-to-session noise floor, ranking unchanged.
 
@@ -378,6 +388,7 @@ StyleGAN3-T generalisation gap is the open question (`heldout.py --model <baseli
 | model | params | MACs @256² | **ms @ bs=1, L4** | ms @ bs=1, CPU | img/s @144 | peak MB @ bs=1 (re-measured 2026-09-24) | test AUC, SG2 (resize) | test AUC, SG2 (**crop**) |
 |---|---|---|---|---|---|---|---|---|
 | **this model, native crops, no FFT (headline)** | 1.01M | 1.11G | **1.02** | **8.4** | 2,098 | 171 | — | **0.9996** |
+| this model, **stride-2 stem** (test21) | 1.01M | **0.28G** | 0.97 | **4.0** (6.4 for the headline, same session) | **5,547** | **158** | — | 0.9990 (acc 0.98) |
 | this model, native crops, with FFT (test19) | 1.02M | 1.20G | 1.49 | 8.6 | 1,564 | 171 | — | 0.9994 |
 | this model, resize pipeline (test17) | 1.02M | 1.20G | 1.34 | 8.7 | 1,564 | 171 (same network) | 0.964 (mix 0.973) | — |
 | this model, no FFT branch, resize pipeline | 1.01M | 1.11G | **0.99** | **6.6** | 2,098 | 171 (same network) | 0.953 (mix 0.975) | — |
@@ -500,6 +511,7 @@ input, where the frequencies it was designed for have not been resized away.
 |---|---|---|---|---|---|
 | **test19_sg2_crop_no_fft** | **headline** — native-resolution crops, spatial branch only | FFHQ 1024 + StyleGAN2 ψ=1.0 (NVIDIA), 25k/class | **0.9996** (acc 0.99) | 0.9996 (best epoch 73, killed at 81 flat) | `experiments/test19_sg2_crop_no_fft/` |
 | test19_sg2_crop | native crops, with FFT branch | same | 0.9994 (acc 0.99) | 0.9994 (~50 epochs incl. a resume; first run's history lost to a VM) | `experiments/test19_sg2_crop/` |
+| test21_stride2_stem | headline with a stride-2 first conv (4× fewer MACs) | same | 0.9990 (acc 0.984) | 0.9983 (best epoch 129; ran to the 150 cap, plateaued from ~125) | `experiments/test21_stride2_stem/` |
 | test17_sg2 | headline, resize pipeline (1024→512→256) | same | 0.9636 (acc 0.90) | 0.9645 (best epoch 89 of 104, early-stopped) | `experiments/test17_sg2/` |
 | test17_sg2_no_fft | ablation — FFT branch removed | same | 0.9527 (acc 0.88) | 0.9503 (best epoch 114, killed at 116 while grinding) | `experiments/test17_sg2_no_fft/` |
 | test18_distill | distillation, raw EfficientNet-B0 teacher, T=2, same 35k | same | 0.9226 (acc 0.84) — **worse**; swap drop 0.21 | 0.9123 (best 104, killed at 111) | `experiments/test18_distill/` |

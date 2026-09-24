@@ -231,6 +231,13 @@ the README says how things *are*, this says how we found out.
   Xception 409.** The "7× MobileNet" memory loss was a measurement artefact; the honest
   gap is 12%. What remains real: at batch 144 the full-res activations put this model at
   2.8 GB vs MobileNet's 0.67 GB — the batched regime is where the stem costs (test21).
+- **2026-09-24 — Stride-2 stem: 0.9990 vs 0.9996, at 4× fewer MACs, half the CPU
+  latency, 158 MB at bs=1, 1.0 GB at bs=144 (from 2.8).** It learns the same signal
+  13× more slowly (best epoch 129 vs ~10) and lands 0.0006 AUC lower. Gragnaniello
+  2021's "early downsampling destroys the fingerprint" is measurable as a slower climb,
+  not a ceiling. GPU bs=1 latency is identical (0.97 ms): the first layer was never the
+  GPU's bottleneck; CPU, memory and throughput are where it pays. Same-session
+  headline CPU read 6.4 ms here vs 8.4 on 2026-09-21 — the VM variance again.
 - **Latency needs no training; accuracy does.** The efficiency half of the comparison
   can be measured before any baseline is fine-tuned.
 - **Published detectors zero-shot measure generalisation, not architecture.** CNNDetection
