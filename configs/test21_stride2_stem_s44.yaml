@@ -1,0 +1,34 @@
+# Seed 44 of test21_stride2_stem: identical config, seed 44 -- a different 25k
+# sample, split, init and shuffle. With seed 42 (0.9990) gives mean +/- std over
+# three seeds, to be set against the stride-1 headline's three (0.9996, s43, s44).
+# If the two stems are within each other's spread, the cheaper one is the headline.
+# New cache (the seed is in the key); first epoch reads 50k PNGs from Drive.
+name: test21_stride2_stem_s44
+stem_stride: 2
+fft_branch: false
+
+real_dir: "/content/drive/MyDrive/Real(FFHQ)"
+fake_dir: "/content/drive/MyDrive/Fake(SG2-psi1)"
+
+mask_mode: none
+limit_per_class: 25000
+
+img_size: 256
+native_size: 512            # unused in crop mode
+input_mode: crop
+cache_size: 512             # centre 512^2 at native pixels; 768 keeps the hair, 1024 everything -- see model.Config
+batch_size: 144
+
+epochs: 150               # let patience decide
+lr: 0.0003
+patience: 15              # 6 cut the test16 ablation off mid-climb; both runs sat at 0.960 at epoch 61
+seed: 44
+
+crop_frac_min: 0.85
+shuffle_buffer: 8192         # train split is 28000; a full-set buffer would be ~5.5 GB of
+                             # uint8 images in RAM -- too much for a standard Colab runtime.
+                             # Raise toward 28000 on a high-RAM runtime if you want the
+                             # notebook's whole-set shuffle.
+
+cache_dir: "/content/cache"
+out_dir: "/content/drive/MyDrive/Research/experiments"
