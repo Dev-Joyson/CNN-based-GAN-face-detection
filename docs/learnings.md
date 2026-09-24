@@ -216,6 +216,10 @@ the README says how things *are*, this says how we found out.
   read the peak over the timed loop after warmup, keep the autotune number as a
   separate field, write the analytic number too. Re-measure all four in one session.
   Lesson: a memory "peak" is meaningless without stating *when* the counter was reset.
+- **2026-09-24 — Re-measured, one session: 171 MB at bs=1 vs MobileNet 152, EffNet 205,
+  Xception 409.** The "7× MobileNet" memory loss was a measurement artefact; the honest
+  gap is 12%. What remains real: at batch 144 the full-res activations put this model at
+  2.8 GB vs MobileNet's 0.67 GB — the batched regime is where the stem costs (test21).
 - **Latency needs no training; accuracy does.** The efficiency half of the comparison
   can be measured before any baseline is fine-tuned.
 - **Published detectors zero-shot measure generalisation, not architecture.** CNNDetection

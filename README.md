@@ -258,7 +258,8 @@ The same command also prints, and writes into `eval.json`:
 device      : NVIDIA L4  (TF 2.20.0, XLA)                         measured 2026-09-20
 params      : 1,020,417  (4.08 MB fp32 weights; checkpoint 12.33 MB incl. optimizer)
 MACs        : 1.199 G per image at 256^2  (FLOPs ~= 2.40 G)
-peak memory : 1301 MB at bs=1 | 7278 MB at bs=144
+peak memory : 171 MB at bs=1 | 2811 MB at bs=144   (incl. autotune: 1301 | 5374)   re-measured 2026-09-24
+activations : 8.39 MB largest tensor | 20.78 MB all, at bs=1 fp32 (analytic)
 latency bs=1: 1.34 ms median | 1.34 mean | 1.41 p95   (n=1000)   [1.41 / 1.57 on a second L4 session]
 throughput  : 1,564 img/s at batch 144
 ```
@@ -267,8 +268,8 @@ Two L4 sessions gave 1.34 and 1.41 ms median — ~5% apart on identical code. Th
 the session-to-session noise floor, and why baselines must be measured in the *same*
 session as the model they are compared with, never across sessions.
 
-**Peak memory: the 1,301 MB above is wrong as a footprint, and the column is being
-re-measured (2026-09-24).** The counter was reset *before* the warmup loop, which is
+**Peak memory: the 1,301 MB the table carried until 2026-09-24 was wrong as a
+footprint; the column below is the re-measurement.** The counter was reset *before* the warmup loop, which is
 where cuDNN autotunes — it tries every conv algorithm, including FFT/Winograd variants
 whose scratch workspace for a 256²×32-channel conv runs to hundreds of MB — so the
 "peak" was the largest autotune trial, not the model. `measure_efficiency` now reports
@@ -286,8 +287,25 @@ Those analytic numbers, at bs=1 fp32:
 
 The network's own footprint is the smallest of the four. What the old column ranked was
 cuDNN's appetite for scratch on a large-spatial conv, which is real on a GPU but is a
-runtime property, and one a stride-2 stem (test21) shrinks 4×. The measured `bs1`
-column must be re-taken for all four models in one session before it is quoted.
+runtime property, and one a stride-2 stem (test21) shrinks 4×.
+
+**Re-measured, all five models in one L4 session (2026-09-24, git 11883d0):**
+
+| model | peak MB @ bs=1 | peak MB @ bs=144 | incl. autotune @ bs=1 (old column) | ms @ bs=1 this session |
+|---|---|---|---|---|
+| **this model, no FFT (headline)** | **171** | 2,811 | 1,301 | **0.96** |
+| this model, with FFT | 171 | 2,962 | 1,301 | 1.45 |
+| MobileNetV3-Small | **152** | **665** | 191 | 4.81 |
+| EfficientNet-B0 | 205 | 2,017 | 234 | 7.10 |
+| Xception | 409 | 2,987 | 717 | 4.84 |
+
+At bs=1 the headline holds 171 MB against MobileNet's 152 — within 12%, and below
+EfficientNet and Xception. The 7× gap was the autotune search. What survives, honestly:
+at **batch 144** this model peaks at 2.8 GB against MobileNet's 0.67 GB, because its
+full-resolution early activations scale with the batch — the throughput regime is where
+the full-res stem costs, and where test21 would show. GPU latencies this session are
+within 5% of the table's (0.96 / 1.45 / 4.81 / 7.10 / 4.84 vs 1.02 / 1.49 / 4.71 /
+6.82 / 4.78): the session-to-session noise floor, ranking unchanged.
 
 `eval.json` also carries a `system_under_test` block — GPU, TF version, platform,
 mixed-precision policy, git SHA, timestamp, warmup and run count. Colab states its
@@ -357,23 +375,24 @@ network reaching parity with fine-tuned ImageNet backbones on the same task, and
 EfficientNet / Xception at equal or fewer parameters. Whether the baselines share the
 StyleGAN3-T generalisation gap is the open question (`heldout.py --model <baseline>`, written, unrun).
 
-| model | params | MACs @256² | **ms @ bs=1, L4** | ms @ bs=1, CPU | img/s @144 | peak MB @ bs=1 (incl. autotune — superseded, see *Peak memory* above) | test AUC, SG2 (resize) | test AUC, SG2 (**crop**) |
+| model | params | MACs @256² | **ms @ bs=1, L4** | ms @ bs=1, CPU | img/s @144 | peak MB @ bs=1 (re-measured 2026-09-24) | test AUC, SG2 (resize) | test AUC, SG2 (**crop**) |
 |---|---|---|---|---|---|---|---|---|
-| **this model, native crops, no FFT (headline)** | 1.01M | 1.11G | **1.02** | **8.4** | 2,098 | 1,301 | — | **0.9996** |
-| this model, native crops, with FFT (test19) | 1.02M | 1.20G | 1.49 | 8.6 | 1,564 | 1,301 | — | 0.9994 |
-| this model, resize pipeline (test17) | 1.02M | 1.20G | 1.34 | 8.7 | 1,564 | 1,301 | 0.964 (mix 0.973) | — |
-| this model, no FFT branch, resize pipeline | 1.01M | 1.11G | **0.99** | **6.6** | 2,098 | 1,301 | 0.953 (mix 0.975) | — |
-| MobileNetV3-Small | 1.01M | **0.07G** | 4.71 | 18.7 | **2,684** | **181** | 0.992 (ImageNet-pretrained, fine-tuned) | **0.9999** (acc 0.998; test20, 2026-09-23) |
-| EfficientNet-B0 | 4.21M | 0.50G | 6.82 | 39.8 | 540 | 198 | 0.9997 (ImageNet-pretrained, fine-tuned) | **1.0000** (0.999999; acc 0.999; early-stopped ep 19; test20, 2026-09-23) |
-| Xception | 21.1M | 5.95G | 4.78 | 65.0 | 377 | 560 | 0.9987 (ImageNet-pretrained, fine-tuned, stopped early at a 0.999 plateau) | **1.0000** (0.999999; acc 0.9995; early-stopped ep 27; test20, 2026-09-23) |
+| **this model, native crops, no FFT (headline)** | 1.01M | 1.11G | **1.02** | **8.4** | 2,098 | 171 | — | **0.9996** |
+| this model, native crops, with FFT (test19) | 1.02M | 1.20G | 1.49 | 8.6 | 1,564 | 171 | — | 0.9994 |
+| this model, resize pipeline (test17) | 1.02M | 1.20G | 1.34 | 8.7 | 1,564 | 171 (same network) | 0.964 (mix 0.973) | — |
+| this model, no FFT branch, resize pipeline | 1.01M | 1.11G | **0.99** | **6.6** | 2,098 | 171 (same network) | 0.953 (mix 0.975) | — |
+| MobileNetV3-Small | 1.01M | **0.07G** | 4.71 | 18.7 | **2,684** | **152** | 0.992 (ImageNet-pretrained, fine-tuned) | **0.9999** (acc 0.998; test20, 2026-09-23) |
+| EfficientNet-B0 | 4.21M | 0.50G | 6.82 | 39.8 | 540 | 205 | 0.9997 (ImageNet-pretrained, fine-tuned) | **1.0000** (0.999999; acc 0.999; early-stopped ep 19; test20, 2026-09-23) |
+| Xception | 21.1M | 5.95G | 4.78 | 65.0 | 377 | 409 | 0.9987 (ImageNet-pretrained, fine-tuned, stopped early at a 0.999 plateau) | **1.0000** (0.999999; acc 0.9995; early-stopped ep 27; test20, 2026-09-23) |
 
 The honest reading. **Single-image latency: this model wins by 3.5–5×**, including
 against EfficientNet-B0, which has *half* the MACs — MACs are an indirect metric
 (ShuffleNetV2); depthwise-separable nets are FLOP-cheap and GPU-hostile, this model
-is five plain convs. **It loses MACs (second-worst), peak memory (worst, 7× MobileNet
-— no stride-2 stem, so full-resolution early activations; the FFT tensor is not the
-cause, the no-FFT model peaks identically at bs=1), and batched throughput (MobileNet's 17× fewer MACs pay off once the GPU is
-saturated).** Params: tied with MobileNetV3-Small.
+is five plain convs. **It loses MACs (second-worst) and batched throughput (MobileNet's 17× fewer MACs
+pay off once the GPU is saturated), and at bs=1 it holds 12% more memory than
+MobileNet (171 vs 152 MB; the earlier "7×" was the autotune search, see *Peak memory*).
+At batch 144 the full-resolution early activations cost it 4× MobileNet's memory —
+no stride-2 stem; test21 tests whether one is affordable.** Params: tied with MobileNetV3-Small.
 
 GPU latencies for the four baselines and the resize rows are one L4 session
 (2026-09-20 morning); the two crop rows are a third session (2026-09-21: 1.49 with
