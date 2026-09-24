@@ -81,7 +81,9 @@ def main():
     paths, labels = real + fake, [0] * n + [1] * n
     ds = cached_dataset(paths, labels, cfg, f"heldout_{args.tag}")      # its own cache file
     ds = ds.map(lambda x, y: augment_and_mask(x, y, cfg, face_mask, training=False),
-                num_parallel_calls=tf.data.AUTOTUNE).batch(cfg.batch_size)
+                num_parallel_calls=tf.data.AUTOTUNE).batch(32)
+    # 32, not cfg.batch_size: scoring is batch-independent, and Xception's separable
+    # convs run eagerly here (no tf.function) -- at 144 that OOMed a 20 GB L4
 
     y_true, y_score = [], []
     for xb, yb in ds:
