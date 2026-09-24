@@ -1,0 +1,43 @@
+# Test22: the headline (test19_sg2_crop_no_fft) trained with Wang et al. 2020's
+# augmentation instead of ours. Same data, split, seed, cache, architecture and
+# recipe; only `aug` changes -- latency and memory are untouched by construction.
+#
+# Why: on held-out StyleGAN3-T the headline scores 0.703 AUC where the
+# ImageNet-pretrained baselines score 0.96-0.99. Wang et al. (CVPR 2020,
+# "CNN-generated images are surprisingly easy to spot... for now") report that
+# blur (sigma~U[0,3]) and JPEG (q~U[30,100]) augmentation, each at p=0.5, is what
+# made their ProGAN detector generalise to eleven unseen generators. Ours was
+# milder (box blur p=0.3, JPEG q>=60 p=0.3). This run tests their recipe on this
+# data: a cited value, verified here, as the panel's standard requires.
+#
+# Selection: score on StyleGAN3-R (heldout.py --tag sg3r). StyleGAN3-T is the
+# final test and is scored once, after the choice is made.
+name: test22_sg2_crop_wang_aug
+aug: wang
+fft_branch: false
+
+real_dir: "/content/drive/MyDrive/Real(FFHQ)"
+fake_dir: "/content/drive/MyDrive/Fake(SG2-psi1)"
+
+mask_mode: none
+limit_per_class: 25000
+
+img_size: 256
+native_size: 512            # unused in crop mode
+input_mode: crop
+cache_size: 512             # centre 512^2 at native pixels; 768 keeps the hair, 1024 everything -- see model.Config
+batch_size: 144
+
+epochs: 150               # let patience decide
+lr: 0.0003
+patience: 15              # 6 cut the test16 ablation off mid-climb; both runs sat at 0.960 at epoch 61
+seed: 42
+
+crop_frac_min: 0.85
+shuffle_buffer: 8192         # train split is 28000; a full-set buffer would be ~5.5 GB of
+                             # uint8 images in RAM -- too much for a standard Colab runtime.
+                             # Raise toward 28000 on a high-RAM runtime if you want the
+                             # notebook's whole-set shuffle.
+
+cache_dir: "/content/cache"
+out_dir: "/content/drive/MyDrive/Research/experiments"

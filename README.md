@@ -505,7 +505,7 @@ input, where the frequencies it was designed for have not been resized away.
 | test18_distill | distillation, raw EfficientNet-B0 teacher, T=2, same 35k | same | 0.9226 (acc 0.84) — **worse**; swap drop 0.21 | 0.9123 (best 104, killed at 111) | `experiments/test18_distill/` |
 | test18b_distill_cal | distillation, teacher calibrated first (Guo 2017) | same | not run: T_cal = 1.10 — the teacher is not miscalibrated, it is near-perfect (val 0.013 / 0.995 and right that often) | | — |
 | test18c_distill_mnv3 | distillation, MobileNetV3-Small teacher (student's size, 0.992) | same | 0.9014 (acc 0.80) — **worse**; swap drop 0.18 | 0.904 (best 63, killed at 64) | `experiments/test18c_distill_mnv3/` |
-| test16_full | *preliminary* — StyleGAN1+2 mix, ratio unknown | FFHQ 1024 + FakeMix, 20k/class | 0.9728 (acc 0.91) | 0.9724 (best 85 of 91) | `experiments/test16_full/` |
+| test16_full | *preliminary* — StyleGAN1+2 mix (15k SG2 + 10k SG1 per its `_manifest.csv`, learned 2026-09-24) | FFHQ 1024 + FakeMix, 20k/class | 0.9728 (acc 0.91) | 0.9724 (best 85 of 91) | `experiments/test16_full/` |
 | test16_no_fft | *preliminary* ablation on the mix | same | 0.9751 (acc 0.91) | 0.9748 (patience 15; stopped at 101) | `experiments/test16_no_fft/` |
 | test13_face | control — `face_only` | FFHQ 1024 + FakeMix, 25k/class | _pending_ | 0.9995 | `experiments/test13_face/` |
 | test14_background | control — `background_only` | FFHQ 1024 + FakeMix, 20k/class | _pending_ | _rerun pending_ | `experiments/test14_background/` |
@@ -586,7 +586,10 @@ latency and memory — unchanged and are the next experiments: Wang et al. 2020'
 augmentation (blur σ≤3 and JPEG 30–100 at p=0.5, their generalisation recipe) and
 training on two generators with a third held out. StyleGAN3-T is now the *final*
 held-out set; a second unseen set (StyleGAN3-R) selects between runs so SG3-T is
-scored once.
+scored once. Configs: `test22_sg2_crop_wang_aug.yaml` (`aug: wang`, same cache as the
+headline) and `test23_sg2_sg1_crop.yaml` (`fake_dir` list + `fake_mix: [15000, 10000]`,
+the FakeMix manifest's ratio; StyleGAN1 folder `Research/Dataset New/FakeSG1`,
+provenance to be recorded under *Data*).
 
 ## Is the dataset honest?
 

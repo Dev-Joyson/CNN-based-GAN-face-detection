@@ -92,7 +92,7 @@ def main():
     rng = random.Random(cfg.seed)
 
     real = list_images(cfg.real_dir)
-    fake = list_images(cfg.fake_dir)
+    fake = [q for d in cfg.fake_dirs for q in list_images(d)]
     if not real or not fake:
         raise FileNotFoundError(f"real={len(real)} fake={len(fake)} -- check paths in {args.config}")
 

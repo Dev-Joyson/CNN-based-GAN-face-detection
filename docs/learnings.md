@@ -10,6 +10,10 @@ the README says how things *are*, this says how we found out.
   low-passed twice and reals once. Resize equalises size, not spectra; the FFT branch is
   built to find exactly that residual, and the face/background masks do not control for
   it. → FFHQ reals at 1024 so both classes take the identical path.
+- **2026-09-24 — FakeMix's ratio was in its manifest all along: 15,000 SG2 + 10,000
+  SG1.** `_manifest.csv` maps every renamed file to its source folder. Lesson: a
+  merged dataset must carry its composition as data, not as a memory. → `fake_dir`
+  takes a list and `fake_mix` states the counts, so a two-generator run is exact.
 - **2026-09-19 — A sorted prefix of a mixed folder can be one generator.** FakeMix holds
   StyleGAN1 + 2; FFHQ is numbered. → `load_paths` takes a seeded random sample.
 - **2026-09-19 — 25,001 files for 25,000 images.** One non-image would have reached

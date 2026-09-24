@@ -93,9 +93,15 @@ branch, native-resolution 256² crops. Test AUC 0.9996, 1.01M params, ~1 ms on L
 2c. **Generalisation at the same architecture** (next; decided 2026-09-24). Two levers,
    latency/memory unchanged: (i) Wang et al. 2020 augmentation — blur σ~U[0,3] and
    JPEG q~U[30,100], each p=0.5 — as a config; (ii) two-generator training (SG2 +
-   FakeMix's SG1, or SG2 + a generated SG3-R) with SG3-T held out. **Rule: SG3-T is
-   the final test, scored once per model. Generate SG3-R (1,500, ψ=1.0, same patched
-   repo, seeds 200000+) as the selection set.** Configs not written yet.
+   the 10k SG1 that FakeMix's manifest identifies) with SG3-T held out. **Rule: SG3-T
+   is the final test, scored once per model. Generate SG3-R (1,500, ψ=1.0, same
+   patched repo, seeds 200000+, to `Fake(SG3-R-psi1)`) as the selection set.**
+   Configs written 2026-09-24: `test22_sg2_crop_wang_aug.yaml` (headline's cache) and
+   `test23_sg2_sg1_crop.yaml` (new cache; needs `Research/Dataset New/FakeSG1` with
+   ≥10,000 images — verify, and record the SG1 set's provenance/ψ under README Data).
+   Run: `train.py` → `evaluate.py` → `heldout.py --fake-dir "…/Fake(SG3-R-psi1)" --tag sg3r`;
+   compare to the headline scored on sg3r; the winner (if any) is scored on sg3t once.
+   If both help, test24 = both.
 3. **Stride-2 stem, test21** (`configs/test21_stride2_stem.yaml`, written 2026-09-24,
    unrun): the headline with `stem_stride: 2` — same 1.01M params, 0.28 G MACs instead
    of 1.11 G, ~4× less activation memory. The headline is fastest on latency but worst

@@ -93,7 +93,7 @@ def extra_pool(cfg, splits):
     for paths, _ in splits.values():
         used.update(paths)
     real = [p for p in list_images(cfg.real_dir) if p not in used]
-    fake = [p for p in list_images(cfg.fake_dir) if p not in used]
+    fake = [p for d in cfg.fake_dirs for p in list_images(d) if p not in used]
     n = min(len(real), len(fake))
     rng = random.Random(cfg.seed)
     real = sorted(rng.sample(real, n)) if len(real) > n else real

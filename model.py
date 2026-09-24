@@ -31,7 +31,11 @@ MASK_MODES = ("face_only", "background_only", "none")
 class Config:
     name: str
     real_dir: str
-    fake_dir: str
+    fake_dir: str                         # one folder, or a list of folders (one per generator)
+    # counts per fake folder when fake_dir is a list; must sum to limit_per_class.
+    # Stated, not inferred: a mixed training set with an unknown ratio is not an
+    # experiment (FakeMix was 15k SG2 + 10k SG1 -- learned from its manifest).
+    fake_mix: list = field(default=None)
 
     # experiment knobs
     mask_mode: str = "face_only"          # face_only | background_only | none
@@ -80,6 +84,11 @@ class Config:
     stem_stride: int = 1
 
     # augmentation (train split only)
+    # ours: 3x3 box blur p=0.3, JPEG q~U[60,100] p=0.3 (the notebook's).
+    # wang: Wang et al. CVPR 2020 (CNNDetection) -- Gaussian blur sigma~U[0,3]
+    #       p=0.5, JPEG q~U[30,100] p=0.5. Their finding: this is what made a
+    #       ProGAN detector generalise to unseen generators. Not in the cache key.
+    aug: str = "ours"
     crop_frac_min: float = 0.85           # Test16: random crop keeps 85-100% of the side
     shuffle_buffer: int = 4096            # images held for shuffling; Test16 used the whole train set
 
@@ -103,7 +112,18 @@ class Config:
     #   worse target than hard labels; seen on test18)
     distill: dict = field(default=None)
 
+    @property
+    def fake_dirs(self):
+        return list(self.fake_dir) if isinstance(self.fake_dir, (list, tuple)) else [self.fake_dir]
+
     def __post_init__(self):
+        if self.aug not in ("ours", "wang"):
+            raise ValueError(f"aug must be ours or wang, got {self.aug!r}")
+        if self.fake_mix is not None:
+            if len(self.fake_mix) != len(self.fake_dirs):
+                raise ValueError("fake_mix needs one count per fake_dir")
+            if sum(self.fake_mix) != self.limit_per_class:
+                raise ValueError(f"fake_mix {self.fake_mix} must sum to limit_per_class {self.limit_per_class}")
         if self.mask_mode not in MASK_MODES:
             raise ValueError(f"mask_mode must be one of {MASK_MODES}, got {self.mask_mode!r}")
         if self.input_mode not in ("resize", "crop"):
@@ -136,7 +156,10 @@ class Config:
         Without the seed, a 3-seed run would read seed-42's images from disk and
         label them seed-43 -- silently, with plausible numbers.
         """
-        ident = f"{self.real_dir}|{self.fake_dir}".encode()
+        fake = self.fake_dir if isinstance(self.fake_dir, str) else "|".join(self.fake_dirs)
+        if self.fake_mix is not None:
+            fake += "|mix" + "-".join(str(n) for n in self.fake_mix)
+        ident = f"{self.real_dir}|{fake}".encode()
         tag = hashlib.sha1(ident).hexdigest()[:8]
         key = f"n{self.limit_per_class}_i{self.img_size}_n{self.native_size}_s{self.seed}_{tag}"
         if self.input_mode == "crop":
@@ -195,19 +218,32 @@ def load_paths(cfg):
     silently be one generator or one slice of FFHQ. Seeded, so the same
     config always picks the same images.
     """
-    def sample(folder):
+    def sample(folder, n):
         files = list_images(folder)
-        if len(files) <= cfg.limit_per_class:
+        if len(files) < n:
+            raise FileNotFoundError(f"{folder}: {len(files)} images, {n} asked")
+        if len(files) == n:
             return files
-        return sorted(random.Random(cfg.seed).sample(files, cfg.limit_per_class))
+        return sorted(random.Random(cfg.seed).sample(files, n))
 
-    real_images = sample(cfg.real_dir)
-    fake_images = sample(cfg.fake_dir)
+    dirs = cfg.fake_dirs
+    if cfg.fake_mix is not None:
+        counts = list(cfg.fake_mix)
+    else:                                   # equal share, remainder to the first
+        k = len(dirs)
+        counts = [cfg.limit_per_class // k] * k
+        counts[0] += cfg.limit_per_class - sum(counts)
+
+    real_images = sample(cfg.real_dir, cfg.limit_per_class)
+    fake_images = []
+    for folder, n in zip(dirs, counts):
+        fake_images += sample(folder, n)
     if not real_images or not fake_images:
         raise FileNotFoundError(
             f"No images found. real_dir={cfg.real_dir!r} ({len(real_images)}), "
             f"fake_dir={cfg.fake_dir!r} ({len(fake_images)})")
-    print(f"real: {len(real_images)} of pool   fake: {len(fake_images)} of pool")
+    mix = "" if len(dirs) == 1 else "  (" + " + ".join(f"{n} {os.path.basename(d)}" for d, n in zip(dirs, counts)) + ")"
+    print(f"real: {len(real_images)} of pool   fake: {len(fake_images)} of pool{mix}")
 
     paths = real_images + fake_images
     labels = [0] * len(real_images) + [1] * len(fake_images)
@@ -225,8 +261,8 @@ def load_paths(cfg):
     }
 
 
-def random_jpeg(image):
-    quality = tf.random.uniform([], 60, 100, dtype=tf.int32)
+def random_jpeg(image, q_min=60):
+    quality = tf.random.uniform([], q_min, 100, dtype=tf.int32)
     # clip BEFORE the uint8 cast: the bicubic resize in random_crop_resize
     # overshoots past 1.0, and 1.07 * 255 = 273 wraps around to 17 -- bright
     # edge pixels turn into black speckles.
@@ -241,6 +277,19 @@ def random_blur(image):
         lambda: tf.nn.avg_pool2d(image[None], ksize=3, strides=1, padding="SAME")[0],
         lambda: image,
     )
+
+
+def random_gaussian_blur(image, sigma_max=3.0, radius=9):
+    """Wang et al. 2020's blur: Gaussian, sigma ~ U[0, sigma_max]. Fixed 19-tap
+    kernel (radius 9 covers 3 sigma at sigma_max); as sigma -> 0 the kernel is a
+    delta, so the low end is the identity."""
+    sigma = tf.random.uniform([], 0.0, sigma_max)
+    x = tf.cast(tf.range(-radius, radius + 1), tf.float32)
+    k1 = tf.exp(-0.5 * tf.square(x / tf.maximum(sigma, 1e-3)))
+    k1 = k1 / tf.reduce_sum(k1)
+    k2 = k1[:, None] * k1[None, :]
+    kernel = tf.tile(k2[:, :, None, None], [1, 1, 3, 1])       # depthwise, per channel
+    return tf.nn.depthwise_conv2d(image[None], kernel, [1, 1, 1, 1], "SAME")[0]
 
 
 def random_crop_resize(image, img_size, crop_frac_min):
@@ -304,10 +353,16 @@ def augment_and_mask(image, label, cfg, face_mask, training):
         if cfg.input_mode == "resize":
             image = random_crop_resize(image, cfg.img_size, cfg.crop_frac_min)
             image = tf.clip_by_value(image, 0.0, 1.0)   # bicubic overshoots again
-        image = random_blur(image)
-        image = tf.cond(tf.random.uniform([]) < 0.3,
-                        lambda: random_jpeg(image),
-                        lambda: image)
+        if cfg.aug == "wang":
+            image = tf.cond(tf.random.uniform([]) < 0.5,
+                            lambda: random_gaussian_blur(image), lambda: image)
+            image = tf.cond(tf.random.uniform([]) < 0.5,
+                            lambda: random_jpeg(image, q_min=30), lambda: image)
+        else:
+            image = random_blur(image)
+            image = tf.cond(tf.random.uniform([]) < 0.3,
+                            lambda: random_jpeg(image),
+                            lambda: image)
 
     # NOTE: outside the `if training` block on purpose. The mask must hit
     # train + val + test identically -- indenting this line inside `if training:`

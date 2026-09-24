@@ -39,7 +39,8 @@ from model import (augment_and_mask, cached_dataset, feathered_ellipse, list_ima
 
 
 def pick(folder, n, exclude, seed):
-    files = [p for p in list_images(folder) if p not in exclude]
+    folders = folder if isinstance(folder, (list, tuple)) else [folder]
+    files = [p for f in folders for p in list_images(f) if p not in exclude]
     if len(files) < n:
         print(f"  {folder}: only {len(files)} usable images (asked {n})")
         n = len(files)
@@ -75,7 +76,7 @@ def main():
     n = min(len(real), len(fake))
     real, fake = real[:n], fake[:n]
     print(f"held-out '{args.tag}': {n} real from {args.real_dir or cfg.real_dir + ' (unsampled)'}\n"
-          f"                     {n} fake from {args.fake_dir or cfg.fake_dir + ' (unsampled)'}")
+          f"                     {n} fake from {args.fake_dir or str(cfg.fake_dir) + ' (unsampled)'}")
 
     face_mask = feathered_ellipse(cfg.img_size, cfg.mask_rx, cfg.mask_ry, cfg.mask_feather)
     paths, labels = real + fake, [0] * n + [1] * n
