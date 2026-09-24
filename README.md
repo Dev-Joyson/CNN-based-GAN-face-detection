@@ -547,8 +547,24 @@ in each run folder (2026-09-22, L4).
 |---|---|---|---|---|---|
 | test19_sg2_crop_no_fft (headline) | 0.9996 | **0.703** | 0.529 | 0.064 | 0.012 / 0.081 |
 | test19_sg2_crop (with FFT) | 0.9994 | **0.711** | 0.526 | 0.056 | 0.012 / 0.077 |
+| MobileNetV3-Small (test20, crop) | 0.9999 | **0.958** | 0.675 | 0.353 | 0.004 / 0.355 |
+| EfficientNet-B0 (test20, crop) | 1.0000 | **0.993** | 0.844 | 0.689 | 0.003 / 0.681 |
+| Xception (test20, crop) | 1.0000 | **0.967** | 0.651 | 0.301 | 0.000 / 0.309 |
 
-**Neither model transfers.** Both score 94% of StyleGAN3 faces as real; the 0.70 AUC is
+**The pretrained baselines transfer; this model does not (2026-09-24).** Same held-out
+set, same pipeline, same code path: EfficientNet-B0 ranks StyleGAN3 fakes at 0.993 AUC
+where this model manages 0.703. The reals side is identical for all five (p_fake ≤
+0.012), so the gap is entirely in what each network learned about "fake". The
+baselines' features come from ImageNet and were only nudged by fine-tuning; ours were
+learned from StyleGAN2 alone and are StyleGAN2's fingerprint. This is the effect Ojha
+et al. (CVPR 2023) describe — a feature extractor trained on one generator's fakes
+overfits to that generator — and Wang et al. (2020) rely on for their ImageNet-
+pretrained ResNet-50. It is the honest limit of the from-scratch 1M model, and it is
+the price of the resource numbers above. Thresholds: even the baselines' accuracies
+at 0.5 are poor (0.65–0.84); their advantage is ranking, which a recalibrated
+threshold would turn into accuracy. Ours has nothing to recalibrate.
+
+**Neither of our models transfers.** Both score 94% of StyleGAN3 faces as real; the 0.70 AUC is
 a weak ranking signal with no usable threshold. Unseen FFHQ reals are still scored
 correctly (p_fake 0.012), so the failure is entirely on the fake side: the fingerprint
 learned from StyleGAN2 is not present in StyleGAN3. That is by design of the
@@ -564,10 +580,13 @@ headline on every axis measured.
 
 What the claim is, stated exactly: in-distribution detection of StyleGAN2 at
 1.01M parameters and ~1 ms, competitive with detectors 4–20× larger on the same
-task. Cross-generator generalisation is out of scope and reported honestly as 0.70;
-fixing it (multi-generator training, Wang 2020's augmentation set at scale) is future
-work, and the baselines are expected to share the gap — worth measuring once they
-are fine-tuned on the crop pipeline.
+task. Cross-generator generalisation is where the pretrained baselines win (0.96–0.99
+vs 0.70) and is reported as such. Two levers keep the architecture — and so the
+latency and memory — unchanged and are the next experiments: Wang et al. 2020's
+augmentation (blur σ≤3 and JPEG 30–100 at p=0.5, their generalisation recipe) and
+training on two generators with a third held out. StyleGAN3-T is now the *final*
+held-out set; a second unseen set (StyleGAN3-R) selects between runs so SG3-T is
+scored once.
 
 ## Is the dataset honest?
 

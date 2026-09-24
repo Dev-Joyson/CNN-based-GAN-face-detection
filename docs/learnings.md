@@ -185,6 +185,13 @@ the README says how things *are*, this says how we found out.
   score 0.012, so the failure is one-sided: unseen fakes look real. Matches the
   cross-generator collapse Wang 2020 / Gragnaniello 2021 report; the claim stays
   in-distribution, the gap is stated, not hidden.
+- **2026-09-24 — The pretrained baselines DO transfer to StyleGAN3-T: MobileNet 0.958,
+  EfficientNet 0.993, Xception 0.967 vs ours 0.703.** Reals identical for all; the gap
+  is what "fake" means to each network. ImageNet features nudged by fine-tuning
+  generalise; features learned from one generator are that generator's fingerprint
+  (Ojha et al. 2023; Wang et al. 2020). This is the real cost of the from-scratch
+  1M model and goes in the thesis as such. Next: Wang's augmentation and two-generator
+  training, same architecture; SG3-R as the selection set so SG3-T stays held out.
 - **2026-09-22 — The FFT branch does not generalise either: 0.711 vs 0.703.** Fourth
   ablation row, same verdict. A frequency branch trained on one generator learns that
   generator's spectrum; it is not a generator-agnostic prior. Dropped on every axis.

@@ -85,10 +85,16 @@ branch, native-resolution 256² crops. Test AUC 0.9996, 1.01M params, ~1 ms on L
 2. ~~Re-measure peak memory~~ **done 2026-09-24**, one L4 session: headline 171 MB at
    bs=1, MobileNet 152, EffNet 205, Xception 409 (old 1,301 was autotune scratch).
    README table updated. Remaining honest weakness: batch-144 memory 2.8 GB vs 0.67.
-2b. **Baselines on StyleGAN3-T** (written 2026-09-24, unrun; ~5 min each, no training):
-   `python heldout.py --config configs/test20_crop_baselines.yaml --model <mobilenet_v3_small|efficientnet_b0|xception> --fake-dir "/content/drive/MyDrive/Fake(SG3-T-psi1)" --tag sg3t`
-   Answers whether the 0.70 generalisation gap is shared by the big models. If a
-   baseline scores well above 0.70, that is a real weakness of ours to report.
+2b. ~~Baselines on StyleGAN3-T~~ **done 2026-09-24**: MobileNet 0.958, EfficientNet
+   0.993, Xception 0.967 vs ours 0.703. The gap is NOT shared — pretrained features
+   transfer, from-scratch ones do not (README *Held-out generator*). This is the
+   thesis's stated limit unless 2c moves it.
+2c. **Generalisation at the same architecture** (next; decided 2026-09-24). Two levers,
+   latency/memory unchanged: (i) Wang et al. 2020 augmentation — blur σ~U[0,3] and
+   JPEG q~U[30,100], each p=0.5 — as a config; (ii) two-generator training (SG2 +
+   FakeMix's SG1, or SG2 + a generated SG3-R) with SG3-T held out. **Rule: SG3-T is
+   the final test, scored once per model. Generate SG3-R (1,500, ψ=1.0, same patched
+   repo, seeds 200000+) as the selection set.** Configs not written yet.
 3. **Stride-2 stem, test21** (`configs/test21_stride2_stem.yaml`, written 2026-09-24,
    unrun): the headline with `stem_stride: 2` — same 1.01M params, 0.28 G MACs instead
    of 1.11 G, ~4× less activation memory. The headline is fastest on latency but worst
