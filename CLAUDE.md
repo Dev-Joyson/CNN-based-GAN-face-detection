@@ -10,8 +10,9 @@ A ~1M-parameter CNN detects StyleGAN2 faces (vs FFHQ) with accuracy competitive 
 detectors 4–20× larger (Xception, EfficientNet-B0, MobileNetV3-Small), measured on the
 **identical task and same GPU**: params, MACs, latency (bs=1 median/p95), peak memory,
 CPU latency. "Edge deployment" was dropped by the panel — the claim is resource
-comparison, not deployment. Cross-generator generalisation is **out of scope** and
-reported honestly (StyleGAN3-T AUC 0.70).
+comparison, not deployment. Cross-generator generalisation is the **stated limit**:
+StyleGAN3-T AUC 0.70 vs the pretrained baselines' 0.96–0.99 (todo 2c tries to close it
+without changing the architecture).
 
 Headline model: `configs/test19_sg2_crop_no_fft.yaml` — five plain conv blocks, no FFT
 branch, native-resolution 256² crops. Test AUC 0.9996, 1.01M params, ~1 ms on L4.
