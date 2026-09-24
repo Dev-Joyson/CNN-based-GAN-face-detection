@@ -90,7 +90,11 @@ branch, native-resolution 256² crops. Test AUC 0.9996, 1.01M params, ~1 ms on L
    0.993, Xception 0.967 vs ours 0.703. The gap is NOT shared — pretrained features
    transfer, from-scratch ones do not (README *Held-out generator*). This is the
    thesis's stated limit unless 2c moves it.
-2c. **Generalisation at the same architecture** (next; decided 2026-09-24). Two levers,
+2c. **Generalisation at the same architecture — ALL FOUR levers, decided by Joyson
+   2026-09-25, to run right after the seed chain.** The research question becomes: a
+   1M from-scratch model matches pretrained detectors in-distribution; what does it
+   lose on unseen generators (SG3-T 0.70 vs 0.96–0.99) and degraded input (chance on
+   downscaled), and can training alone, at zero inference cost, recover it? Levers,
    latency/memory unchanged: (i) Wang et al. 2020 augmentation — blur σ~U[0,3] and
    JPEG q~U[30,100], each p=0.5 — as a config; (ii) two-generator training (SG2 +
    the 10k SG1 that FakeMix's manifest identifies) with SG3-T held out. **Rule: SG3-T
@@ -101,7 +105,14 @@ branch, native-resolution 256² crops. Test AUC 0.9996, 1.01M params, ~1 ms on L
    ≥10,000 images — verify, and record the SG1 set's provenance/ψ under README Data).
    Run: `train.py` → `evaluate.py` → `heldout.py --fake-dir "…/Fake(SG3-R-psi1)" --tag sg3r`;
    compare to the headline scored on sg3r; the winner (if any) is scored on sg3t once.
-   If both help, test24 = both.
+   (iii) **scale augmentation** — training windows drawn at 1×, ½×, ¼× of native
+   (config knob to write), targets the downscaled-input failure; (iv) **online
+   distillation** from EfficientNet-B0 (the baseline that generalises, 0.993 on SG3-T):
+   teacher and student see the identical augmented view, in-graph, no offline logits
+   (`online: true` in the distill block — to write; the offline attempt test18 failed
+   for view inconsistency). Order: (i) test22 → (ii) test23 → (iii) → combine the
+   winners → (iv). Select on SG3-R, score SG3-T once per model. Also score each on the
+   on-resize probe (`--tag on_resize`) since (iii) targets it.
 3. ~~Stride-2 stem, test21~~ **trained + evaluated 2026-09-24**: test AUC 0.9990
    (acc 0.984) vs headline 0.9996; 0.28 G MACs, CPU 4.0 ms, 158 MB bs=1, 1.0 GB bs=144,
    5,547 img/s; GPU bs=1 unchanged. Best epoch 129 of 150 (plateaued). JPEG q95 0.9978
