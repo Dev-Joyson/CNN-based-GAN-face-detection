@@ -453,7 +453,7 @@ Flickr-JPEG past that the fakes lack — a model could read "photograph" instead
 | check | result | reading |
 |---|---|---|
 | native-res audit, `highfreq` | AUC 0.553 | raw fine-detail *amount* does not separate the classes |
-| JPEG q95 on both classes before scoring | 0.9994 → **0.9976** (no-FFT: 0.9996 → 0.9984) | −0.002; the resize model drops −0.027 under the same treatment |
+| JPEG q95 on both classes before scoring | 0.9994 → **0.9976** (no-FFT: 0.9996 → 0.9984; stride-2 stem: 0.9990 → 0.9978) | −0.002 (stride-2: −0.001); the resize model drops −0.027 under the same treatment |
 | JPEG q75 (social-media grade) | 0.9994 → **0.9862** (no-FFT: 0.9864) | still above the resize model's *clean* 0.964 |
 
 | **whole face downscaled to 256² (the resize pipeline's input)** | **0.5563** (with FFT: 0.5902) | **chance** — the fingerprint is scale-specific; shrink the image and it is gone. The FFT branch does not buy scale robustness either |
@@ -559,6 +559,7 @@ in each run folder (2026-09-22, L4).
 |---|---|---|---|---|---|
 | test19_sg2_crop_no_fft (headline) | 0.9996 | **0.703** | 0.529 | 0.064 | 0.012 / 0.081 |
 | test19_sg2_crop (with FFT) | 0.9994 | **0.711** | 0.526 | 0.056 | 0.012 / 0.077 |
+| test21_stride2_stem | 0.9990 | **0.735** | 0.540 | 0.085 | 0.010 / 0.101 |
 | MobileNetV3-Small (test20, crop) | 0.9999 | **0.958** | 0.675 | 0.353 | 0.004 / 0.355 |
 | EfficientNet-B0 (test20, crop) | 1.0000 | **0.993** | 0.844 | 0.689 | 0.003 / 0.681 |
 | Xception (test20, crop) | 1.0000 | **0.967** | 0.651 | 0.301 | 0.000 / 0.309 |

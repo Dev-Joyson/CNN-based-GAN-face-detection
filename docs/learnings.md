@@ -238,6 +238,9 @@ the README says how things *are*, this says how we found out.
   not a ceiling. GPU bs=1 latency is identical (0.97 ms): the first layer was never the
   GPU's bottleneck; CPU, memory and throughput are where it pays. Same-session
   headline CPU read 6.4 ms here vs 8.4 on 2026-09-21 — the VM variance again.
+- **2026-09-24 — Stride-2 stem behaves like the headline on every other axis:** JPEG
+  q95 costs 0.001 (headline 0.001–0.002); StyleGAN3-T 0.735 (headline 0.703) — same
+  no-transfer regime. The stem changes cost, not what the model learns.
 - **Latency needs no training; accuracy does.** The efficiency half of the comparison
   can be measured before any baseline is fine-tuned.
 - **Published detectors zero-shot measure generalisation, not architecture.** CNNDetection

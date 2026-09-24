@@ -104,10 +104,10 @@ branch, native-resolution 256² crops. Test AUC 0.9996, 1.01M params, ~1 ms on L
    If both help, test24 = both.
 3. ~~Stride-2 stem, test21~~ **trained + evaluated 2026-09-24**: test AUC 0.9990
    (acc 0.984) vs headline 0.9996; 0.28 G MACs, CPU 4.0 ms, 158 MB bs=1, 1.0 GB bs=144,
-   5,547 img/s; GPU bs=1 unchanged. Best epoch 129 of 150 (plateaued). **Still to do on
-   it**: JPEG probe (`evaluate.py --config configs/test21_stride2_stem.yaml --eval-jpeg 95 --tag jpeg95`)
-   and `heldout.py --config configs/test21_stride2_stem.yaml --fake-dir "…/Fake(SG3-T-psi1)" --tag sg3t`
-   (once), so it is compared on every axis. **Headline decision pending the seeds**: if
+   5,547 img/s; GPU bs=1 unchanged. Best epoch 129 of 150 (plateaued). JPEG q95 0.9978
+   (−0.001), StyleGAN3-T 0.735 — same as the headline on both. **Headline decision
+   pending the seeds** (chain started 2026-09-24 19:07 on VM 224c029a330e:
+   test21 s43, s44, then test19 s43, s44; log `/content/seeds.log`): if
    0.0006 AUC is within seed noise, stride 2 is the better headline (lightest on every
    column but MACs vs MobileNet).
 4. **Seeds 43 and 44** — now decide the headline. Run them for BOTH stems if budget
