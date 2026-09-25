@@ -59,7 +59,10 @@ def curves(run_dir, out):
         print(f"  skip curves: no history in {run_dir}")
         return
     h = read_history(hp)
-    name = os.path.basename(run_dir.rstrip("/"))
+    parts = run_dir.rstrip("/").split(os.sep)
+    # a baseline lives at <headline>/baselines/<model>: name it by both, or the
+    # resize-pipeline and crop-pipeline baselines overwrite each other
+    name = f"{parts[-3]}__{parts[-1]}" if len(parts) >= 3 and parts[-2] == "baselines" else parts[-1]
     best = max(range(len(h["val_auc"])), key=lambda i: h["val_auc"][i])
     fig, ax = plt.subplots(1, 2, figsize=(11, 4))
     for a, key, title in ((ax[0], "accuracy", "accuracy"), (ax[1], "auc", "AUC")):
