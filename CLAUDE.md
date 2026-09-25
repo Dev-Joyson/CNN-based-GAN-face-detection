@@ -98,8 +98,9 @@ branch, native-resolution 256² crops. Test AUC 0.9996, 1.01M params, ~1 ms on L
    latency/memory unchanged: (i) Wang et al. 2020 augmentation — blur σ~U[0,3] and
    JPEG q~U[30,100], each p=0.5 — as a config; (ii) two-generator training (SG2 +
    the 10k SG1 that FakeMix's manifest identifies) with SG3-T held out. **Rule: SG3-T
-   is the final test, scored once per model. Generate SG3-R (1,500, ψ=1.0, same
-   patched repo, seeds 200000+, to `Fake(SG3-R-psi1)`) as the selection set.**
+   is the final test, scored once per model. SG3-R generated 2026-09-25: 1,500 images,
+   ψ=1.0, seeds 200000–201499, official `stylegan3-r-ffhq-1024x1024.pkl`, reference ops,
+   at `/content/drive/MyDrive/Fake(SG3-R-psi1)` — the selection set.**
    Configs written 2026-09-24: `test22_sg2_crop_wang_aug.yaml` (headline's cache) and
    `test23_sg2_sg1_crop.yaml` (new cache; needs `Research/Dataset New/FakeSG1` with
    ≥10,000 images — verify, and record the SG1 set's provenance/ψ under README Data).
