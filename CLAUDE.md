@@ -15,7 +15,9 @@ StyleGAN3-T AUC 0.70 vs the pretrained baselines' 0.96–0.99 (todo 2c tries to 
 without changing the architecture).
 
 Headline model: `configs/test19_sg2_crop_no_fft.yaml` — five plain conv blocks, no FFT
-branch, native-resolution 256² crops. Test AUC 0.9996, 1.01M params, ~1 ms on L4.
+branch, native-resolution 256² crops. Test AUC 0.9998 ± 0.0002 over three seeds
+(0.9996 on seed 42), 1.01M params, ~1 ms on L4, 171 MB at bs=1. Stride-2 variant
+(test21): 0.9988 ± 0.0002 at 4× fewer MACs — the reported cheap variant, not the headline.
 
 ## Standards the panel holds us to
 
@@ -126,7 +128,11 @@ branch, native-resolution 256² crops. Test AUC 0.9996, 1.01M params, ~1 ms on L
    test21 s43, s44, then test19 s43, s44; log `/content/seeds.log`): if
    0.0006 AUC is within seed noise, stride 2 is the better headline (lightest on every
    column but MACs vs MobileNet).
-4. **Seeds 43 and 44** — now decide the headline. Run them for BOTH stems if budget
+4. ~~Seeds 43 and 44~~ **done 2026-09-25 — headline stays stride 1.** Stride 1:
+   0.9996 / 0.9998 / 0.99995 = 0.9998 ± 0.0002; stride 2: 0.9990 / 0.9987 / 0.9987 =
+   0.9988 ± 0.0002. Gap 0.001 = five spreads. All generalisation configs (test22–25)
+   stay on stride 1 as written. Original plan text follows for the record.
+   Seeds 43 and 44 — now decide the headline. Run them for BOTH stems if budget
    allows (stride 1: `configs/test19_sg2_crop_no_fft_s43/_s44.yaml`; stride 2: copies
    with `stem_stride: 2`, to be written), else stride 2 first since it trains at 27 s/epoch.
    Report mean ± std of test AUC per stem; the cheaper stem wins a tie.

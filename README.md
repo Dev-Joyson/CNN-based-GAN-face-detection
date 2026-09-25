@@ -313,8 +313,9 @@ the headline's 6.4 in the same session; GPU bs=1 latency unchanged at 0.97 ms (t
 layer was never the GPU's bottleneck). Price: test AUC 0.9990 vs 0.9996, accuracy 0.984
 vs 0.99, and ~130 epochs to converge against ~10 — Gragnaniello et al. 2021's claim
 that early downsampling hurts is measurable here, but as a slower climb to nearly the
-same place, not a ceiling. Whether 0.0006 AUC is a real gap or seed noise is what the
-seed runs decide; if it is noise, the cheaper stem is the better headline. GPU latencies this session are
+same place, not a ceiling. Three seeds each (2026-09-25): stride 1 0.9998 ± 0.0002, stride 2 0.9988 ± 0.0002 —
+the gap is real (five spreads), so the headline stays stride 1 and stride 2 is the
+reported cheap variant (README *Seeds*). GPU latencies this session are
 within 5% of the table's (0.96 / 1.45 / 4.81 / 7.10 / 4.84 vs 1.02 / 1.49 / 4.71 /
 6.82 / 4.78): the session-to-session noise floor, ranking unchanged.
 
@@ -510,9 +511,9 @@ input, where the frequencies it was designed for have not been resized away.
 
 | experiment | role | dataset | **test AUC** | val AUC (selection) | run folder |
 |---|---|---|---|---|---|
-| **test19_sg2_crop_no_fft** | **headline** — native-resolution crops, spatial branch only | FFHQ 1024 + StyleGAN2 ψ=1.0 (NVIDIA), 25k/class | **0.9996** (acc 0.99) | 0.9996 (best epoch 73, killed at 81 flat) | `experiments/test19_sg2_crop_no_fft/` |
+| **test19_sg2_crop_no_fft** | **headline** — native-resolution crops, spatial branch only | FFHQ 1024 + StyleGAN2 ψ=1.0 (NVIDIA), 25k/class | **0.9996** (acc 0.99); **0.9998 ± 0.0002 over seeds 42/43/44** (see *Seeds*) | 0.9996 (best epoch 73, killed at 81 flat) | `experiments/test19_sg2_crop_no_fft/` |
 | test19_sg2_crop | native crops, with FFT branch | same | 0.9994 (acc 0.99) | 0.9994 (~50 epochs incl. a resume; first run's history lost to a VM) | `experiments/test19_sg2_crop/` |
-| test21_stride2_stem | headline with a stride-2 first conv (4× fewer MACs) | same | 0.9990 (acc 0.984) | 0.9983 (best epoch 129; ran to the 150 cap, plateaued from ~125) | `experiments/test21_stride2_stem/` |
+| test21_stride2_stem | headline with a stride-2 first conv (4× fewer MACs) | same | 0.9990 (acc 0.984); 0.9988 ± 0.0002 over three seeds | 0.9983 (best epoch 129; ran to the 150 cap, plateaued from ~125) | `experiments/test21_stride2_stem/` |
 | test17_sg2 | headline, resize pipeline (1024→512→256) | same | 0.9636 (acc 0.90) | 0.9645 (best epoch 89 of 104, early-stopped) | `experiments/test17_sg2/` |
 | test17_sg2_no_fft | ablation — FFT branch removed | same | 0.9527 (acc 0.88) | 0.9503 (best epoch 114, killed at 116 while grinding) | `experiments/test17_sg2_no_fft/` |
 | test18_distill | distillation, raw EfficientNet-B0 teacher, T=2, same 35k | same | 0.9226 (acc 0.84) — **worse**; swap drop 0.21 | 0.9123 (best 104, killed at 111) | `experiments/test18_distill/` |
@@ -522,6 +523,31 @@ input, where the frequencies it was designed for have not been resized away.
 | test16_no_fft | *preliminary* ablation on the mix | same | 0.9751 (acc 0.91) | 0.9748 (patience 15; stopped at 101) | `experiments/test16_no_fft/` |
 | test13_face | control — `face_only` | FFHQ 1024 + FakeMix, 25k/class | _pending_ | 0.9995 | `experiments/test13_face/` |
 | test14_background | control — `background_only` | FFHQ 1024 + FakeMix, 20k/class | _pending_ | _rerun pending_ | `experiments/test14_background/` |
+
+### Seeds: is 0.9996 a lucky draw?
+
+Three seeds per stem, everything else identical (`configs/*_s43.yaml`, `*_s44.yaml`;
+the seed picks the 25k sample, the split, the init, the shuffle and the augmentation
+draws). Test AUC from `evaluate.py`, 2026-09-24/25:
+
+| stem | seed 42 | seed 43 | seed 44 | **mean ± std** | accuracy | epochs to best |
+|---|---|---|---|---|---|---|
+| **stride 1 (headline)** | 0.9996 | 0.9998 | 0.99995 | **0.9998 ± 0.0002** | 0.99–0.997 | 73 / 149 / ~111 |
+| stride 2 (test21) | 0.9990 | 0.9987 | 0.9987 | **0.9988 ± 0.0002** | 0.984–0.986 | 129 / ~116 / ~140 |
+
+**Reading.** Both stems reproduce to ±0.0002. The gap between them, 0.0010, is five
+spreads: the full-resolution first layer buys a real, small, consistent amount of
+accuracy, and the panel's "one seed is attackable" is answered with the same number
+three times. **The headline stays stride 1.** Stride 2 is the cheap variant — 4× fewer
+MACs, half the CPU latency, 2.8× less batched memory — at 0.001 AUC and ~1 accuracy
+point, reported as such. Two honest notes: seed 42 of the headline was stopped by hand
+at epoch 81 while seeds 43/44 ran to 150 and 126, and they came in higher (0.9998,
+0.99995) — the original 0.9996 was, if anything, under-trained; and stride-2 seed 43
+sat at chance for five epochs before learning, so the cheap stem is also slower and
+less reliable to *train*, which is a training-time cost only. Convergence epoch varies
+2× between seeds of the same stem; the 150 cap was reached by three of the six runs
+at a plateau, not mid-climb (seed 43 of the headline was still at its best on 149 —
+at 0.9998 there is nothing left to gain). Figure: `figures.py` → `seeds.png`.
 
 **StyleGAN2 alone is harder.** Same model, same seed: the mix reached val 0.77 after
 one epoch; SG2 sat at chance for nine epochs before finding any signal (loss stuck

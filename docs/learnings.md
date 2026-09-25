@@ -241,6 +241,16 @@ the README says how things *are*, this says how we found out.
 - **2026-09-24 — Stride-2 stem behaves like the headline on every other axis:** JPEG
   q95 costs 0.001 (headline 0.001–0.002); StyleGAN3-T 0.735 (headline 0.703) — same
   no-transfer regime. The stem changes cost, not what the model learns.
+- **2026-09-25 — Three seeds per stem: headline 0.9998 ± 0.0002, stride-2 0.9988 ±
+  0.0002.** Both reproduce to the fourth decimal; the 0.001 gap is five spreads, so the
+  full-res stem's accuracy is real and the headline stays stride 1. The original 0.9996
+  (seed 42, hand-stopped at epoch 81) was the LOWEST of its three — seeds 43/44 ran to
+  150/126 and reached 0.9998/0.99995. Lesson: a hand-killed run under-reports; let
+  patience decide. Convergence epoch varies 2× across seeds of the same recipe
+  (73/149/~111), so "epochs to converge" is not a stable number to quote.
+- **2026-09-25 — Stride-2 seed 43 sat at chance for five epochs before learning.** The
+  cheap stem is slower and less reliable to train from a cold start; inference-only
+  saving, training-time cost. Batch norm (v2 recipe) is the untested fix.
 - **Latency needs no training; accuracy does.** The efficiency half of the comparison
   can be measured before any baseline is fine-tuned.
 - **Published detectors zero-shot measure generalisation, not architecture.** CNNDetection
