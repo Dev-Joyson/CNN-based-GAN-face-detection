@@ -130,9 +130,11 @@ branch, native-resolution 256² crops. Test AUC 0.9996, 1.01M params, ~1 ms on L
    allows (stride 1: `configs/test19_sg2_crop_no_fft_s43/_s44.yaml`; stride 2: copies
    with `stem_stride: 2`, to be written), else stride 2 first since it trains at 27 s/epoch.
    Report mean ± std of test AUC per stem; the cheaper stem wins a tie.
-   **Progress:** stride-2 s42 0.9990 / s43 **0.9987** (acc 0.984, best ep ~116 of 131,
-   climbed out of a 5-epoch chance start); s44 running 2026-09-24 21:26; stride-1
-   s43/s44 queued in the same chain (`/content/seeds.log`, VM 224c029a330e).
+   **Progress:** stride-2 DONE 2026-09-25: s42 0.9990 / s43 0.9987 / s44 0.9987 →
+   **0.9988 ± 0.0002** (acc 0.985; s43 climbed out of a 5-epoch chance start; s44 hit
+   the 150 cap after a VM reclaim + `--resume` from epoch 133). Stride-1 s43 started
+   2026-09-25 ~07:10 (cache build), s44 queued (`/content/seeds.log`, VM 75bedbb4438c).
+   Headline single number 0.9996 is 4 spreads above the stride-2 mean.
 5. **Held-out reals** (CelebA-HQ 1024) with `heldout.py --real-dir … --tag celebahq`.
 6. **Sensitivity checks** on the crop pipeline for `docs/hyperparameters.md`:
    lr {1e-4, 1e-3}, augmentation {off, Wang 2020's}. One run each, note the number.
