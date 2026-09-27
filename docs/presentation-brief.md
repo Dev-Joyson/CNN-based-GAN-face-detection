@@ -82,6 +82,25 @@ Dense 128, Dropout 0.4, sigmoid. Native-resolution 256² crops, no resize.
 - Scale augmentation (test24), online distillation from EfficientNet (test25), int8 quantization of all four: not yet run.
 - Selection set = StyleGAN3-R; final test = StyleGAN3-T, scored once.
 
+## Do not rewrite the proposal
+
+The introduction, research problem, aims, objectives, motivation and proposed
+methodology stay **as they were in the progress presentation**. The marks are
+"Achievement of the Research Objectives" (20) and "Adaptation of the
+Methodology" (20): the panel scores what was achieved against the objectives as
+set, and rewards methodology that changed for a documented reason. So:
+
+- Objectives slide: verbatim from the proposal. Then an **achievement slide**,
+  one row per objective: achieved (with the number) / achieved with a caveat /
+  changed, and why. The only scope change is edge deployment, removed by the
+  panel at the progress review — say exactly that.
+- Proposed methodology: as proposed. Then an **adaptations slide**, each change
+  with the evidence that forced it: resize → native crops (0.964 → 0.9996; the
+  resize deletes the fingerprint); FFT branch ablated four ways and dropped;
+  baselines fine-tuned on the identical pipeline; three seeds; peak-memory
+  measurement corrected (autotune); generalisation tested on unseen generators
+  with training-only levers. That slide is where the adaptation marks come from.
+
 ## Mapping to the guideline structure and marks
 
 25 min incl. demonstration; 5 min Q&A. Marks: objectives 20, methodology 20,
