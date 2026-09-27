@@ -604,7 +604,8 @@ here before SG3-T is touched.
 | test19_sg2_crop_no_fft (reference) | — | 0.9996 | 0.742 | 0.058 | — |
 | test22_sg2_crop_wang_aug | Wang 2020 aug, from scratch | 0.5 | — | — | never learned: 16 epochs at chance |
 | test22b_wang_aug_from_headline | Wang 2020 aug, warm-started from the headline | 0.9997 | **0.772** | 0.086 | +0.03: real but small (±0.01 at n=1500); nowhere near the pretrained 0.96 |
-| test23_sg2_sg1_crop | two generators, 12.5k SG2 + 12.5k SG1 | | | | pending |
+| test16_full (preview) | SG1+SG2 mix, *resize* pipeline, 60/40 | 0.973 | 0.612 | 0.157 | diversity on the resize pipeline transfers less, not more |
+| test23_sg2_sg1_crop | two generators, 12.5k SG2 + 12.5k SG1, crop pipeline | | | | running 2026-09-27 |
 | test24_sg2_crop_scale_aug | scale aug [1, 2] | | | | pending |
 | test25_online_kd_effnet | online KD from EfficientNet-B0 | | | | pending |
 

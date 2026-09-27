@@ -263,6 +263,10 @@ the README says how things *are*, this says how we found out.
   not from the augmentation alone; on a from-scratch 1M model it nudges, it does not
   transfer. Training accuracy on the corrupted set sat at 0.92–0.94 while clean val
   stayed 0.999 — the model sees through the corruption, it does not learn from it.
+- **2026-09-27 — test16 (SG1+SG2 mix, resize pipeline) on SG3-R: 0.612 — below the
+  single-generator crop headline's 0.742.** Generator diversity on the resize pipeline
+  bought no transfer; whether that is the pipeline or the diversity, test23 (same mix,
+  crop pipeline, stated 50/50) decides.
 - **Latency needs no training; accuracy does.** The efficiency half of the comparison
   can be measured before any baseline is fine-tuned.
 - **Published detectors zero-shot measure generalisation, not architecture.** CNNDetection
