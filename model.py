@@ -82,6 +82,13 @@ class Config:
     # on this data. 2 halves every feature map after it (~4x fewer MACs, ~4x
     # less activation memory, same parameter count). Not in the cache key.
     stem_stride: int = 1
+    # BatchNormalization after every conv (Ioffe & Szegedy 2015). Off in the
+    # headline. The from-scratch recipe has a chance plateau on every run (6-9
+    # epochs for the headline; test22/test23 never left it) -- BN is the
+    # textbook fix for gradients that do not flow from epoch 1. Inference
+    # cost: BN folds into the conv weights, so latency/memory are unchanged;
+    # params +0.2% (two per channel). Ablation knob, not a headline change.
+    batchnorm: bool = False
 
     # augmentation (train split only)
     # ours: 3x3 box blur p=0.3, JPEG q~U[60,100] p=0.3 (the notebook's).
@@ -501,8 +508,14 @@ def fft_layer(x):
     return mag[..., tf.newaxis]                # (B, H, W, 1)
 
 
-def conv_block(x, filters, name=None, stride=1):
-    x = layers.Conv2D(filters, 3, strides=stride, padding='same', activation='relu', name=name)(x)
+def conv_block(x, filters, name=None, stride=1, batchnorm=False):
+    if batchnorm:
+        # conv -> BN -> ReLU; the conv keeps its name so Grad-CAM finds "spatial_conv_5"
+        x = layers.Conv2D(filters, 3, strides=stride, padding='same', use_bias=False, name=name)(x)
+        x = layers.BatchNormalization()(x)
+        x = layers.ReLU()(x)
+    else:
+        x = layers.Conv2D(filters, 3, strides=stride, padding='same', activation='relu', name=name)(x)
     return layers.MaxPooling2D()(x)
 
 
@@ -510,11 +523,12 @@ def build_model(cfg):
     input_img = layers.Input(shape=(cfg.img_size, cfg.img_size, 3))
 
     # Spatial branch -- fixed names so Grad-CAM can ask for "spatial_conv_5"
-    x = conv_block(input_img, 32, name="spatial_conv_1", stride=cfg.stem_stride)
-    x = conv_block(x, 64, name="spatial_conv_2")
-    x = conv_block(x, 128, name="spatial_conv_3")
-    x = conv_block(x, 256, name="spatial_conv_4")
-    x = conv_block(x, 256, name="spatial_conv_5")
+    bn = cfg.batchnorm
+    x = conv_block(input_img, 32, name="spatial_conv_1", stride=cfg.stem_stride, batchnorm=bn)
+    x = conv_block(x, 64, name="spatial_conv_2", batchnorm=bn)
+    x = conv_block(x, 128, name="spatial_conv_3", batchnorm=bn)
+    x = conv_block(x, 256, name="spatial_conv_4", batchnorm=bn)
+    x = conv_block(x, 256, name="spatial_conv_5", batchnorm=bn)
     x = layers.GlobalAveragePooling2D()(x)
 
     if cfg.fft_branch:

@@ -118,7 +118,9 @@ branch, native-resolution 256² crops. Test AUC 0.9998 ± 0.0002 over three seed
    knob + `test22c_wang_aug_continue.yaml` (30 fixed epochs from test22b, score SG3-R
    after; chain again if rising). Next: test23 (running; at 0.5000 through epoch 10 — if it dies at 16 unstarted,
    rerun as `test23b_sg2_sg1_crop_es40.yaml`: same run, `es_start_epoch: 40`, same
-   cache), then test22c, test24, test25.
+   cache — test23 DID die at 16, test23b launched 2026-09-27 ~11:45; if test23b is
+   still at 0.5000 at epoch 40, run `test23c_sg2_sg1_crop_bn.yaml` (`batchnorm: true`,
+   same cache; BN folds at inference, +0.2% params)), then test22c, test24, test25.
    (iii) **scale augmentation** — `scale_aug: [1, 2]`, windows at native and half
    scale (¼ would need cache_size 1024; stated), `configs/test24_sg2_crop_scale_aug.yaml`
    (written 2026-09-25), targets the downscaled-input failure; (iv) **online

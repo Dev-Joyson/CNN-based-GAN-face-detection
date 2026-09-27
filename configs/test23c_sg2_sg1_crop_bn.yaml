@@ -1,0 +1,42 @@
+# Test23c: test23 (two generators, from scratch) with batch normalization after
+# every conv. Same data, mix, seed, cache and recipe otherwise.
+#
+# Why: test23 never left the chance plateau (16 epochs at 0.5000, killed);
+# test23b gives the plain recipe until epoch 40. If that also fails, the
+# problem is optimisation from a cold start, and BN (Ioffe & Szegedy 2015) is
+# the standard fix: gradients flow from epoch 1. BN folds into the conv at
+# inference -- latency and memory are unchanged -- so it is a training-recipe
+# change, not an architecture change. Two variables vs the headline (BN + mix);
+# a BN-only headline run (test26) would separate them if this one matters.
+name: test23c_sg2_sg1_crop_bn
+batchnorm: true
+fft_branch: false
+
+real_dir: "/content/drive/MyDrive/Real(FFHQ)"
+fake_dir:
+  - "/content/drive/MyDrive/Fake(SG2-psi1)"
+  - "/content/drive/MyDrive/Research/Dataset New/FakeSG1"
+fake_mix: [12500, 12500]   # sums to limit_per_class; equal share per generator
+
+mask_mode: none
+limit_per_class: 25000
+
+img_size: 256
+native_size: 512            # unused in crop mode
+input_mode: crop
+cache_size: 512             # centre 512^2 at native pixels; 768 keeps the hair, 1024 everything -- see model.Config
+batch_size: 144
+
+epochs: 150               # let patience decide
+lr: 0.0003
+patience: 15              # 6 cut the test16 ablation off mid-climb; both runs sat at 0.960 at epoch 61
+seed: 42
+
+crop_frac_min: 0.85
+shuffle_buffer: 8192         # train split is 28000; a full-set buffer would be ~5.5 GB of
+                             # uint8 images in RAM -- too much for a standard Colab runtime.
+                             # Raise toward 28000 on a high-RAM runtime if you want the
+                             # notebook's whole-set shuffle.
+
+cache_dir: "/content/cache"
+out_dir: "/content/drive/MyDrive/Research/experiments"
