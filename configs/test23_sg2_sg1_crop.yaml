@@ -1,12 +1,13 @@
-# Test23: the headline trained on TWO generators -- 15,000 StyleGAN2 (official,
-# psi=1.0) + 10,000 StyleGAN1 (the FakeSG1 folder; provenance in README Data) --
-# with StyleGAN3 held out. Same 25k/class, split rule, seed, architecture and
-# recipe; the cache is new (different fake folders -> different key).
+# Test23: the headline trained on TWO generators -- 12,500 StyleGAN2 (official,
+# psi=1.0) + 12,500 StyleGAN1 (the FakeSG1 folder, 23,000 available; provenance
+# in README Data) -- with StyleGAN3 held out. Same 25k/class, split rule, seed,
+# architecture and recipe; the cache is new (different fake folders -> key).
 #
 # Why: a detector that sees one generator learns that generator's fingerprint
 # (Ojha et al. 2023). Generator diversity in training is the other lever the
 # literature offers that leaves the network -- and its latency -- unchanged.
-# The ratio is the FakeMix manifest's (60/40), stated here rather than inferred.
+# Equal share per generator: the cleanest single-variable version of "two
+# generators instead of one" (FakeMix's 60/40 was an accident of what existed).
 #
 # Selection on StyleGAN3-R; StyleGAN3-T scored once at the end. If test22's
 # augmentation helps, a test24 combines both.
@@ -17,7 +18,7 @@ real_dir: "/content/drive/MyDrive/Real(FFHQ)"
 fake_dir:
   - "/content/drive/MyDrive/Fake(SG2-psi1)"
   - "/content/drive/MyDrive/Research/Dataset New/FakeSG1"
-fake_mix: [15000, 10000]   # sums to limit_per_class; the FakeMix manifest ratio
+fake_mix: [12500, 12500]   # sums to limit_per_class; equal share per generator
 
 mask_mode: none
 limit_per_class: 25000

@@ -106,8 +106,10 @@ branch, native-resolution 256² crops. Test AUC 0.9998 ± 0.0002 over three seed
    Configs written 2026-09-24: `test22_sg2_crop_wang_aug.yaml` (headline's cache) and
    `test23_sg2_sg1_crop.yaml` (new cache; needs `Research/Dataset New/FakeSG1` with
    ≥10,000 images — verify, and record the SG1 set's provenance/ψ under README Data).
+   **Reference on SG3-R (2026-09-27): headline 0.742, stride-2 0.686.** FakeSG1 has
+   23,000 images; test23 now uses `fake_mix: [12500, 12500]` (equal share).
    Run: `train.py` → `evaluate.py` → `heldout.py --fake-dir "…/Fake(SG3-R-psi1)" --tag sg3r`;
-   compare to the headline scored on sg3r; the winner (if any) is scored on sg3t once.
+   compare to 0.742; the winner (if any) is scored on sg3t once.
    (iii) **scale augmentation** — `scale_aug: [1, 2]`, windows at native and half
    scale (¼ would need cache_size 1024; stated), `configs/test24_sg2_crop_scale_aug.yaml`
    (written 2026-09-25), targets the downscaled-input failure; (iv) **online

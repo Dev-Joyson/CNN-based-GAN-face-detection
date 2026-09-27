@@ -591,6 +591,10 @@ in each run folder (2026-09-22, L4).
 | EfficientNet-B0 (test20, crop) | 1.0000 | **0.993** | 0.844 | 0.689 | 0.003 / 0.681 |
 | Xception (test20, crop) | 1.0000 | **0.967** | 0.651 | 0.301 | 0.000 / 0.309 |
 
+**StyleGAN3-R, the selection set (2026-09-27):** headline 0.742, stride-2 0.686 (fake
+recall 0.06 / 0.05). Same regime as SG3-T; every generalisation lever must beat 0.742
+here before SG3-T is touched.
+
 **The pretrained baselines transfer; this model does not (2026-09-24).** Same held-out
 set, same pipeline, same code path: EfficientNet-B0 ranks StyleGAN3 fakes at 0.993 AUC
 where this model manages 0.703. The reals side is identical for all five (p_fake ≤
