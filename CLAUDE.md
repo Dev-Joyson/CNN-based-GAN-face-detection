@@ -112,7 +112,9 @@ branch, native-resolution 256² crops. Test AUC 0.9998 ± 0.0002 over three seed
    compare to 0.742; the winner (if any) is scored on sg3t once.
    **test22 from scratch: never learned (0.5, 16 epochs, early-stopped, 2026-09-27).**
    → `init_from` knob added to Config/train(); `test22b_wang_aug_from_headline.yaml`
-   warm-starts from the headline's weights. Run test22b instead.
+   warm-starts from the headline's weights. **test22b done 2026-09-27: SG2 0.9997,
+   SG3-R 0.772 (+0.03 over 0.742; small, real at ±0.01). Lever (i) = marginal.**
+   Next: test23 (new cache, ~1.5 h first epoch), then test24, test25.
    (iii) **scale augmentation** — `scale_aug: [1, 2]`, windows at native and half
    scale (¼ would need cache_size 1024; stated), `configs/test24_sg2_crop_scale_aug.yaml`
    (written 2026-09-25), targets the downscaled-input failure; (iv) **online

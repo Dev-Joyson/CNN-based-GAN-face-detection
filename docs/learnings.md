@@ -257,6 +257,12 @@ the README says how things *are*, this says how we found out.
   ImageNet-pretrained ResNet-50 that already had features. Lesson: augmentation-for-
   generalisation presupposes a feature extractor; at this size it must be warm-started
   (test22b: `init_from` the headline) or it is a null result.
+- **2026-09-27 — Wang aug warm-started from the headline: SG3-R 0.742 → 0.772, SG2
+  intact (0.9997).** Real but small (+0.03 at ±0.01), fake recall 6% → 9%. The recipe's
+  generalisation in Wang et al. came from the ImageNet ResNet-50 it was applied to,
+  not from the augmentation alone; on a from-scratch 1M model it nudges, it does not
+  transfer. Training accuracy on the corrupted set sat at 0.92–0.94 while clean val
+  stayed 0.999 — the model sees through the corruption, it does not learn from it.
 - **Latency needs no training; accuracy does.** The efficiency half of the comparison
   can be measured before any baseline is fine-tuned.
 - **Published detectors zero-shot measure generalisation, not architecture.** CNNDetection
