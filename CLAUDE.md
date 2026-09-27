@@ -116,7 +116,9 @@ branch, native-resolution 256² crops. Test AUC 0.9998 ± 0.0002 over three seed
    SG3-R 0.772 (+0.03 over 0.742; small, real at ±0.01). Lever (i) = marginal.**
    test22b early-stopped on saturated SG2 val while still adapting → `checkpoint: last`
    knob + `test22c_wang_aug_continue.yaml` (30 fixed epochs from test22b, score SG3-R
-   after; chain again if rising). Next: test23 (running), then test22c, test24, test25.
+   after; chain again if rising). Next: test23 (running; at 0.5000 through epoch 10 — if it dies at 16 unstarted,
+   rerun as `test23b_sg2_sg1_crop_es40.yaml`: same run, `es_start_epoch: 40`, same
+   cache), then test22c, test24, test25.
    (iii) **scale augmentation** — `scale_aug: [1, 2]`, windows at native and half
    scale (¼ would need cache_size 1024; stated), `configs/test24_sg2_crop_scale_aug.yaml`
    (written 2026-09-25), targets the downscaled-input failure; (iv) **online
