@@ -120,7 +120,14 @@ branch, native-resolution 256² crops. Test AUC 0.9998 ± 0.0002 over three seed
    rerun as `test23b_sg2_sg1_crop_es40.yaml`: same run, `es_start_epoch: 40`, same
    cache — test23 DID die at 16, test23b launched 2026-09-27 ~11:45; if test23b is
    still at 0.5000 at epoch 40, run `test23c_sg2_sg1_crop_bn.yaml` (`batchnorm: true`,
-   same cache; BN folds at inference, +0.2% params)), then test22c, test24, test25.
+   same cache; BN folds at inference, +0.2% params)). **test23c (BN) DID start: best
+   val 0.9990 at epoch 45, VM lost at 46, resumed 2026-09-28.** After its SG3-R score,
+   Joyson's agreed order ("remember it"): (1) Wang aug warm-started from test23c
+   (as test22b did from the headline); (2) test24 scale aug stacked; (3) test25 online
+   KD from EfficientNet; (4) a THIRD generator outside the StyleGAN1/2 family if
+   diversity moved the number (SG3-R is the selection set — never train on it);
+   (5) BN-only headline run to attribute BN vs mix. A big SG3-R gain pulls (4)
+   forward; a small one pulls (3) forward. test22c stays in the queue.
    (iii) **scale augmentation** — `scale_aug: [1, 2]`, windows at native and half
    scale (¼ would need cache_size 1024; stated), `configs/test24_sg2_crop_scale_aug.yaml`
    (written 2026-09-25), targets the downscaled-input failure; (iv) **online
