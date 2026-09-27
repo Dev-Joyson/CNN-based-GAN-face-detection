@@ -146,6 +146,11 @@ branch, native-resolution 256² crops. Test AUC 0.9998 ± 0.0002 over three seed
    the 150 cap after a VM reclaim + `--resume` from epoch 133). Stride-1 s43 started
    2026-09-25 ~07:10 (cache build), s44 queued (`/content/seeds.log`, VM 75bedbb4438c).
    Headline single number 0.9996 is 4 spreads above the stride-2 mean.
+4b. **Int8 quantization of all four models, at the END** (decided 2026-09-27): post-
+   training TFLite int8, no retraining; CPU latency + SG2 accuracy + SG3-T per model at
+   equal precision. Answers "why not compress EfficientNet, which generalises?".
+   Applied to the FINAL student, so after 2c; the three baselines can be done earlier
+   as a CPU side job. Script not written yet.
 5. **Held-out reals** (CelebA-HQ 1024) with `heldout.py --real-dir … --tag celebahq`.
 6. **Sensitivity checks** on the crop pipeline for `docs/hyperparameters.md`:
    lr {1e-4, 1e-3}, augmentation {off, Wang 2020's}. One run each, note the number.
