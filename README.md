@@ -609,8 +609,8 @@ here before SG3-T is touched.
 | test23_sg2_sg1_crop | two generators, 12.5k SG2 + 12.5k SG1, crop pipeline, from scratch | 0.5 | — | — | never learned: 16 epochs at chance (like test22) |
 | test23c_sg2_sg1_crop_bn | same, with batch norm (needed to start) | 0.9999 (SG1+SG2 split) | **0.777** | 0.089 | +0.035: same size as the augmentation's gain. Two related generators do not yield StyleGAN3-transferable features. Val AUC swung 0.5–0.9999 between epochs (BN running stats on a bimodal fake set); best-epoch checkpoint used |
 | test24_sg2_crop_scale_aug | scale aug [1, 2] | | | | pending |
-| test25_online_kd_effnet | online KD from EfficientNet-B0, from scratch | 0.5 | — | — | cold-start plateau (constant output, epochs 1–4); killed |
-| test25b_online_kd_from_headline | online KD from EfficientNet-B0, warm-started from the headline | | | | running 2026-09-27 |
+| test25_online_kd_effnet | online KD from EfficientNet-B0, from scratch | | | | running 2026-09-27: at chance for 5 epochs, then climbing (val 0.88 at epoch 11) |
+| test25b_online_kd_from_headline | online KD from EfficientNet-B0, warm-started from the headline | | | | in reserve (config written) |
 
 **The pretrained baselines transfer; this model does not (2026-09-24).** Same held-out
 set, same pipeline, same code path: EfficientNet-B0 ranks StyleGAN3 fakes at 0.993 AUC
