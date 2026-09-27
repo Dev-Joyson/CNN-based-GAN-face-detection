@@ -1,0 +1,42 @@
+# Test23b: test23 (two generators, from scratch) with early stopping not
+# counting before epoch 40. Identical otherwise -- same data, mix, seed, cache.
+#
+# Why: test23 sat at exactly 0.5000 val AUC for its first 10+ epochs. With
+# patience 15 counted from epoch 1, a from-scratch run that needs more than 15
+# epochs to find its first foothold is killed before it has started (test22 was),
+# and the record then says "did not learn" when it means "was not given time".
+# es_start_epoch only matters for a run that has not improved by then; a run
+# that clicks at epoch 8 is stopped exactly as before. Comparable to the headline
+# (which clicked at 6-9 under the same patience).
+name: test23b_sg2_sg1_crop_es40
+es_start_epoch: 40
+fft_branch: false
+
+real_dir: "/content/drive/MyDrive/Real(FFHQ)"
+fake_dir:
+  - "/content/drive/MyDrive/Fake(SG2-psi1)"
+  - "/content/drive/MyDrive/Research/Dataset New/FakeSG1"
+fake_mix: [12500, 12500]   # sums to limit_per_class; equal share per generator
+
+mask_mode: none
+limit_per_class: 25000
+
+img_size: 256
+native_size: 512            # unused in crop mode
+input_mode: crop
+cache_size: 512             # centre 512^2 at native pixels; 768 keeps the hair, 1024 everything -- see model.Config
+batch_size: 144
+
+epochs: 150               # let patience decide
+lr: 0.0003
+patience: 15              # 6 cut the test16 ablation off mid-climb; both runs sat at 0.960 at epoch 61
+seed: 42
+
+crop_frac_min: 0.85
+shuffle_buffer: 8192         # train split is 28000; a full-set buffer would be ~5.5 GB of
+                             # uint8 images in RAM -- too much for a standard Colab runtime.
+                             # Raise toward 28000 on a high-RAM runtime if you want the
+                             # notebook's whole-set shuffle.
+
+cache_dir: "/content/cache"
+out_dir: "/content/drive/MyDrive/Research/experiments"

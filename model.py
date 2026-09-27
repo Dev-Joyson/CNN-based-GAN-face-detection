@@ -109,6 +109,14 @@ class Config:
     # epoch 1 and the quantity of interest (SG3-R AUC) is scored afterwards.
     # Pair it with patience >= epochs so early stopping cannot cut the run.
     checkpoint: str = "best"
+    # early stopping does not count before this epoch. 0 = the headline's rule
+    # (patience from epoch 1). A from-scratch run on a harder signal can sit at
+    # chance for longer than `patience` -- test22 (Wang aug) died at 16 without
+    # ever starting, test23 (two generators) sat at 0.5000 for 10+ -- and the
+    # rule then measures "slow to start", not "stopped improving". A start
+    # epoch never changes a run that improves before it, so headline numbers
+    # are unaffected; it only stops a slow starter from being killed unseen.
+    es_start_epoch: int = 0
     crop_frac_min: float = 0.85           # Test16: random crop keeps 85-100% of the side
     shuffle_buffer: int = 4096            # images held for shuffling; Test16 used the whole train set
 
@@ -613,7 +621,8 @@ def train(cfg, resume=False, build_fn=None):
                                            save_best_only=best),
         tf.keras.callbacks.EarlyStopping(monitor='val_auc', mode='max',
                                         patience=cfg.patience,
-                                        restore_best_weights=best),
+                                        restore_best_weights=best,
+                                        start_from_epoch=cfg.es_start_epoch),
         HistoryCSV(history_csv, append=initial_epoch > 0),
         # live curves: %tensorboard --logdir <out_dir> in a notebook cell
         tf.keras.callbacks.TensorBoard(log_dir=os.path.join(cfg.run_dir, "tb"),
