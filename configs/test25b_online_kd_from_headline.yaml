@@ -1,0 +1,50 @@
+# Test25b: test25 (online distillation from EfficientNet-B0) warm-started from
+# the headline. Everything else identical.
+#
+# Test25 from scratch sat at chance for its first epochs (constant output, loss
+# flat at 2.148 = the KD loss of a student that says 0.5 to everything) -- the
+# fourth from-scratch run to show the cold-start plateau on this recipe. Rather
+# than wait for patience to kill it, the student starts as the trained headline
+# (init_from), as test22b did, and the teacher pulls it from there. This keeps
+# the architecture plain (no batch norm): the deployed model is the headline's
+# network at the headline's latency. The question is unchanged: can the
+# teacher's cross-generator behaviour be transferred at zero inference cost?
+# Selection on SG3-R (reference 0.742; levers so far 0.772 / 0.777); SG3-T once.
+name: test25b_online_kd_from_headline
+init_from: test19_sg2_crop_no_fft
+fft_branch: false
+
+real_dir: "/content/drive/MyDrive/Real(FFHQ)"
+fake_dir: "/content/drive/MyDrive/Fake(SG2-psi1)"
+
+mask_mode: none
+limit_per_class: 25000
+
+img_size: 256
+native_size: 512            # unused in crop mode
+input_mode: crop
+cache_size: 512             # centre 512^2 at native pixels; 768 keeps the hair, 1024 everything -- see model.Config
+batch_size: 144
+
+epochs: 150               # let patience decide
+lr: 0.0003
+patience: 15              # 6 cut the test16 ablation off mid-climb; both runs sat at 0.960 at epoch 61
+seed: 42
+
+crop_frac_min: 0.85
+shuffle_buffer: 8192         # train split is 28000; a full-set buffer would be ~5.5 GB of
+                             # uint8 images in RAM -- too much for a standard Colab runtime.
+                             # Raise toward 28000 on a high-RAM runtime if you want the
+                             # notebook's whole-set shuffle.
+
+cache_dir: "/content/cache"
+out_dir: "/content/drive/MyDrive/Research/experiments"
+
+distill:
+  headline: test20_crop_baselines   # teachers live in experiments/test20_crop_baselines/baselines/
+  teachers: [efficientnet_b0]
+  temperature: 2.0
+  alpha: 0.7
+  extra: false
+  init: false
+  online: true

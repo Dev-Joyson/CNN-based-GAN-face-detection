@@ -245,10 +245,11 @@ def distill_online(cfg):
     ds = build_datasets(cfg)            # the standard augmented pipeline; same cache key as the headline
 
     student = build_model(cfg)
-    if d["init"]:
-        src = os.path.join(hcfg.run_dir, "model.keras")
+    init_run = cfg.init_from or (d["headline"] if d["init"] else None)
+    if init_run:
+        src = os.path.join(cfg.out_dir, init_run, "model.keras")
         student.set_weights(tf.keras.models.load_model(src, safe_mode=False).get_weights())
-        print(f"student initialised from {src}")
+        print(f"INIT: student weights from {src}")
     kd = OnlineKD(student, teachers, d["temperature"], d["alpha"])
     kd.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=cfg.lr))
     student.summary()
