@@ -30,6 +30,7 @@ data**, **✗ nothing yet**.
 | baseline `lr` | 1e-4 | ~ cited | Fine-tuning a pretrained backbone: an order of magnitude below from-scratch, to preserve pretrained features (Keras transfer-learning guide uses 1e-5–1e-4; Yosinski et al. 2014). | — |
 | `epochs` | 150 | ✓ tried | A cap under early stopping; 50 was hit mid-climb (test16: 0.945 → 0.972 by 85). Never reached since. | — |
 | `patience` | 15 | ✓ tried | 6 cut the test16 ablation off at epoch 61 at 0.960; 15 let it reach 0.975. Prechelt 1998 on early-stopping criteria. | — |
+| `checkpoint` | best (all headline numbers) / last (test22c) | ✓ by design | "best" selects on in-distribution val AUC, which is the metric reported. "last" exists for continuation runs whose quantity of interest (SG3-R) is scored afterwards and whose val AUC is saturated from epoch 1; paired with patience ≥ epochs. Never used for a reported in-distribution number. | — |
 | early-stopping metric | val AUC | ✓ (3) | Threshold-free; the metric reported. Prechelt 1998. | — |
 | `seed` | 42 (+43, 44) | ✓ done | Not a tuned value; fixed before running and reported. Bouthillier et al. 2021: report variation across seeds. **Headline 0.9998 ± 0.0002, stride-2 0.9988 ± 0.0002 over three seeds** (README *Seeds*). | — |
 | `crop_frac_min` | 0.85 | ✗ | Random-resized-crop is standard (Szegedy et al. 2015 use 8–100% area); 0.85 is the notebook's. | fold into the augmentation sweep below, or cite Szegedy's range and adopt a value from it |

@@ -1,0 +1,41 @@
+# Test22c: CONTINUE test22b (Wang aug, warm-started from the headline) for a
+# fixed 30 epochs with early stopping off and the LAST weights kept.
+#
+# Why: test22b stopped at epoch 39 because its stopping metric -- SG2 val AUC --
+# sat at 0.9999 from epoch 1 (it started as the headline), while training
+# accuracy on the corrupted images was still rising (0.91 -> 0.94). The number
+# of interest, SG3-R AUC (0.742 -> 0.772), was never watched. This run asks
+# whether it keeps rising with more training under the augmentation. Score
+# SG3-R after it; chain another 30 (init_from: test22c) if it does. Selection
+# on SG3-R is what the R set is for; SG3-T stays untouched.
+name: test22c_wang_aug_continue
+checkpoint: last
+init_from: test22b_wang_aug_from_headline
+aug: wang
+fft_branch: false
+
+real_dir: "/content/drive/MyDrive/Real(FFHQ)"
+fake_dir: "/content/drive/MyDrive/Fake(SG2-psi1)"
+
+mask_mode: none
+limit_per_class: 25000
+
+img_size: 256
+native_size: 512            # unused in crop mode
+input_mode: crop
+cache_size: 512             # centre 512^2 at native pixels; 768 keeps the hair, 1024 everything -- see model.Config
+batch_size: 144
+
+epochs: 30                 # fixed; see header
+lr: 0.0003
+patience: 30               # >= epochs: early stopping off
+seed: 42
+
+crop_frac_min: 0.85
+shuffle_buffer: 8192         # train split is 28000; a full-set buffer would be ~5.5 GB of
+                             # uint8 images in RAM -- too much for a standard Colab runtime.
+                             # Raise toward 28000 on a high-RAM runtime if you want the
+                             # notebook's whole-set shuffle.
+
+cache_dir: "/content/cache"
+out_dir: "/content/drive/MyDrive/Research/experiments"

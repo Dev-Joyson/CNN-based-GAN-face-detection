@@ -102,6 +102,13 @@ class Config:
     # augmentation) sat at chance for 16 epochs -- and the question is whether
     # an already-trained detector can be pushed toward more general features.
     init_from: str = field(default=None)
+    # which weights model.keras holds at the end: "best" = the epoch with the
+    # highest val_auc (the default; every headline number), "last" = the final
+    # epoch. "last" is for continuation runs whose selection metric is not the
+    # in-distribution val_auc -- e.g. test22c, where SG2 val sits at 0.9999 from
+    # epoch 1 and the quantity of interest (SG3-R AUC) is scored afterwards.
+    # Pair it with patience >= epochs so early stopping cannot cut the run.
+    checkpoint: str = "best"
     crop_frac_min: float = 0.85           # Test16: random crop keeps 85-100% of the side
     shuffle_buffer: int = 4096            # images held for shuffling; Test16 used the whole train set
 
@@ -137,6 +144,8 @@ class Config:
                 raise ValueError(f"scale_aug factors must be ints >= 1, got {self.scale_aug}")
             if self.img_size * max(self.scale_aug) > self.cache_size:
                 raise ValueError(f"scale_aug {self.scale_aug}: img_size*f exceeds cache_size {self.cache_size}")
+        if self.checkpoint not in ("best", "last"):
+            raise ValueError(f"checkpoint must be best or last, got {self.checkpoint!r}")
         if self.aug not in ("ours", "wang"):
             raise ValueError(f"aug must be ours or wang, got {self.aug!r}")
         if self.fake_mix is not None:
@@ -598,12 +607,13 @@ def train(cfg, resume=False, build_fn=None):
             print(f"INIT: weights from {src}")
     model.summary()
 
+    best = cfg.checkpoint == "best"
     callbacks = [
         tf.keras.callbacks.ModelCheckpoint(ckpt, monitor='val_auc', mode='max',
-                                           save_best_only=True),
+                                           save_best_only=best),
         tf.keras.callbacks.EarlyStopping(monitor='val_auc', mode='max',
                                         patience=cfg.patience,
-                                        restore_best_weights=True),
+                                        restore_best_weights=best),
         HistoryCSV(history_csv, append=initial_epoch > 0),
         # live curves: %tensorboard --logdir <out_dir> in a notebook cell
         tf.keras.callbacks.TensorBoard(log_dir=os.path.join(cfg.run_dir, "tb"),
