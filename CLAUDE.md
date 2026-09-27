@@ -128,6 +128,11 @@ branch, native-resolution 256² crops. Test AUC 0.9998 ± 0.0002 over three seed
    diversity moved the number (SG3-R is the selection set — never train on it);
    (5) BN-only headline run to attribute BN vs mix. A big SG3-R gain pulls (4)
    forward; a small one pulls (3) forward. test22c stays in the queue.
+   **test23c result 2026-09-27: SG3-R 0.777 (+0.035), SG2+SG1 test 0.9999.** Small
+   gain → (3) online distillation test25 is NEXT (needs the headline cache synced +
+   `test20_crop_baselines/baselines/efficientnet_b0/model.keras`, on Drive). Then
+   test24 scale aug, then stacking (Wang aug from test23c), then the BN-only headline
+   for attribution, then quantization.
    (iii) **scale augmentation** — `scale_aug: [1, 2]`, windows at native and half
    scale (¼ would need cache_size 1024; stated), `configs/test24_sg2_crop_scale_aug.yaml`
    (written 2026-09-25), targets the downscaled-input failure; (iv) **online

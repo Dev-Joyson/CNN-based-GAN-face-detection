@@ -267,6 +267,15 @@ the README says how things *are*, this says how we found out.
   single-generator crop headline's 0.742.** Generator diversity on the resize pipeline
   bought no transfer; whether that is the pipeline or the diversity, test23 (same mix,
   crop pipeline, stated 50/50) decides.
+- **2026-09-27 — Two generators (SG1+SG2, batch norm): SG3-R 0.777 vs 0.742.** Same
+  +0.035 as the augmentation lever. Generator diversity within one family does not
+  produce StyleGAN3-transferable features; SG3 was built to remove exactly what SG1/SG2
+  share. Batch norm was required to start training (plain recipe died at 16 epochs
+  unstarted) and made val AUC swing 0.5–0.9999 between epochs — BN running statistics
+  on a bimodal fake population; the best-epoch checkpoint (0.9999 on the mixed split)
+  is fine, but BN is not a recipe to deploy without lowering its momentum or the LR.
+  Two levers, two small gains: the missing ingredient is representational (pretrained
+  features), which is what online distillation (test25) tests next.
 - **Latency needs no training; accuracy does.** The efficiency half of the comparison
   can be measured before any baseline is fine-tuned.
 - **Published detectors zero-shot measure generalisation, not architecture.** CNNDetection

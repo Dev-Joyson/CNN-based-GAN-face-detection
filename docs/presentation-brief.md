@@ -78,7 +78,7 @@ Dense 128, Dropout 0.4, sigmoid. Native-resolution 256² crops, no resize.
 
 **Generalisation phase (IN PROGRESS — check README "Held-out generator" table before slides):**
 - Wang 2020 augmentation from scratch: never learned. Warm-started from the headline: SG3-R 0.742 → 0.772 (small, real).
-- Two generators (SG1+SG2) needed batch norm to start training (test23c); SG3-R score pending.
+- Two generators (SG1+SG2) needed batch norm to start training (test23c): SG3-R 0.742 → 0.777 (small, same size as the augmentation's).
 - Scale augmentation (test24), online distillation from EfficientNet (test25), int8 quantization of all four: not yet run.
 - Selection set = StyleGAN3-R; final test = StyleGAN3-T, scored once.
 

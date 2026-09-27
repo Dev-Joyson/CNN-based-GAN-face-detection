@@ -515,6 +515,7 @@ input, where the frequencies it was designed for have not been resized away.
 | test19_sg2_crop | native crops, with FFT branch | same | 0.9994 (acc 0.99) | 0.9994 (~50 epochs incl. a resume; first run's history lost to a VM) | `experiments/test19_sg2_crop/` |
 | test22_sg2_crop_wang_aug | headline with Wang et al. 2020's augmentation, from scratch | same | **0.5 — never learned**; 16 epochs at chance, early-stopped. Heavy blur+JPEG erase the signal a from-scratch model bootstraps on (2026-09-27) | 0.5 | `experiments/test22_sg2_crop_wang_aug/` |
 | test22b_wang_aug_from_headline | Wang aug, warm-started from the headline (`init_from`) | same | 0.9997 (acc 0.993); SG3-R 0.772 vs 0.742 | 0.9999 (best 12–37, stopped 39) | `experiments/test22b_wang_aug_from_headline/` |
+| test23c_sg2_sg1_crop_bn | two generators (12.5k SG2 + 12.5k SG1), batch norm | FFHQ + SG2 + SG1 | 0.9999 (acc 0.992) on the mixed split; SG3-R 0.777 | 0.99996 (best 52, stopped 67; unstable val) | `experiments/test23c_sg2_sg1_crop_bn/` |
 | test21_stride2_stem | headline with a stride-2 first conv (4× fewer MACs) | same | 0.9990 (acc 0.984); 0.9988 ± 0.0002 over three seeds | 0.9983 (best epoch 129; ran to the 150 cap, plateaued from ~125) | `experiments/test21_stride2_stem/` |
 | test17_sg2 | headline, resize pipeline (1024→512→256) | same | 0.9636 (acc 0.90) | 0.9645 (best epoch 89 of 104, early-stopped) | `experiments/test17_sg2/` |
 | test17_sg2_no_fft | ablation — FFT branch removed | same | 0.9527 (acc 0.88) | 0.9503 (best epoch 114, killed at 116 while grinding) | `experiments/test17_sg2_no_fft/` |
@@ -605,7 +606,8 @@ here before SG3-T is touched.
 | test22_sg2_crop_wang_aug | Wang 2020 aug, from scratch | 0.5 | — | — | never learned: 16 epochs at chance |
 | test22b_wang_aug_from_headline | Wang 2020 aug, warm-started from the headline | 0.9997 | **0.772** | 0.086 | +0.03: real but small (±0.01 at n=1500); nowhere near the pretrained 0.96 |
 | test16_full (preview) | SG1+SG2 mix, *resize* pipeline, 60/40 | 0.973 | 0.612 | 0.157 | diversity on the resize pipeline transfers less, not more |
-| test23_sg2_sg1_crop | two generators, 12.5k SG2 + 12.5k SG1, crop pipeline | | | | running 2026-09-27 |
+| test23_sg2_sg1_crop | two generators, 12.5k SG2 + 12.5k SG1, crop pipeline, from scratch | 0.5 | — | — | never learned: 16 epochs at chance (like test22) |
+| test23c_sg2_sg1_crop_bn | same, with batch norm (needed to start) | 0.9999 (SG1+SG2 split) | **0.777** | 0.089 | +0.035: same size as the augmentation's gain. Two related generators do not yield StyleGAN3-transferable features. Val AUC swung 0.5–0.9999 between epochs (BN running stats on a bimodal fake set); best-epoch checkpoint used |
 | test24_sg2_crop_scale_aug | scale aug [1, 2] | | | | pending |
 | test25_online_kd_effnet | online KD from EfficientNet-B0 | | | | pending |
 
