@@ -1,0 +1,40 @@
+# Test22b: test22 (Wang et al. 2020 augmentation) warm-started from the headline.
+#
+# Test22 from scratch sat at chance for 16 epochs and early-stopped: blur
+# sigma~U[0,3] + JPEG q~U[30,100] at p=0.5 erase the fine-scale fingerprint a
+# from-scratch 1M model needs to bootstrap on. Wang et al. applied the recipe to
+# an ImageNet-pretrained ResNet-50, which already had features to build on.
+# The fair version of the question is therefore: can a detector that already
+# reads StyleGAN2 be pushed, by heavy augmentation, toward features that
+# survive on StyleGAN3? init_from loads the headline's weights; everything
+# else is test22. Selection on SG3-R (headline reference 0.742); SG3-T once.
+name: test22b_wang_aug_from_headline
+init_from: test19_sg2_crop_no_fft
+aug: wang
+fft_branch: false
+
+real_dir: "/content/drive/MyDrive/Real(FFHQ)"
+fake_dir: "/content/drive/MyDrive/Fake(SG2-psi1)"
+
+mask_mode: none
+limit_per_class: 25000
+
+img_size: 256
+native_size: 512            # unused in crop mode
+input_mode: crop
+cache_size: 512             # centre 512^2 at native pixels; 768 keeps the hair, 1024 everything -- see model.Config
+batch_size: 144
+
+epochs: 150               # let patience decide
+lr: 0.0003
+patience: 15              # 6 cut the test16 ablation off mid-climb; both runs sat at 0.960 at epoch 61
+seed: 42
+
+crop_frac_min: 0.85
+shuffle_buffer: 8192         # train split is 28000; a full-set buffer would be ~5.5 GB of
+                             # uint8 images in RAM -- too much for a standard Colab runtime.
+                             # Raise toward 28000 on a high-RAM runtime if you want the
+                             # notebook's whole-set shuffle.
+
+cache_dir: "/content/cache"
+out_dir: "/content/drive/MyDrive/Research/experiments"

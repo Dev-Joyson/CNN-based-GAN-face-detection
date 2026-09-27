@@ -110,6 +110,9 @@ branch, native-resolution 256² crops. Test AUC 0.9998 ± 0.0002 over three seed
    23,000 images; test23 now uses `fake_mix: [12500, 12500]` (equal share).
    Run: `train.py` → `evaluate.py` → `heldout.py --fake-dir "…/Fake(SG3-R-psi1)" --tag sg3r`;
    compare to 0.742; the winner (if any) is scored on sg3t once.
+   **test22 from scratch: never learned (0.5, 16 epochs, early-stopped, 2026-09-27).**
+   → `init_from` knob added to Config/train(); `test22b_wang_aug_from_headline.yaml`
+   warm-starts from the headline's weights. Run test22b instead.
    (iii) **scale augmentation** — `scale_aug: [1, 2]`, windows at native and half
    scale (¼ would need cache_size 1024; stated), `configs/test24_sg2_crop_scale_aug.yaml`
    (written 2026-09-25), targets the downscaled-input failure; (iv) **online

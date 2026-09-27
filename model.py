@@ -96,6 +96,12 @@ class Config:
     # inference cost. Targets the on-resize failure (0.556 = chance). f=4 would
     # need cache_size 1024. Eval unchanged (centre native window). Not in the key.
     scale_aug: list = field(default=None)
+    # warm start: name of a finished run under out_dir whose model.keras weights
+    # initialise this one (same architecture required). None = from scratch.
+    # Used when a recipe cannot bootstrap from random init -- test22 (Wang 2020
+    # augmentation) sat at chance for 16 epochs -- and the question is whether
+    # an already-trained detector can be pushed toward more general features.
+    init_from: str = field(default=None)
     crop_frac_min: float = 0.85           # Test16: random crop keeps 85-100% of the side
     shuffle_buffer: int = 4096            # images held for shuffling; Test16 used the whole train set
 
@@ -586,6 +592,10 @@ def train(cfg, resume=False, build_fn=None):
         if resume:
             print(f"resume requested but no checkpoint at {ckpt} -- starting fresh")
         model = compile_model((build_fn or build_model)(cfg), cfg)
+        if cfg.init_from:
+            src = os.path.join(cfg.out_dir, cfg.init_from, "model.keras")
+            model.set_weights(tf.keras.models.load_model(src, safe_mode=False).get_weights())
+            print(f"INIT: weights from {src}")
     model.summary()
 
     callbacks = [

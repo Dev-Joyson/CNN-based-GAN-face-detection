@@ -251,6 +251,12 @@ the README says how things *are*, this says how we found out.
 - **2026-09-25 — Stride-2 seed 43 sat at chance for five epochs before learning.** The
   cheap stem is slower and less reliable to train from a cold start; inference-only
   saving, training-time cost. Batch norm (v2 recipe) is the untested fix.
+- **2026-09-27 — Wang 2020's augmentation from scratch: the model never learns (16
+  epochs at 0.5000, early-stopped).** Blur σ≤3 + JPEG q≥30 at p=0.5 erase the fine-scale
+  fingerprint a from-scratch 1M model bootstraps on. Wang et al. applied it to an
+  ImageNet-pretrained ResNet-50 that already had features. Lesson: augmentation-for-
+  generalisation presupposes a feature extractor; at this size it must be warm-started
+  (test22b: `init_from` the headline) or it is a null result.
 - **Latency needs no training; accuracy does.** The efficiency half of the comparison
   can be measured before any baseline is fine-tuned.
 - **Published detectors zero-shot measure generalisation, not architecture.** CNNDetection
