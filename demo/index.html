@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>GAN-face detection — live demonstration</title>
+<title>GAN-face detection - live demonstration</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
   :root { --ink:#1a1a1a; --muted:#666; --line:#ddd; --accent:#1f4e79; --region:#f5a623; --real:#2e7d32; --fake:#c62828; }
@@ -42,7 +42,7 @@
 </head>
 <body>
 <main>
-  <h1>Lightweight CNN for StyleGAN-face detection — live demonstration</h1>
+  <h1>Lightweight CNN for StyleGAN-face detection - live demonstration</h1>
   <p class="muted">The trained headline model (1,011,521 parameters) runs on this laptop. Select images, run, then click any row to see everything the model did with that image.</p>
 
   <div class="samples" id="samples"></div>
@@ -61,7 +61,7 @@
     <h2>Behind the detection: <span id="deep-name"></span></h2>
 
     <h3>1. What the model was given</h3>
-    <p class="muted legend"><i style="border-color:var(--region)"></i>512² region cached at native pixels &nbsp; <i style="border-color:var(--accent)"></i>256² window the model sees (centre at evaluation; random inside the region during training). Nothing is resized on this path. The right-hand column is the alternative pipeline: the whole face shrunk to 256².</p>
+    <p class="muted legend"><i style="border-color:var(--region)"></i>512² region cached at native pixels &nbsp; <i style="border-color:var(--accent)"></i>256² window the model sees (centre at evaluation; random inside the region during training).</p>
     <div class="grid g3">
       <div class="panel"><img id="d-orig"><div class="cap" id="d-orig-cap"></div></div>
       <div class="panel"><img id="d-win"><div class="cap">native 256² window → <span id="d-pn"></span></div><div class="big" id="d-vn"></div><div class="pbar"><i id="d-bn"></i><b></b></div></div>
@@ -69,7 +69,7 @@
     </div>
 
     <h3>2. What the pixels contain</h3>
-    <p class="muted">High-frequency residual (image minus a 5×5 blur, amplified 4×) and log-spectrum of each view. The native window shows the fine pixel structure the model reads; the downscaled view has been through an interpolation that replaces it. The <em>amount</em> of fine detail is not the signal — a shrunk whole face packs more edges per pixel than a skin patch, and the dataset audit found high-frequency energy does not separate real from fake (AUC 0.55). What differs is the structure. Illustration only; the model reads the pixels, not these views.</p>
+    <p class="muted">High-frequency residual (image minus a 5×5 blur, amplified 4×) and log-spectrum of each view. The native window shows the fine pixel structure the model reads; the downscaled view has been through an interpolation that replaces it. The <em>amount</em> of fine detail is not the signal: a shrunk whole face packs more edges per pixel than a skin patch, and the dataset audit found high-frequency energy does not separate real from fake (AUC 0.55). What differs is the structure. Illustration only; the model reads the pixels, not these views.</p>
     <div class="grid g4">
       <div class="panel"><img id="d-resn"><div class="cap">native residual · mean |residual| <span id="d-hfn"></span></div></div>
       <div class="panel"><img id="d-specn"><div class="cap">native spectrum (log |FFT|)</div></div>
@@ -152,7 +152,7 @@ $('#run').onclick = async () => {
     const j = await (await fetch('/predict', {method: 'POST', body: it.blob})).json();
     results[k] = j.error ? null : j;
     const tr = tbl.insertRow(); tr.className = 'row';
-    if (j.error) { tr.innerHTML = `<td colspan="6">${it.name}: error — ${j.error}</td>`; continue; }
+    if (j.error) { tr.innerHTML = `<td colspan="6">${it.name}: error - ${j.error}</td>`; continue; }
     const vn = verdict(j.native.p_fake); let truth = 'unknown (uploaded)';
     if (it.truth) { judged++; const ok = it.truth === vn; if (ok) correct++; truth = `${it.truth} <span class="${ok ? 'ok' : 'bad'}">${ok ? '✓' : '✗'}</span>`; }
     lat.push(j.latency_ms);
