@@ -179,7 +179,11 @@ branch, native-resolution 256² crops. Test AUC 0.9998 ± 0.0002 over three seed
    training TFLite int8, no retraining; CPU latency + SG2 accuracy + SG3-T per model at
    equal precision. Answers "why not compress EfficientNet, which generalises?".
    Applied to the FINAL student, so after 2c; the three baselines can be done earlier
-   as a CPU side job. Script not written yet.
+   as a CPU side job. **`quantize.py` written 2026-09-28** (smoke-tested locally: headline
+   fp32 4.05 MB → int8 1.04 MB). Run per model:
+   `python quantize.py --config configs/test19_sg2_crop_no_fft.yaml --fake-dir "…/Fake(SG3-T-psi1)" --tag sg3t`
+   and `--config configs/test20_crop_baselines.yaml --model <m>` for the three baselines
+   (Xception at 7,500 test images on CPU is slow; `--n-eval 2000` is acceptable, stated).
 5. **Held-out reals** (CelebA-HQ 1024) with `heldout.py --real-dir … --tag celebahq`.
 6. **Sensitivity checks** on the crop pipeline for `docs/hyperparameters.md`:
    lr {1e-4, 1e-3}, augmentation {off, Wang 2020's}. One run each, note the number.
