@@ -1,0 +1,32 @@
+# Probe: test24 (scale augmentation, trained on native + half-scale windows)
+# scored on DOWNSCALED input -- the 1024->512->256 resize pipeline, i.e. the
+# quarter-scale view. Same run dir (loads test24's model.keras); the resize
+# cache is the one test17 built. Evaluate with --tag on_resize -> eval_on_resize.json.
+# The headline scores 0.556 here (chance); test24 trains at half scale, so a
+# partial recovery is the expectation, not a full one -- stated in test24's config.
+name: test24_sg2_crop_scale_aug
+fft_branch: false
+
+real_dir: "/content/drive/MyDrive/Real(FFHQ)"
+fake_dir: "/content/drive/MyDrive/Fake(SG2-psi1)"
+
+mask_mode: none
+limit_per_class: 25000
+
+img_size: 256
+native_size: 512
+batch_size: 144
+
+epochs: 150               # let patience decide
+lr: 0.0003
+patience: 15              # 6 cut the test16 ablation off mid-climb; both runs sat at 0.960 at epoch 61
+seed: 42
+
+crop_frac_min: 0.85
+shuffle_buffer: 8192         # train split is 28000; a full-set buffer would be ~5.5 GB of
+                             # uint8 images in RAM -- too much for a standard Colab runtime.
+                             # Raise toward 28000 on a high-RAM runtime if you want the
+                             # notebook's whole-set shuffle.
+
+cache_dir: "/content/cache"
+out_dir: "/content/drive/MyDrive/Research/experiments"
