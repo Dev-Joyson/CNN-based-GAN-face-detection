@@ -100,9 +100,15 @@ def efficiency(experiments, out):
         if not os.path.exists(ep):
             print(f"  efficiency: no eval.json for {rel}, skipped"); continue
         e = read_json(ep); eff = e["efficiency"]
+        # CPU: prefer the TFLite/XNNPACK fp32 number from eval_quant.json (the device
+        # runtime); TensorFlow's CPU path mis-ranks depthwise models (README *Quantization*)
+        qp = os.path.join(experiments, rel, "eval_quant.json")
+        cpu = read_json(qp)["precision"]["fp32"]["cpu_latency_ms"]["median"] if os.path.exists(qp) else None
+        cpu_src = "TFLite fp32" if cpu is not None else "TF path"
+        if cpu is None:
+            cpu = eff.get("latency_bs1_ms_cpu", {}).get("median")
         rows.append({"label": label, "auc": e["test_auc"], "params": eff["params"], "macs": eff["macs"],
-                     "gpu_ms": eff["latency_bs1_ms"]["median"],
-                     "cpu_ms": eff.get("latency_bs1_ms_cpu", {}).get("median"),
+                     "gpu_ms": eff["latency_bs1_ms"]["median"], "cpu_ms": cpu, "cpu_src": cpu_src,
                      "mem": eff["peak_gpu_memory_mb"]["bs1"]})
     if not rows:
         return
@@ -118,7 +124,8 @@ def efficiency(experiments, out):
     fig.tight_layout(); p = os.path.join(out, "efficiency_scatter.png"); fig.savefig(p, dpi=150); plt.close(fig)
     print(f"  wrote {p}")
     # bars
-    keys = [("macs", "MACs (G)", 1e-9), ("mem", "peak GPU MB @ bs=1", 1), ("cpu_ms", "CPU ms @ bs=1", 1), ("gpu_ms", "GPU ms @ bs=1", 1)]
+    cpu_title = "CPU ms @ bs=1 (" + ("/".join(sorted({r["cpu_src"] for r in rows}))) + ")"
+    keys = [("macs", "MACs (G)", 1e-9), ("mem", "peak GPU MB @ bs=1", 1), ("cpu_ms", cpu_title, 1), ("gpu_ms", "GPU ms @ bs=1 (L4)", 1)]
     fig, ax = plt.subplots(1, len(keys), figsize=(4 * len(keys), 4))
     labels = [r["label"] for r in rows]
     for a, (k, title, scale) in zip(ax, keys):
