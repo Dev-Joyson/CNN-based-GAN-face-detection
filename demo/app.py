@@ -100,14 +100,18 @@ class Engine:
         return float(self.infer(x).numpy()[0, 0])
 
     def _gradcam(self, x, for_fake):
-        """Grad-CAM for the model's VERDICT: evidence for 'fake' when it says fake,
-        evidence for 'real' (the negated output) when it says real. evaluate.py's
-        version maps evidence for 'fake' only, which is flat on a confident real."""
+        """Grad-CAM for the model's VERDICT on the LOGIT (pre-sigmoid): evidence for
+        'fake' when it says fake, for 'real' (negated logit) when it says real.
+        evaluate.py's version differentiates the sigmoid output for 'fake' only:
+        flat on a confident real (no positive evidence) AND flat on a confident
+        fake (sigmoid saturated at 0.9999, gradient ~0). The logit has neither problem."""
+        dense = self.model.layers[-1]                       # Dense(1, sigmoid)
         grad_model = tf.keras.models.Model(self.model.inputs,
-                                           [self.model.get_layer(self.layer).output, self.model.output])
+                                           [self.model.get_layer(self.layer).output, dense.input])
         with tf.GradientTape() as tape:
-            conv_out, preds = grad_model(x)
-            target = preds[:, 0] if for_fake else 1.0 - preds[:, 0]
+            conv_out, h = grad_model(x)
+            logit = tf.matmul(h, dense.kernel) + dense.bias    # pre-activation
+            target = logit[:, 0] if for_fake else -logit[:, 0]
         grads = tape.gradient(target, conv_out)
         pooled = tf.reduce_mean(grads, axis=(0, 1, 2))
         heat = tf.reduce_sum(conv_out[0] * pooled, axis=-1)
