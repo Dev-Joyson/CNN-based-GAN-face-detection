@@ -16,7 +16,9 @@
   table { border-collapse:collapse; width:100%; margin:10px 0; font-size:15px; }
   th, td { text-align:left; padding:6px 10px; border-bottom:1px solid var(--line); vertical-align:middle; }
   th { font-weight:600; background:#f6f6f6; }
-  .samples { display:flex; flex-wrap:wrap; gap:10px; margin:12px 0; }
+  .samplerow { margin:12px 0; }
+  .rowlabel { font-size:13px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); margin-bottom:6px; }
+  .samples { display:flex; flex-wrap:wrap; gap:10px; }
   .samples img { width:104px; height:104px; object-fit:cover; border:2px solid var(--line); cursor:pointer; }
   .samples img.sel { border-color:var(--accent); }
   .controls { display:flex; gap:14px; align-items:center; flex-wrap:wrap; margin:10px 0; }
@@ -46,11 +48,12 @@
   <h1>Lightweight CNN for GAN Synthetic Faces - Demonstration</h1>
   <p class="muted">Select images, run, then click any row to see everything the model did with that image.</p>
 
-  <div class="samples" id="samples"></div>
+  <div class="samplerow"><div class="rowlabel">real (FFHQ photographs)</div><div class="samples" id="samples-real"></div></div>
+  <div class="samplerow"><div class="rowlabel">fake (StyleGAN2)</div><div class="samples" id="samples-fake"></div></div>
   <div class="controls">
-    <input type="file" id="file" accept="image/*" multiple>
     <span class="muted" id="status"></span>
     <span class="right">
+      <input type="file" id="file" accept="image/*" multiple>
       <button id="run" disabled>Run selected</button>
       <button id="clear" class="secondary">Clear</button>
     </span>
@@ -111,8 +114,9 @@ fetch('/model.json').then(r => r.json()).then(m => {
   $('#model').innerHTML += m.layers.map(l => `<tr><td>${l.layer}</td><td>${l.type}</td><td>${l.shape}</td><td>${l.params.toLocaleString()}</td></tr>`).join('');
 });
 fetch('/samples.json').then(r => r.json()).then(list => {
-  $('#samples').innerHTML = list.map(s => `<img src="${s.url}" data-cls="${s.cls}" data-name="${s.file}" title="${s.cls}: ${s.file}">`).join('');
-  document.querySelectorAll('#samples img').forEach(img => img.onclick = async () => {
+  for (const cls of ['real', 'fake'])
+    $('#samples-' + cls).innerHTML = list.filter(s => s.cls === cls).map(s => `<img src="${s.url}" data-cls="${s.cls}" data-name="${s.file}" title="${s.cls}: ${s.file}">`).join('');
+  document.querySelectorAll('.samples img').forEach(img => img.onclick = async () => {
     const i = items.findIndex(x => x.el === img);
     if (i >= 0) { items.splice(i, 1); img.classList.remove('sel'); }
     else { items.push({name: img.dataset.name, blob: await (await fetch(img.src)).blob(), truth: img.dataset.cls, el: img, thumb: img.src}); img.classList.add('sel'); }
@@ -120,7 +124,7 @@ fetch('/samples.json').then(r => r.json()).then(list => {
   });
 });
 $('#file').onchange = e => { for (const f of e.target.files) items.push({name: f.name, blob: f, truth: null, el: null, thumb: URL.createObjectURL(f)}); refresh(); };
-$('#clear').onclick = () => { items = []; results = []; document.querySelectorAll('#samples img').forEach(i => i.classList.remove('sel')); $('#results').style.display = 'none'; $('#deep').style.display = 'none'; $('#summary').textContent = ''; refresh(); };
+$('#clear').onclick = () => { items = []; results = []; document.querySelectorAll('.samples img').forEach(i => i.classList.remove('sel')); $('#results').style.display = 'none'; $('#deep').style.display = 'none'; $('#summary').textContent = ''; refresh(); };
 
 const verdict = p => p > 0.5 ? 'fake' : 'real';
 function showDeep(k) {
