@@ -4,6 +4,7 @@ make it comparable: TFLite file size, CPU latency (fp32 vs int8, same
 interpreter, same threads), test AUC/accuracy for both, optional held-out AUC.
 
     python quantize.py --config configs/test19_sg2_crop_no_fft.yaml
+    (three precisions per model: fp32, int8_dynamic = weights only, int8 = full integer)
     python quantize.py --config configs/test20_crop_baselines.yaml --model efficientnet_b0
     python quantize.py --config ... --fake-dir "/content/drive/MyDrive/Fake(SG3-T-psi1)" --tag sg3t
 
@@ -34,10 +35,20 @@ N_REP = 200          # representative images for calibration
 N_LAT = 300          # latency runs per precision
 
 
-def convert(model, rep_images, int8):
+PRECISIONS = ("fp32", "int8_dynamic", "int8")
+# fp32:         the float model through TFLite -- the CPU runtime a device would use
+# int8_dynamic: weights int8, activations float (no calibration). The 4x size cut
+#               and a speedup on matmul-heavy layers; accuracy essentially intact.
+# int8:         full integer, calibrated on 200 test images; fastest on int8
+#               hardware, but post-training it can break models with
+#               squeeze-excite / hard-swish (EfficientNet collapsed to 0.5).
+
+
+def convert(model, rep_images, precision):
     conv = tf.lite.TFLiteConverter.from_keras_model(model)
-    if int8:
+    if precision != "fp32":
         conv.optimizations = [tf.lite.Optimize.DEFAULT]
+    if precision == "int8":
         conv.representative_dataset = lambda: ([x[None].astype(np.float32)] for x in rep_images)
         conv.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
         conv.inference_input_type = tf.float32
@@ -47,8 +58,19 @@ def convert(model, rep_images, int8):
 
 class Runner:
     def __init__(self, tflite_bytes, threads):
-        self.interp = tf.lite.Interpreter(model_content=tflite_bytes, num_threads=threads)
-        self.interp.allocate_tensors()
+        self.delegate = "xnnpack"
+        try:
+            self.interp = tf.lite.Interpreter(model_content=tflite_bytes, num_threads=threads)
+            self.interp.allocate_tensors()
+        except RuntimeError as e:
+            # XNNPACK refuses some quantized ops (MobileNetV3's hard-swish); the
+            # reference kernels run everything, slower. Recorded, not hidden.
+            print(f"  XNNPACK delegate failed ({str(e).strip().splitlines()[-1]}); using builtin kernels")
+            self.delegate = "builtin"
+            self.interp = tf.lite.Interpreter(
+                model_content=tflite_bytes, num_threads=threads,
+                experimental_op_resolver_type=tf.lite.experimental.OpResolverType.BUILTIN_WITHOUT_DEFAULT_DELEGATES)
+            self.interp.allocate_tensors()
         self.inp = self.interp.get_input_details()[0]["index"]
         self.out = self.interp.get_output_details()[0]["index"]
 
@@ -102,14 +124,14 @@ def main():
 
     out = {"model": name, "threads": args.threads, "params": int(model.count_params()), "precision": {}}
     x1 = rep[:1].astype(np.float32)
-    for prec in ("fp32", "int8"):
-        blob = convert(model, rep, int8=(prec == "int8"))
+    for prec in PRECISIONS:
+        blob = convert(model, rep, prec)
         path = os.path.join(run_dir, f"model_{prec}.tflite")
         with open(path, "wb") as f:
             f.write(blob)
         r = Runner(blob, args.threads)
-        rec = {"file_mb": round(len(blob) / 1e6, 2), "cpu_latency_ms": latency_ms(r, x1),
-               "test": score(r, ds, args.n_eval or None)}
+        rec = {"file_mb": round(len(blob) / 1e6, 2), "delegate": r.delegate,
+               "cpu_latency_ms": latency_ms(r, x1), "test": score(r, ds, args.n_eval or None)}
         if args.fake_dir:
             from heldout import pick
             used = {p for paths, _ in load_paths(cfg).values() for p in paths}
@@ -121,7 +143,7 @@ def main():
             rec[f"heldout_{args.tag}"] = score(r, hds)
         out["precision"][prec] = rec
         h = rec.get(f"heldout_{args.tag}", {})
-        print(f"{prec}: {rec['file_mb']} MB | CPU {rec['cpu_latency_ms']['median']} ms (p95 {rec['cpu_latency_ms']['p95']}) | "
+        print(f"{prec}: {rec['file_mb']} MB | CPU {rec['cpu_latency_ms']['median']} ms (p95 {rec['cpu_latency_ms']['p95']}, {r.delegate}) | "
               f"test AUC {rec['test']['auc']} acc {rec['test']['accuracy']} (n={rec['test']['n']})"
               + (f" | {args.tag} AUC {h['auc']}" if h else ""))
 
