@@ -5,18 +5,19 @@ order of the talk and runs the headline model live on the presenter's laptop.
     python demo/app.py                      # then open http://localhost:8000
     python demo/app.py --model <model.keras> --figures <dir> --port 8000
 
-Why this file: the guidelines score a "presentation and demonstration". A page
-served from the laptop needs no internet, uses the same preprocessing as
-training (predict.preprocess -> load_and_resize -> eval_view, nothing re-
-implemented), and reads every number from demo/data.json, which is copied from
-the README tables with its source named. Standard library only (no Flask).
+Why this file: the guidelines score a "presentation and demonstration". The
+slides carry the argument; this page is the instrument. For one image it shows
+everything the model did: the window it was cut (pipeline drawn on the original),
+the downscaled alternative and both predictions, the high-frequency residual and
+spectrum of each view, first- and last-layer feature maps, Grad-CAM, JPEG and
+window-position probes, latency, and the architecture table. Same preprocessing
+as training (predict.preprocess -> load_and_resize -> eval_view); nothing is
+re-implemented. No internet; standard library only (no Flask).
 
-Routes: /            the page
-        /data.json   the numbers
-        /figures/<f> the rendered figures (from --figures)
-        /samples.json, /samples/<class>/<f>   bundled 1024^2 sample images
-        POST /predict?mode=native|downscaled  image bytes -> JSON (p_fake,
-             latency, the 256^2 window, Grad-CAM), optionally int8 via --tflite
+Routes: /                                   the page
+        /model.json                         layer table (from the loaded model)
+        /samples.json, /samples/<class>/<f> bundled 1024^2 sample images
+        POST /predict                       image bytes -> JSON, everything above
 """
 
 import argparse
@@ -29,7 +30,7 @@ import sys
 import tempfile
 import time
 from http.server import HTTPServer, SimpleHTTPRequestHandler
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import urlparse
 
 import numpy as np
 
@@ -41,12 +42,12 @@ import tensorflow as tf                                   # noqa: E402
 from PIL import Image                                     # noqa: E402
 
 from evaluate import compute_gradcam, last_spatial_conv, overlay   # noqa: E402
-from model import build_model, feathered_ellipse, load_config   # noqa: E402
+from model import build_model, eval_view, feathered_ellipse, load_and_resize, load_config   # noqa: E402
 from predict import preprocess                            # noqa: E402
+from PIL import ImageDraw                                 # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_MODEL = os.path.expanduser("~/Downloads/thesis-figures/test19_sg2_crop_no_fft/model.keras")
-DEFAULT_FIGURES = os.path.expanduser("~/Downloads/thesis-figures/figures")
 
 
 class Engine:
@@ -63,6 +64,12 @@ class Engine:
             self.model = build_model(self.cfg["native"])
             self.model.load_weights(model_path)
         self.layer = last_spatial_conv(self.model)
+        self.feat = tf.keras.Model(self.model.inputs, [self.model.get_layer("spatial_conv_1").output,
+                                                       self.model.get_layer(self.layer).output])
+        self.table = [{"layer": l.name, "type": type(l).__name__,
+                       "shape": "×".join(str(d) for d in l.output.shape[1:]), "params": int(l.count_params())}
+                      for l in self.model.layers]
+        self.total_params = int(self.model.count_params())
         c = self.cfg["native"]
         self.mask = feathered_ellipse(c.img_size, c.mask_rx, c.mask_ry, c.mask_feather)
         self.infer = tf.function(lambda x: self.model(x, training=False))
@@ -89,33 +96,101 @@ class Engine:
         Image.fromarray((np.clip(arr01, 0, 1) * 255).astype(np.uint8)).save(buf, format="PNG")
         return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
 
-    def predict(self, image_bytes, mode):
-        cfg = self.cfg[mode]
+    def _p(self, x):
+        return float(self.infer(x).numpy()[0, 0])
+
+    @staticmethod
+    def _gray(x):                                   # (1,H,W,3) float -> (H,W) numpy
+        return tf.image.rgb_to_grayscale(x)[0, ..., 0].numpy()
+
+    def _residual(self, x):
+        """Image minus a 5x5 box blur, amplified: the high-frequency content the
+        crop keeps and the resize deletes. Illustration only; the model reads pixels."""
+        blur = tf.nn.avg_pool2d(x, ksize=5, strides=1, padding="SAME")
+        r = (x - blur)[0].numpy()
+        return self._png(np.clip(r * 4 + 0.5, 0, 1)), round(float(np.abs(r).mean()) * 100, 2)
+
+    def _spectrum(self, x):
+        g = self._gray(x)
+        f = np.fft.fftshift(np.abs(np.fft.fft2(g - g.mean())))
+        f = np.log1p(f); f = (f - f.min()) / (f.max() - f.min() + 1e-8)
+        return self._png(np.repeat(f[..., None], 3, -1))
+
+    def _feature_strip(self, fm, n=8):
+        """First n channels of a feature map, each min-max normalised, tiled."""
+        fm = fm[0].numpy(); tiles = []
+        for c in range(min(n, fm.shape[-1])):
+            t = fm[..., c]; t = (t - t.min()) / (t.max() - t.min() + 1e-8)
+            tiles.append(np.repeat(t[..., None], 3, -1))
+        strip = np.concatenate(tiles, axis=1)
+        return self._png(strip), list(fm.shape[:2])
+
+    def predict(self, image_bytes):
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
             f.write(image_bytes); path = f.name
         try:
             with Image.open(path) as im:
                 w, h = im.size
-            x = preprocess(path, cfg, self.mask)                    # the training pipeline, unchanged
+                thumb = im.convert("RGB").copy(); thumb.thumbnail((512, 512))
+            xn = preprocess(path, self.cfg["native"], self.mask)          # the training pipeline, unchanged
+            xd = preprocess(path, self.cfg["downscaled"], self.mask)      # the resize pipeline
+            region, _ = load_and_resize(tf.constant(path), tf.constant(0), self.cfg["native"])   # centre 512^2 uint8
         finally:
             os.unlink(path)
+
+        # pipeline drawing: the 512^2 cached region and the 256^2 eval window on the original
+        sx = thumb.width / w
+        d = ImageDraw.Draw(thumb)
+        c = self.cfg["native"]
+        for size, col in ((c.cache_size, "#f5a623"), (c.img_size, "#1f4e79")):
+            x0 = (w - size) / 2 * sx; y0 = (h - size) / 2 * sx
+            d.rectangle([x0, y0, x0 + size * sx, y0 + size * sx], outline=col, width=3)
+        buf = io.BytesIO(); thumb.save(buf, format="JPEG", quality=90)
+        original = "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
+
         times = []
         for _ in range(20):
-            t0 = time.perf_counter(); p = float(self.infer(x).numpy()[0, 0]); times.append((time.perf_counter() - t0) * 1e3)
-        out = {"mode": mode, "input_size": [w, h], "p_fake": round(p, 4),
-               "latency_ms": round(float(np.median(times)), 2),
-               "window": self._png(x[0].numpy())}
-        heat = compute_gradcam(self.model, x, self.layer)
-        out["gradcam"] = self._png(overlay(x[0].numpy(), heat))
+            t0 = time.perf_counter(); p = self._p(xn); times.append((time.perf_counter() - t0) * 1e3)
+        p_down = self._p(xd)
+
+        heat = compute_gradcam(self.model, xn, self.layer)
+        f1, f5 = self.feat(xn)
+        strip1, shape1 = self._feature_strip(f1); strip5, shape5 = self._feature_strip(f5)
+        res_n, hf_n = self._residual(xn); res_d, hf_d = self._residual(xd)
+
+        # probes: JPEG re-encoding of the native window, and five window positions in the region
+        u8 = tf.cast(tf.clip_by_value(xn[0], 0, 1) * 255, tf.uint8)
+        jpeg = {}
+        for q in (95, 75):
+            xq = tf.cast(tf.image.adjust_jpeg_quality(u8, q), tf.float32)[None] / 255.0
+            jpeg[str(q)] = round(self._p(xq), 4)
+        S, s_ = int(region.shape[0]), c.img_size
+        pos = {"centre": ((S - s_) // 2, (S - s_) // 2), "top-left": (0, 0), "top-right": (0, S - s_),
+               "bottom-left": (S - s_, 0), "bottom-right": (S - s_, S - s_)}
+        windows = {}
+        for name, (r0, c0) in pos.items():
+            xw = tf.cast(region[r0:r0 + s_, c0:c0 + s_], tf.float32)[None] / 255.0
+            windows[name] = round(self._p(xw), 4)
+
+        out = {"input_size": [w, h], "original": original,
+               "native": {"p_fake": round(p, 4), "window": self._png(xn[0].numpy()),
+                          "gradcam": self._png(overlay(xn[0].numpy(), heat)),
+                          "residual": res_n, "highfreq": hf_n, "spectrum": self._spectrum(xn)},
+               "downscaled": {"p_fake": round(p_down, 4), "window": self._png(xd[0].numpy()),
+                              "residual": res_d, "highfreq": hf_d, "spectrum": self._spectrum(xd)},
+               "features": {"conv1": strip1, "conv1_shape": shape1, "conv5": strip5, "conv5_shape": shape5,
+                            "last_layer": self.layer},
+               "probes": {"jpeg": jpeg, "windows": windows},
+               "latency_ms": round(float(np.median(times)), 2)}
         if self.tflite:
             tt = []
             for _ in range(20):
-                t0 = time.perf_counter(); q = self._tflite(x.numpy()); tt.append((time.perf_counter() - t0) * 1e3)
+                t0 = time.perf_counter(); q = self._tflite(xn.numpy()); tt.append((time.perf_counter() - t0) * 1e3)
             out["int8"] = {"p_fake": round(q, 4), "latency_ms": round(float(np.median(tt)), 2)}
         return out
 
 
-def make_handler(engine, figures_dir, samples_dir):
+def make_handler(engine, samples_dir):
     class H(SimpleHTTPRequestHandler):
         def log_message(self, *a):            # quiet
             pass
@@ -136,8 +211,9 @@ def make_handler(engine, figures_dir, samples_dir):
             u = urlparse(self.path); p = u.path
             if p in ("/", "/index.html"):
                 return self._file(os.path.join(HERE, "index.html"))
-            if p == "/data.json":
-                return self._file(os.path.join(HERE, "data.json"))
+            if p == "/model.json":
+                return self._send(json.dumps({"layers": engine.table, "total_params": engine.total_params,
+                                              "last_layer": engine.layer}))
             if p == "/samples.json":
                 items = []
                 for cls in ("real", "fake"):
@@ -146,8 +222,6 @@ def make_handler(engine, figures_dir, samples_dir):
                         if f.lower().endswith((".png", ".jpg", ".jpeg")):
                             items.append({"cls": cls, "file": f, "url": f"/samples/{cls}/{f}"})
                 return self._send(json.dumps(items))
-            if p.startswith("/figures/"):
-                return self._file(os.path.join(figures_dir, os.path.basename(p)))
             if p.startswith("/samples/"):
                 parts = p.split("/")
                 if len(parts) == 4 and parts[2] in ("real", "fake"):
@@ -158,13 +232,10 @@ def make_handler(engine, figures_dir, samples_dir):
             u = urlparse(self.path)
             if u.path != "/predict":
                 return self._send("not found", "text/plain", 404)
-            mode = parse_qs(u.query).get("mode", ["native"])[0]
-            if mode not in ("native", "downscaled"):
-                return self._send('{"error":"mode"}', code=400)
             n = int(self.headers.get("Content-Length", 0))
             body = self.rfile.read(n)
             try:
-                self._send(json.dumps(engine.predict(body, mode)))
+                self._send(json.dumps(engine.predict(body)))
             except Exception as e:                       # a bad upload must not kill the demo
                 self._send(json.dumps({"error": str(e)}), code=500)
     return H
@@ -175,15 +246,14 @@ def main():
     ap.add_argument("--model", default=DEFAULT_MODEL)
     ap.add_argument("--tflite", default=os.path.join(os.path.dirname(DEFAULT_MODEL), "model_int8.tflite"),
                     help="optional int8 .tflite of the same model; shown beside fp32 if present")
-    ap.add_argument("--figures", default=DEFAULT_FIGURES)
     ap.add_argument("--samples", default=os.path.join(HERE, "samples"))
     ap.add_argument("--port", type=int, default=8000)
     args = ap.parse_args()
     print(f"loading {args.model} ...", flush=True)
     engine = Engine(args.model, args.tflite)
-    print(f"model ready ({'fp32 + int8' if engine.tflite else 'fp32'}); figures from {args.figures}; samples from {args.samples}")
+    print(f"model ready ({'fp32 + int8' if engine.tflite else 'fp32'}); samples from {args.samples}")
     print(f"open  http://localhost:{args.port}   (Ctrl+C to stop)", flush=True)
-    HTTPServer(("127.0.0.1", args.port), make_handler(engine, args.figures, args.samples)).serve_forever()
+    HTTPServer(("127.0.0.1", args.port), make_handler(engine, args.samples)).serve_forever()
 
 
 if __name__ == "__main__":

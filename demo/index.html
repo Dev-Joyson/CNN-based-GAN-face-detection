@@ -2,135 +2,111 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Lightweight GAN-face detection — demonstration</title>
+<title>GAN-face detection — live demonstration</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-  :root { --ink:#1a1a1a; --muted:#666; --line:#ddd; --accent:#1f4e79; --real:#2e7d32; --fake:#c62828; }
+  :root { --ink:#1a1a1a; --muted:#666; --line:#ddd; --accent:#1f4e79; --region:#f5a623; --real:#2e7d32; --fake:#c62828; }
   * { box-sizing:border-box; }
-  body { margin:0; font:16px/1.5 -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif; color:var(--ink); background:#fff; }
-  main { max-width:1080px; margin:0 auto; padding:32px 24px 80px; }
-  h1 { font-size:26px; margin:0 0 4px; }
-  h2 { font-size:20px; margin:48px 0 12px; padding-top:16px; border-top:1px solid var(--line); }
-  p { margin:8px 0; }
-  .muted { color:var(--muted); font-size:14px; }
-  .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin:20px 0; }
-  .stat { border:1px solid var(--line); padding:14px 16px; }
-  .stat .v { font-size:30px; font-weight:600; color:var(--accent); }
-  .stat .l { font-size:13px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }
-  .stat .s { font-size:13px; color:var(--muted); }
-  table { border-collapse:collapse; width:100%; margin:12px 0; font-size:15px; }
-  th, td { text-align:left; padding:7px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+  body { margin:0; font:16px/1.5 -apple-system,"Helvetica Neue",Helvetica,Arial,sans-serif; color:var(--ink); background:#fff; }
+  main { max-width:1180px; margin:0 auto; padding:28px 24px 80px; }
+  h1 { font-size:24px; margin:0 0 4px; }
+  h2 { font-size:19px; margin:36px 0 10px; padding-top:14px; border-top:1px solid var(--line); }
+  h3 { font-size:16px; margin:18px 0 6px; }
+  p { margin:6px 0; } .muted { color:var(--muted); font-size:14px; }
+  table { border-collapse:collapse; width:100%; margin:10px 0; font-size:15px; }
+  th, td { text-align:left; padding:6px 10px; border-bottom:1px solid var(--line); vertical-align:middle; }
   th { font-weight:600; background:#f6f6f6; }
-  tr.hl td { font-weight:600; }
-  .story { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
-  .story .card { border:1px solid var(--line); padding:14px; }
-  .story .auc { font-size:28px; font-weight:600; }
-  .story .bar { height:8px; background:#eee; margin:6px 0 10px; }
-  .story .bar i { display:block; height:100%; background:var(--accent); }
-  figure { margin:20px 0; }
-  figure img { width:100%; border:1px solid var(--line); }
-  figcaption { font-size:14px; color:var(--muted); margin-top:6px; }
-  .figs { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
-  .neg li { margin:6px 0; }
-  /* demo */
   .samples { display:flex; flex-wrap:wrap; gap:10px; margin:12px 0; }
-  .samples img { width:110px; height:110px; object-fit:cover; border:2px solid var(--line); cursor:pointer; }
+  .samples img { width:104px; height:104px; object-fit:cover; border:2px solid var(--line); cursor:pointer; }
   .samples img.sel { border-color:var(--accent); }
-  .controls { display:flex; gap:16px; align-items:center; flex-wrap:wrap; margin:12px 0; }
-  .result { display:grid; grid-template-columns:256px 256px 1fr; gap:20px; align-items:start; margin-top:16px; }
-  .result img { width:256px; height:256px; border:1px solid var(--line); image-rendering:pixelated; }
-  .verdict { font-size:34px; font-weight:700; }
-  .verdict.real { color:var(--real); } .verdict.fake { color:var(--fake); }
-  .pbar { height:14px; background:#eee; margin:8px 0; position:relative; }
-  .pbar i { display:block; height:100%; background:var(--fake); }
-  .pbar b { position:absolute; left:50%; top:-4px; width:2px; height:22px; background:#333; }
-  .kv { font-size:15px; } .kv div { margin:4px 0; }
+  .controls { display:flex; gap:14px; align-items:center; flex-wrap:wrap; margin:10px 0; }
   button { font:inherit; padding:6px 14px; border:1px solid var(--accent); background:var(--accent); color:#fff; cursor:pointer; }
-  button[disabled] { opacity:.5; cursor:default; }
-  label.tog { display:flex; gap:6px; align-items:center; cursor:pointer; }
-  #results img { width:128px; height:128px; border:1px solid var(--line); image-rendering:pixelated; display:block; }
-  #results td { vertical-align:middle; }
+  button.secondary { background:#fff; color:var(--accent); } button[disabled] { opacity:.5; cursor:default; }
+  #results tr.row { cursor:pointer; } #results tr.row:hover td { background:#f9f9f9; } #results tr.open td { background:#eef3f8; }
+  #results img { width:72px; height:72px; border:1px solid var(--line); display:block; }
   .v.real { color:var(--real); font-weight:700; } .v.fake { color:var(--fake); font-weight:700; }
-  .summary { font-size:17px; margin:10px 0; }
   .ok { color:var(--real); } .bad { color:var(--fake); }
-  button.secondary { background:#fff; color:var(--accent); }
-  @media (max-width:800px) { .stats,.story,.figs,.result { grid-template-columns:1fr; } }
+  .summary { font-size:17px; margin:8px 0; }
+  /* deep view */
+  .grid { display:grid; gap:18px; } .g2 { grid-template-columns:1fr 1fr; } .g3 { grid-template-columns:1fr 1fr 1fr; } .g4 { grid-template-columns:repeat(4,1fr); }
+  .panel { border:1px solid var(--line); padding:12px; }
+  .panel img { width:100%; border:1px solid var(--line); display:block; image-rendering:pixelated; }
+  .panel .cap { font-size:13px; color:var(--muted); margin-top:6px; }
+  .big { font-size:30px; font-weight:700; } .big.real { color:var(--real); } .big.fake { color:var(--fake); }
+  .pbar { height:12px; background:#eee; position:relative; margin:6px 0; } .pbar i { display:block; height:100%; background:var(--fake); } .pbar b { position:absolute; left:50%; top:-4px; width:2px; height:20px; background:#333; }
+  .legend i { display:inline-block; width:14px; height:14px; border:3px solid; vertical-align:middle; margin-right:6px; }
+  .strip img { image-rendering:pixelated; }
+  .kv td:first-child { color:var(--muted); width:45%; }
+  @media (max-width:900px) { .g2,.g3,.g4 { grid-template-columns:1fr; } }
 </style>
 </head>
 <body>
 <main>
-  <h1>Lightweight CNN for StyleGAN-face detection</h1>
-  <p class="muted">Every number on this page is copied from the repository's README tables; the live panel runs the trained headline model on this laptop; the sections below it are the evidence.</p>
+  <h1>Lightweight CNN for StyleGAN-face detection — live demonstration</h1>
+  <p class="muted">The trained headline model (1,011,521 parameters) runs on this laptop. Select images, run, then click any row to see everything the model did with that image.</p>
 
-  <h2 style="border-top:0;margin-top:24px">Live demonstration</h2>
-  <p class="muted">Select any number of bundled 1024² images (click to toggle) or upload several. The page cuts the centre 256² window of native pixels from each, exactly as at evaluation, and runs the trained model. "Downscale first" shrinks the whole face to 256² instead — the resize pipeline — to show why native pixels matter.</p>
   <div class="samples" id="samples"></div>
   <div class="controls">
     <input type="file" id="file" accept="image/*" multiple>
-    <label class="tog"><input type="checkbox" id="down"> downscale first (1024→512→256)</label>
     <button id="run" disabled>Run selected</button>
     <button id="clear" class="secondary">Clear</button>
     <span class="muted" id="status"></span>
   </div>
   <div id="summary" class="summary"></div>
   <table id="results" style="display:none">
-    <tr><th>image</th><th>model input (256²)</th><th>Grad-CAM</th><th>verdict</th><th>p(fake)</th><th>latency</th><th>ground truth</th></tr>
+    <tr><th>image</th><th>native window → verdict</th><th>p(fake), native</th><th>p(fake), downscaled</th><th>latency</th><th>ground truth</th></tr>
   </table>
 
-  <h2>Claim</h2>
-  <p id="claim"></p>
-  <div class="stats" id="stats"></div>
-  <p class="muted" id="arch"></p>
+  <section id="deep" style="display:none">
+    <h2>Behind the detection: <span id="deep-name"></span></h2>
 
-  <h2>How the accuracy was reached</h2>
-  <div class="story" id="story"></div>
+    <h3>1. What the model was given</h3>
+    <p class="muted legend"><i style="border-color:var(--region)"></i>512² region cached at native pixels &nbsp; <i style="border-color:var(--accent)"></i>256² window the model sees (centre at evaluation; random inside the region during training). Nothing is resized on this path. The right-hand column is the alternative pipeline: the whole face shrunk to 256².</p>
+    <div class="grid g3">
+      <div class="panel"><img id="d-orig"><div class="cap" id="d-orig-cap"></div></div>
+      <div class="panel"><img id="d-win"><div class="cap">native 256² window → <span id="d-pn"></span></div><div class="big" id="d-vn"></div><div class="pbar"><i id="d-bn"></i><b></b></div></div>
+      <div class="panel"><img id="d-dwin"><div class="cap">downscaled 1024→512→256 → <span id="d-pd"></span></div><div class="big" id="d-vd"></div><div class="pbar"><i id="d-bd"></i><b></b></div></div>
+    </div>
 
-  <h2>Comparison with pretrained detectors</h2>
-  <p class="muted" id="cmp-note"></p>
-  <table id="cmp"></table>
-  <div class="figs" id="figs-cmp"></div>
+    <h3>2. What the pixels contain</h3>
+    <p class="muted">High-frequency residual (image minus a 5×5 blur, amplified 4×) and log-spectrum of each view. The fingerprint a generator's upsampling leaves lives here; the resize removes it. Illustration only — the model reads the pixels, not these views.</p>
+    <div class="grid g4">
+      <div class="panel"><img id="d-resn"><div class="cap">native residual · mean |residual| <span id="d-hfn"></span></div></div>
+      <div class="panel"><img id="d-specn"><div class="cap">native spectrum (log |FFT|)</div></div>
+      <div class="panel"><img id="d-resd"><div class="cap">downscaled residual · mean |residual| <span id="d-hfd"></span></div></div>
+      <div class="panel"><img id="d-specd"><div class="cap">downscaled spectrum</div></div>
+    </div>
 
-  <h2>Reproducibility: three seeds</h2>
-  <p class="muted" id="seed-note"></p>
-  <table id="seeds"><tr><th>stem</th><th>seed 42</th><th>seed 43</th><th>seed 44</th><th>mean ± std</th></tr></table>
-  <div class="figs" id="figs-seeds"></div>
+    <h3>3. Inside the network</h3>
+    <p class="muted">Eight channels of the first convolution (what the network extracts from raw pixels) and of the last (<span id="d-last"></span>, the evidence map that is average-pooled into the decision), then Grad-CAM: where the last layer's evidence for "fake" sits on the window.</p>
+    <div class="panel strip"><img id="d-f1"><div class="cap">spatial_conv_1 · 8 of 32 channels · each <span id="d-f1s"></span></div></div>
+    <div class="panel strip"><img id="d-f5"><div class="cap"><span id="d-last2"></span> · 8 of 256 channels · each <span id="d-f5s"></span></div></div>
+    <div class="grid g3"><div class="panel"><img id="d-cam"><div class="cap">Grad-CAM on the native window</div></div></div>
 
-  <h2>Quantization</h2>
-  <p class="muted" id="q-note"></p>
-  <table id="quant"></table>
-  <p id="q-reading"></p>
+    <h3>4. Is the decision stable?</h3>
+    <p class="muted">The same image, probed. Window position: five 256² windows from the 512² region. JPEG: the native window re-encoded at quality 95 and 75 before scoring. Downscaling is the one change that should move it.</p>
+    <div class="grid g2">
+      <table class="kv" id="d-win-tab"></table>
+      <table class="kv" id="d-probe-tab"></table>
+    </div>
 
-  <h2>What did not work, and what was corrected</h2>
-  <ul class="neg" id="neg"></ul>
+    <h3>5. Cost</h3>
+    <table class="kv" id="d-cost"></table>
+  </section>
 
+  <h2>The model</h2>
+  <p class="muted" id="m-note"></p>
+  <table id="model"><tr><th>layer</th><th>type</th><th>output shape</th><th>parameters</th></tr></table>
 </main>
 <script>
 const $ = s => document.querySelector(s);
-const fmt = v => typeof v === 'number' ? v.toFixed(4) : v;
+let items = [], results = [];
+const refresh = () => { $('#run').disabled = !items.length; $('#status').textContent = items.length ? `${items.length} selected` : ''; };
 
-fetch('/data.json').then(r => r.json()).then(d => {
-  $('#claim').textContent = d.claim;
-  $('#stats').innerHTML = d.headline.stats.map(s => `<div class="stat"><div class="l">${s.label}</div><div class="v">${s.value}</div><div class="s">${s.sub}</div></div>`).join('');
-  $('#arch').textContent = `Architecture: ${d.headline.architecture} Input: ${d.headline.input}.`;
-  $('#story').innerHTML = d.story.map(s => `<div class="card"><div class="muted">${s.step}</div><div class="auc">${fmt(s.auc)}</div><div class="bar"><i style="width:${Math.max(2,(s.auc-0.95)/0.05*100)}%"></i></div><div>${s.text}</div></div>`).join('');
-  $('#cmp-note').textContent = d.comparison.note;
-  $('#cmp').innerHTML = '<tr>' + d.comparison.columns.map(c => `<th>${c}</th>`).join('') + '</tr>' +
-    d.comparison.rows.map((r,i) => `<tr class="${i===0?'hl':''}">` + r.map(c => `<td>${c}</td>`).join('') + '</tr>').join('');
-  const fig = f => `<figure><img src="/figures/${f.file}" alt="${f.file}"><figcaption>${f.caption}</figcaption></figure>`;
-  const F = Object.fromEntries(d.figures.map(f => [f.file, f]));
-  $('#figs-cmp').innerHTML = fig(F['efficiency_scatter.png']) + fig(F['efficiency_bars.png']);
-  $('#seed-note').textContent = d.seeds.note;
-  $('#seeds').innerHTML += d.seeds.rows.map(r => '<tr>' + r.map(c => `<td>${c}</td>`).join('') + '</tr>').join('');
-  $('#figs-seeds').innerHTML = fig(F['seeds.png']) + fig(F['curves_overlay.png']);
-  $('#q-note').textContent = d.quantization.note;
-  $('#quant').innerHTML = '<tr>' + d.quantization.columns.map(c => `<th>${c}</th>`).join('') + '</tr>' +
-    d.quantization.rows.map(r => `<tr class="${r[0]==='this model'?'hl':''}">` + r.map(c => `<td>${c}</td>`).join('') + '</tr>').join('');
-  $('#q-reading').textContent = d.quantization.reading;
-  $('#neg').innerHTML = d.negatives.map(n => `<li><b>${n.what}.</b> ${n.result}</li>`).join('');
+fetch('/model.json').then(r => r.json()).then(m => {
+  $('#m-note').textContent = `${m.total_params.toLocaleString()} parameters. Five 3×3 convolution blocks with max-pooling, global average pooling, Dense 128, Dropout 0.4, sigmoid. Trained from scratch; no pretraining, no batch norm, no FFT branch.`;
+  $('#model').innerHTML += m.layers.map(l => `<tr><td>${l.layer}</td><td>${l.type}</td><td>${l.shape}</td><td>${l.params.toLocaleString()}</td></tr>`).join('');
 });
-
-let items = [];   // {name, blob, truth, el}
-const refresh = () => { $('#run').disabled = items.length === 0; $('#status').textContent = items.length ? `${items.length} selected` : ''; };
 fetch('/samples.json').then(r => r.json()).then(list => {
   $('#samples').innerHTML = list.map(s => `<img src="${s.url}" data-cls="${s.cls}" data-name="${s.file}" title="${s.cls}: ${s.file}">`).join('');
   document.querySelectorAll('#samples img').forEach(img => img.onclick = async () => {
@@ -141,33 +117,55 @@ fetch('/samples.json').then(r => r.json()).then(list => {
   });
 });
 $('#file').onchange = e => { for (const f of e.target.files) items.push({name: f.name, blob: f, truth: null, el: null, thumb: URL.createObjectURL(f)}); refresh(); };
-$('#clear').onclick = () => { items = []; document.querySelectorAll('#samples img').forEach(i => i.classList.remove('sel')); $('#results').style.display = 'none'; $('#summary').textContent = ''; refresh(); };
+$('#clear').onclick = () => { items = []; results = []; document.querySelectorAll('#samples img').forEach(i => i.classList.remove('sel')); $('#results').style.display = 'none'; $('#deep').style.display = 'none'; $('#summary').textContent = ''; refresh(); };
+
+const verdict = p => p > 0.5 ? 'fake' : 'real';
+function showDeep(k) {
+  const it = items[k], j = results[k]; if (!j) return;
+  document.querySelectorAll('#results tr.row').forEach((r, i) => r.classList.toggle('open', i === k));
+  $('#deep').style.display = ''; $('#deep-name').textContent = it.name + (it.truth ? ` (ground truth: ${it.truth})` : '');
+  $('#d-orig').src = j.original; $('#d-orig-cap').textContent = `original ${j.input_size[0]}×${j.input_size[1]} px`;
+  for (const [k2, v] of [['n', j.native], ['d', j.downscaled]]) {
+    $('#d-' + (k2 === 'n' ? 'win' : 'dwin')).src = v.window;
+    $('#d-p' + k2).textContent = `p(fake) = ${v.p_fake.toFixed(4)}`;
+    const ve = $('#d-v' + k2); ve.textContent = verdict(v.p_fake).toUpperCase(); ve.className = 'big ' + verdict(v.p_fake);
+    $('#d-b' + k2).style.width = (v.p_fake * 100) + '%';
+    $('#d-res' + k2).src = v.residual; $('#d-hf' + k2).textContent = v.highfreq; $('#d-spec' + k2).src = v.spectrum;
+  }
+  $('#d-f1').src = j.features.conv1; $('#d-f1s').textContent = j.features.conv1_shape.join('×');
+  $('#d-f5').src = j.features.conv5; $('#d-f5s').textContent = j.features.conv5_shape.join('×');
+  $('#d-last').textContent = j.features.last_layer; $('#d-last2').textContent = j.features.last_layer;
+  $('#d-cam').src = j.native.gradcam;
+  const row = (k3, v) => `<tr><td>${k3}</td><td class="v ${verdict(v)}">${v.toFixed(4)} → ${verdict(v)}</td></tr>`;
+  $('#d-win-tab').innerHTML = '<tr><th colspan="2">window position (256² inside the 512² region)</th></tr>' + Object.entries(j.probes.windows).map(([k3, v]) => row(k3, v)).join('');
+  $('#d-probe-tab').innerHTML = '<tr><th colspan="2">same window, perturbed</th></tr>' + row('native, as is', j.native.p_fake) + Object.entries(j.probes.jpeg).map(([q, v]) => row(`JPEG quality ${q}`, v)).join('') + row('downscaled (1024→512→256)', j.downscaled.p_fake);
+  $('#d-cost').innerHTML = `<tr><td>latency, fp32, this CPU</td><td>${j.latency_ms} ms (median of 20)</td></tr>` + (j.int8 ? `<tr><td>latency, int8 model</td><td>${j.int8.latency_ms} ms · p(fake) = ${j.int8.p_fake.toFixed(4)}</td></tr>` : '') + `<tr><td>parameters</td><td>1,011,521 (4.05 MB fp32)</td></tr>`;
+  $('#deep').scrollIntoView({behavior: 'smooth', block: 'start'});
+}
 
 $('#run').onclick = async () => {
-  const mode = $('#down').checked ? 'downscaled' : 'native';
   const tbl = $('#results'); tbl.style.display = ''; [...tbl.querySelectorAll('tr')].slice(1).forEach(r => r.remove());
-  $('#summary').textContent = ''; $('#run').disabled = true;
+  $('#summary').textContent = ''; $('#deep').style.display = 'none'; $('#run').disabled = true; results = [];
   let correct = 0, judged = 0, lat = [];
   for (const [k, it] of items.entries()) {
     $('#status').textContent = `running ${k + 1} / ${items.length}…`;
-    const r = await fetch('/predict?mode=' + mode, {method: 'POST', body: it.blob});
-    const j = await r.json();
-    const row = tbl.insertRow();
-    if (j.error) { row.innerHTML = `<td colspan="7">${it.name}: error — ${j.error}</td>`; continue; }
-    const fake = j.p_fake > 0.5, verdict = fake ? 'fake' : 'real';
-    let truthCell = 'unknown (uploaded)';
-    if (it.truth) { judged++; const ok = it.truth === verdict; if (ok) correct++; truthCell = `${it.truth} <span class="${ok ? 'ok' : 'bad'}">${ok ? '✓' : '✗'}</span>`; }
+    const j = await (await fetch('/predict', {method: 'POST', body: it.blob})).json();
+    results[k] = j.error ? null : j;
+    const tr = tbl.insertRow(); tr.className = 'row';
+    if (j.error) { tr.innerHTML = `<td colspan="6">${it.name}: error — ${j.error}</td>`; continue; }
+    const vn = verdict(j.native.p_fake); let truth = 'unknown (uploaded)';
+    if (it.truth) { judged++; const ok = it.truth === vn; if (ok) correct++; truth = `${it.truth} <span class="${ok ? 'ok' : 'bad'}">${ok ? '✓' : '✗'}</span>`; }
     lat.push(j.latency_ms);
-    row.innerHTML = `<td><img src="${it.thumb}" title="${it.name}"><div class="muted" style="font-size:12px">${it.name}</div></td>
-      <td><img src="${j.window}"></td><td><img src="${j.gradcam}"></td>
-      <td class="v ${verdict}">${verdict.toUpperCase()}</td><td>${j.p_fake.toFixed(4)}</td>
-      <td>${j.latency_ms} ms${j.int8 ? `<div class="muted">int8: ${j.int8.latency_ms} ms, p=${j.int8.p_fake.toFixed(3)}</div>` : ''}</td>
-      <td>${truthCell}</td>`;
+    tr.innerHTML = `<td><img src="${it.thumb}"><span class="muted" style="font-size:12px">${it.name}</span></td>
+      <td><img src="${j.native.window}" style="display:inline-block;vertical-align:middle;margin-right:10px"><span class="v ${vn}">${vn.toUpperCase()}</span></td>
+      <td>${j.native.p_fake.toFixed(4)}</td><td>${j.downscaled.p_fake.toFixed(4)} <span class="muted">(${verdict(j.downscaled.p_fake)})</span></td>
+      <td>${j.latency_ms} ms</td><td>${truth}</td>`;
+    tr.onclick = () => showDeep(k);
   }
-  const med = lat.length ? lat.sort((a,b)=>a-b)[Math.floor(lat.length/2)] : null;
-  $('#summary').innerHTML = (judged ? `<b>${correct} of ${judged}</b> correct on labelled images` : `${items.length} images scored`) +
-    (med !== null ? ` · median latency ${med} ms per image on this CPU (fp32)` : '') + ` · mode: ${mode}`;
+  const med = lat.length ? lat.sort((a, b) => a - b)[Math.floor(lat.length / 2)] : null;
+  $('#summary').innerHTML = (judged ? `<b>${correct} of ${judged}</b> correct on labelled images (native window)` : `${items.length} images scored`) + (med !== null ? ` · median latency ${med} ms per image on this CPU (fp32)` : '') + ` · click a row for the full analysis`;
   $('#status').textContent = ''; $('#run').disabled = false;
+  if (results.length === 1 && results[0]) showDeep(0);
 };
 </script>
 </body>
