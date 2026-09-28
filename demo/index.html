@@ -69,7 +69,7 @@
     </div>
 
     <h3>2. What the pixels contain</h3>
-    <p class="muted">High-frequency residual (image minus a 5×5 blur, amplified 4×) and log-spectrum of each view. The fingerprint a generator's upsampling leaves lives here; the resize removes it. Illustration only — the model reads the pixels, not these views.</p>
+    <p class="muted">High-frequency residual (image minus a 5×5 blur, amplified 4×) and log-spectrum of each view. The native window shows the fine pixel structure the model reads; the downscaled view has been through an interpolation that replaces it. The <em>amount</em> of fine detail is not the signal — a shrunk whole face packs more edges per pixel than a skin patch, and the dataset audit found high-frequency energy does not separate real from fake (AUC 0.55). What differs is the structure. Illustration only; the model reads the pixels, not these views.</p>
     <div class="grid g4">
       <div class="panel"><img id="d-resn"><div class="cap">native residual · mean |residual| <span id="d-hfn"></span></div></div>
       <div class="panel"><img id="d-specn"><div class="cap">native spectrum (log |FFT|)</div></div>
