@@ -516,6 +516,7 @@ input, where the frequencies it was designed for have not been resized away.
 | test22_sg2_crop_wang_aug | headline with Wang et al. 2020's augmentation, from scratch | same | **0.5 — never learned**; 16 epochs at chance, early-stopped. Heavy blur+JPEG erase the signal a from-scratch model bootstraps on (2026-09-27) | 0.5 | `experiments/test22_sg2_crop_wang_aug/` |
 | test22b_wang_aug_from_headline | Wang aug, warm-started from the headline (`init_from`) | same | 0.9997 (acc 0.993); SG3-R 0.772 vs 0.742 | 0.9999 (best 12–37, stopped 39) | `experiments/test22b_wang_aug_from_headline/` |
 | test23c_sg2_sg1_crop_bn | two generators (12.5k SG2 + 12.5k SG1), batch norm | FFHQ + SG2 + SG1 | 0.9999 (acc 0.992) on the mixed split; SG3-R 0.777 | 0.99996 (best 52, stopped 67; unstable val) | `experiments/test23c_sg2_sg1_crop_bn/` |
+| test25_online_kd_effnet | online distillation from EfficientNet-B0, from scratch | same as headline | 0.9987 (acc 0.985); SG3-R 0.666 — **worse** | 0.9986 (best 58, VM lost at 66, finalized) | `experiments/test25_online_kd_effnet/` |
 | test21_stride2_stem | headline with a stride-2 first conv (4× fewer MACs) | same | 0.9990 (acc 0.984); 0.9988 ± 0.0002 over three seeds | 0.9983 (best epoch 129; ran to the 150 cap, plateaued from ~125) | `experiments/test21_stride2_stem/` |
 | test17_sg2 | headline, resize pipeline (1024→512→256) | same | 0.9636 (acc 0.90) | 0.9645 (best epoch 89 of 104, early-stopped) | `experiments/test17_sg2/` |
 | test17_sg2_no_fft | ablation — FFT branch removed | same | 0.9527 (acc 0.88) | 0.9503 (best epoch 114, killed at 116 while grinding) | `experiments/test17_sg2_no_fft/` |
@@ -609,8 +610,8 @@ here before SG3-T is touched.
 | test23_sg2_sg1_crop | two generators, 12.5k SG2 + 12.5k SG1, crop pipeline, from scratch | 0.5 | — | — | never learned: 16 epochs at chance (like test22) |
 | test23c_sg2_sg1_crop_bn | same, with batch norm (needed to start) | 0.9999 (SG1+SG2 split) | **0.777** | 0.089 | +0.035: same size as the augmentation's gain. Two related generators do not yield StyleGAN3-transferable features. Val AUC swung 0.5–0.9999 between epochs (BN running stats on a bimodal fake set); best-epoch checkpoint used |
 | test24_sg2_crop_scale_aug | scale aug [1, 2] | | | | pending |
-| test25_online_kd_effnet | online KD from EfficientNet-B0, from scratch | | | | running 2026-09-27: at chance for 5 epochs, then climbing (val 0.88 at epoch 11) |
-| test25b_online_kd_from_headline | online KD from EfficientNet-B0, warm-started from the headline | | | | in reserve (config written) |
+| test25_online_kd_effnet | online KD from EfficientNet-B0 (T=2, α=0.7, consistent views), from scratch | 0.9987 | **0.666** | 0.033 | **−0.08: worse than hard labels.** The student copies the teacher's decisions on SG2 images (all near 0/1), not the ImageNet representation behind them — it becomes *more* SG2-specific (Ojha et al. 2023). Best epoch 58 of 66 (VM lost; finalized from best weights) |
+| test25b_online_kd_from_headline | same, warm-started from the headline | | | | not run: the from-scratch result answers the question |
 
 **The pretrained baselines transfer; this model does not (2026-09-24).** Same held-out
 set, same pipeline, same code path: EfficientNet-B0 ranks StyleGAN3 fakes at 0.993 AUC

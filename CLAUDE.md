@@ -130,8 +130,11 @@ branch, native-resolution 256² crops. Test AUC 0.9998 ± 0.0002 over three seed
    forward; a small one pulls (3) forward. test22c stays in the queue.
    **test23c result 2026-09-27: SG3-R 0.777 (+0.035), SG2+SG1 test 0.9999.** Small
    gain → (3) online distillation: test25 from scratch sat at chance for 5 epochs then
-   STARTED (val 0.88 at epoch 11) — let it run; `test25b_online_kd_from_headline.yaml`
-   (init_from the headline; distill path now honours `init_from`) is in reserve (needs the headline cache synced +
+   STARTED, best epoch 58, VM lost at 66, finalized from best weights. **Result
+   2026-09-28: SG2 0.9987, SG3-R 0.666 — WORSE than the headline (0.742).** Copies the
+   teacher's decisions, not its representation. test25b not needed. NEXT: test24 scale
+   aug (targets the downscaled-input failure, a separate axis), then stacking Wang aug
+   on test23c, then BN-only headline, then quantization (needs the headline cache synced +
    `test20_crop_baselines/baselines/efficientnet_b0/model.keras`, on Drive). Then
    test24 scale aug, then stacking (Wang aug from test23c), then the BN-only headline
    for attribution, then quantization.

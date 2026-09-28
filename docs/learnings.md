@@ -276,6 +276,14 @@ the README says how things *are*, this says how we found out.
   is fine, but BN is not a recipe to deploy without lowering its momentum or the LR.
   Two levers, two small gains: the missing ingredient is representational (pretrained
   features), which is what online distillation (test25) tests next.
+- **2026-09-28 — Online distillation from EfficientNet-B0: SG2 0.9987, SG3-R 0.666 —
+  WORSE than hard labels (0.742).** Consistent views fixed the in-distribution loss
+  (0.9987 vs test18's 0.923) but transferred no generalisation: the teacher's outputs
+  on SG2 images are ~0/1, so the student learns its decisions, not the ImageNet
+  representation that makes those decisions transfer. It ends up more SG2-specific.
+  This is Ojha et al. 2023's point from the other side: generalisation lives in the
+  features, and features are not in the logits. Third lever, and the only negative
+  one: +0.03 (aug), +0.035 (two generators), −0.08 (distillation).
 - **Latency needs no training; accuracy does.** The efficiency half of the comparison
   can be measured before any baseline is fine-tuned.
 - **Published detectors zero-shot measure generalisation, not architecture.** CNNDetection
