@@ -284,6 +284,13 @@ the README says how things *are*, this says how we found out.
   This is Ojha et al. 2023's point from the other side: generalisation lives in the
   features, and features are not in the logits. Third lever, and the only negative
   one: +0.03 (aug), +0.035 (two generators), −0.08 (distillation).
+- **2026-09-28 — Scale augmentation (windows at 1× and ½×): downscaled-input AUC 0.556 →
+  0.746, native 0.9998 → 0.9982, SG3-R 0.742 → 0.715.** The lever fixes what it targets
+  and nothing else: scale robustness and generator generalisation are separate axes.
+  Trained at half scale, probed at quarter scale (cache_size 512 cannot hold ¼×), so a
+  partial recovery was the expectation. Quarter-scale training needs a 1024² cache.
+  Four levers done: +0.03 / +0.035 / −0.08 / −0.03 on SG3-R — the from-scratch 1M
+  model's StyleGAN3 ceiling is representational, not a training-recipe problem.
 - **Latency needs no training; accuracy does.** The efficiency half of the comparison
   can be measured before any baseline is fine-tuned.
 - **Published detectors zero-shot measure generalisation, not architecture.** CNNDetection

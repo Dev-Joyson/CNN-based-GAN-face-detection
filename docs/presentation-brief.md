@@ -80,8 +80,9 @@ Dense 128, Dropout 0.4, sigmoid. Native-resolution 256² crops, no resize.
 - Wang 2020 augmentation from scratch: never learned. Warm-started from the headline: SG3-R 0.742 → 0.772 (small, real).
 - Two generators (SG1+SG2) needed batch norm to start training (test23c): SG3-R 0.742 → 0.777 (small, same size as the augmentation's).
 - Online distillation from EfficientNet-B0 (test25, consistent views): SG2 0.9987 but SG3-R **0.666 — worse than hard labels**. The student copies decisions, not the ImageNet representation (Ojha 2023).
-- Scale augmentation (test24) and int8 quantization of all four: not yet run.
-- Three levers so far: +0.03, +0.035, −0.08 on SG3-R. Reading: at 1M params from scratch, generalisation to StyleGAN3 is not recoverable by training tricks; the gap is representational.
+- Scale augmentation (test24): downscaled-input probe 0.556 → **0.746** (the lever's target), native 0.9982, SG3-R 0.715. Scale robustness and generalisation are separate axes.
+- All four levers done: +0.03, +0.035, −0.08, −0.03 on SG3-R. Reading: at 1M params from scratch, generalisation to StyleGAN3 is not recoverable by training tricks; the gap is representational.
+- Still to run: test26 (Wang aug stacked on the two-generator model), int8 quantization of all four.
 - Selection set = StyleGAN3-R; final test = StyleGAN3-T, scored once.
 
 ## Do not rewrite the proposal
