@@ -43,7 +43,8 @@ A 1.01M-parameter CNN trained from scratch matches ImageNet-pretrained detectors
 detection, at the lowest latency and among the lowest memory of the four,
 measured on the identical task, same GPU, same session — and its cost is
 generalisation: 0.70 on an unseen generator where the pretrained models score
-0.96–0.99. (Edge deployment was dropped from the scope by the panel; the claim
+0.96–0.99. (CPU: on TFLite, MobileNet is faster at fp32 — 1.30 vs 5.04 ms; ours is
+the fastest model that survives post-training int8 — 1.76 ms.) (Edge deployment was dropped from the scope by the panel; the claim
 is resource comparison.)
 
 ## The numbers (as of 2026-09-28; README is authoritative)
@@ -83,7 +84,8 @@ Dense 128, Dropout 0.4, sigmoid. Native-resolution 256² crops, no resize.
 - Scale augmentation (test24): downscaled-input probe 0.556 → **0.746** (the lever's target), native 0.9982, SG3-R 0.715. Scale robustness and generalisation are separate axes.
 - All four levers done: +0.03, +0.035, −0.08, −0.03 on SG3-R. Reading: at 1M params from scratch, generalisation to StyleGAN3 is not recoverable by training tricks; the gap is representational.
 - Stacked levers (test26, Wang aug on the two-generator BN model): SG3-R 0.704 — below both parents; the gains do not add. **Lever phase closed: six runs in 0.67–0.78 on SG3-R vs reference 0.742; pretrained baselines 0.96–0.99.**
-- Still to run: int8 quantization of all four (CPU latency, size, accuracy at equal precision).
+- **Quantization (done 2026-09-28) — and a CORRECTION to the CPU claim.** On TFLite (the device runtime), MobileNet fp32 is 1.30 ms vs ours 5.04: MobileNet is the faster CPU model; the README's earlier CPU column (18.7 vs 6.4) measured TensorFlow's CPU path, not the models. Say this on the slide as a correction, with the reason. GPU claim unchanged (0.97 vs 4.81). Our CPU point: post-training full int8 works on our plain convs (1.76 ms, 1.04 MB, SG2 accuracy intact) and collapses MobileNet and EfficientNet to chance (need quantization-aware training). Int8 costs our SG3-T transfer (0.703 → 0.641).
+- **All experiments are complete.** Regenerate figures once more before the talk.
 - Selection set = StyleGAN3-R; final test = StyleGAN3-T, scored once.
 
 ## Do not rewrite the proposal

@@ -300,6 +300,16 @@ the README says how things *are*, this says how we found out.
   The from-scratch 1M model's StyleGAN3 ceiling is representational. Future work, with
   a mechanism each: a generator from a different family (diffusion; Corvi et al. 2023),
   a forensic residual first layer (Bayar & Stamm 2018; NPR, Tan et al. CVPR 2024).
+- **2026-09-28 — The CPU column measured TensorFlow's CPU path, not the models.** On
+  TFLite/XNNPACK, MobileNetV3-Small fp32 runs in 1.30 ms vs this model's 5.04; TensorFlow
+  had given it 18.7 vs 6.4. Depthwise convolutions are what XNNPACK is built for and what
+  TF's CPU kernels handle badly. The GPU ranking (0.97 vs 4.81, one runtime, fp32) stands;
+  the CPU claim is withdrawn and re-labelled. Lesson, the third time: a latency is a
+  (model, runtime, hardware) triple, never a model property. Second lesson: post-training
+  int8 works on plain 3×3 convs (ours 1.76 ms, Xception fine) and collapses hard-swish /
+  squeeze-excite models to chance (MobileNet, EfficientNet) — the honest "why not compress
+  EfficientNet" answer is: not without quantization-aware retraining. Third: int8 costs
+  this model its weak SG3 transfer (0.703 → 0.641) but not its SG2 accuracy.
 - **Latency needs no training; accuracy does.** The efficiency half of the comparison
   can be measured before any baseline is fine-tuned.
 - **Published detectors zero-shot measure generalisation, not architecture.** CNNDetection

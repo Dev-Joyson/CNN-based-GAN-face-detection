@@ -388,7 +388,7 @@ network reaching parity with fine-tuned ImageNet backbones on the same task, and
 EfficientNet / Xception at equal or fewer parameters. Whether the baselines share the
 StyleGAN3-T generalisation gap is the open question (`heldout.py --model <baseline>`, written, unrun).
 
-| model | params | MACs @256² | **ms @ bs=1, L4** | ms @ bs=1, CPU | img/s @144 | peak MB @ bs=1 (re-measured 2026-09-24) | test AUC, SG2 (resize) | test AUC, SG2 (**crop**) |
+| model | params | MACs @256² | **ms @ bs=1, L4** | ms @ bs=1, CPU (TensorFlow path — see *Quantization* below; on TFLite MobileNet is 1.30 ms, this model 5.04) | img/s @144 | peak MB @ bs=1 (re-measured 2026-09-24) | test AUC, SG2 (resize) | test AUC, SG2 (**crop**) |
 |---|---|---|---|---|---|---|---|---|
 | **this model, native crops, no FFT (headline)** | 1.01M | 1.11G | **1.02** | **8.4** | 2,098 | 171 | — | **0.9996** |
 | this model, **stride-2 stem** (test21) | 1.01M | **0.28G** | 0.97 | **4.0** (6.4 for the headline, same session) | **5,547** | **158** | — | 0.9990 (acc 0.98) |
@@ -670,6 +670,53 @@ provenance to be recorded under *Data*); `test24_sg2_crop_scale_aug.yaml` (`scal
 `test25_online_kd_effnet.yaml` (`distill.online: true` — teacher and student see the
 same augmented batch, the corrected version of the failed offline test18). All at the
 headline's latency and memory by construction.
+
+### Quantization, and what the CPU runtime does to the CPU column
+
+```bash
+python quantize.py --config configs/test19_sg2_crop_no_fft.yaml --fake-dir "/content/drive/MyDrive/Fake(SG3-T-psi1)" --tag sg3t
+python quantize.py --config configs/test20_crop_baselines.yaml --model efficientnet_b0 --n-eval 2000 --fake-dir "…/Fake(SG3-T-psi1)" --tag sg3t
+```
+
+Post-training TFLite conversion at three precisions, one Xeon session, 12 threads,
+XNNPACK, 2026-09-28. `int8 weights` = dynamic range (no calibration); `int8 full` =
+weights + activations, calibrated on 200 test images. Baselines scored on 2,000 test
+images (`--n-eval`); headline on all 7,500.
+
+| model | precision | file | **CPU ms, TFLite** | SG2 test AUC | SG3-T AUC |
+|---|---|---|---|---|---|
+| **this model (headline)** | fp32 | 4.05 MB | 5.04 | 0.9996 | 0.703 |
+| | int8 weights | 1.03 MB | 3.01 | 0.9997 | 0.701 |
+| | int8 full | 1.04 MB | **1.76** | 0.9995 | 0.641 |
+| MobileNetV3-Small | fp32 | 4.02 MB | **1.30** | 1.0 | 0.958 |
+| | int8 weights | 1.18 MB | 13.2 | 1.0 | 0.946 |
+| | int8 full | 1.29 MB | 52 (builtin kernels; XNNPACK refused hard-swish) | **0.55 — broken** | 0.51 |
+| EfficientNet-B0 | fp32 | 16.7 MB | 7.49 | 1.0 | 0.993 |
+| | int8 weights | 4.71 MB | 31.2 | 0.9999 | 0.988 |
+| | int8 full | 5.07 MB | 4.33 | **0.58 — broken** | 0.52 |
+| Xception | fp32 | 84.2 MB | 28.9 | 1.0 | 0.967 |
+| | int8 weights | 21.8 MB | 65.4 | 1.0 | 0.966 |
+| | int8 full | 22.4 MB | 39.6 | 1.0 | 0.924 |
+
+**Correction to the CPU column above (2026-09-28).** The `ms @ bs=1, CPU` column in the
+efficiency table was measured through TensorFlow's CPU execution path, which handles
+depthwise convolutions badly: it gave MobileNet 18.7 ms. On TFLite with XNNPACK — the
+runtime a device would actually use — MobileNet's fp32 runs in **1.30 ms against this
+model's 5.04**. The earlier column measured the runtime as much as the model. It stays
+in the table as "TensorFlow CPU path", and this table is the CPU comparison. Where the
+claim stands after this: **fastest on GPU** (0.97 vs 4.81 ms, unchanged; same fp32
+runtime for all four); **on CPU, MobileNet is 4× faster at fp32**; the one CPU point in
+this model's favour is that post-training full-int8 works on its plain convolutions
+(1.76 ms, accuracy intact) and breaks both mobile architectures (hard-swish and
+squeeze-excite need quantization-aware training) — so it is the fastest *working*
+int8 model here, and 4× smaller than its own fp32. Ma et al. (ShuffleNetV2, ECCV 2018)
+warned that MACs and latency diverge by platform; this is that, measured twice.
+
+Two more things the table says: dynamic-range int8 is slower than fp32 on every model
+but ours under XNNPACK (the dequantize-on-the-fly cost outweighs the smaller weights);
+and full int8 costs this model its weak StyleGAN3 transfer (0.703 → 0.641) while its
+StyleGAN2 accuracy is untouched — the fingerprint survives quantization, the
+generalisation signal does not.
 
 ## Is the dataset honest?
 
