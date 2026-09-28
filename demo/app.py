@@ -41,7 +41,7 @@ os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 import tensorflow as tf                                   # noqa: E402
 from PIL import Image                                     # noqa: E402
 
-from evaluate import compute_gradcam, last_spatial_conv, overlay   # noqa: E402
+from evaluate import last_spatial_conv, overlay   # noqa: E402
 from model import build_model, eval_view, feathered_ellipse, load_and_resize, load_config   # noqa: E402
 from predict import preprocess                            # noqa: E402
 from PIL import ImageDraw                                 # noqa: E402
@@ -99,6 +99,21 @@ class Engine:
     def _p(self, x):
         return float(self.infer(x).numpy()[0, 0])
 
+    def _gradcam(self, x, for_fake):
+        """Grad-CAM for the model's VERDICT: evidence for 'fake' when it says fake,
+        evidence for 'real' (the negated output) when it says real. evaluate.py's
+        version maps evidence for 'fake' only, which is flat on a confident real."""
+        grad_model = tf.keras.models.Model(self.model.inputs,
+                                           [self.model.get_layer(self.layer).output, self.model.output])
+        with tf.GradientTape() as tape:
+            conv_out, preds = grad_model(x)
+            target = preds[:, 0] if for_fake else 1.0 - preds[:, 0]
+        grads = tape.gradient(target, conv_out)
+        pooled = tf.reduce_mean(grads, axis=(0, 1, 2))
+        heat = tf.reduce_sum(conv_out[0] * pooled, axis=-1)
+        heat = tf.maximum(heat, 0)
+        return (heat / (tf.reduce_max(heat) + 1e-8)).numpy()
+
     @staticmethod
     def _gray(x):                                   # (1,H,W,3) float -> (H,W) numpy
         return tf.image.rgb_to_grayscale(x)[0, ..., 0].numpy()
@@ -153,7 +168,7 @@ class Engine:
             t0 = time.perf_counter(); p = self._p(xn); times.append((time.perf_counter() - t0) * 1e3)
         p_down = self._p(xd)
 
-        heat = compute_gradcam(self.model, xn, self.layer)
+        heat = self._gradcam(xn, for_fake=p > 0.5)
         f1, f5 = self.feat(xn)
         strip1, shape1 = self._feature_strip(f1); strip5, shape5 = self._feature_strip(f5)
         res_n, hf_n = self._residual(xn); res_d, hf_d = self._residual(xd)
@@ -175,6 +190,7 @@ class Engine:
         out = {"input_size": [w, h], "original": original,
                "native": {"p_fake": round(p, 4), "window": self._png(xn[0].numpy()),
                           "gradcam": self._png(overlay(xn[0].numpy(), heat)),
+                          "gradcam_for": "fake" if p > 0.5 else "real",
                           "residual": res_n, "highfreq": hf_n, "spectrum": self._spectrum(xn)},
                "downscaled": {"p_fake": round(p_down, 4), "window": self._png(xd[0].numpy()),
                               "residual": res_d, "highfreq": hf_d, "spectrum": self._spectrum(xd)},

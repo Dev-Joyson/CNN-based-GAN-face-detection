@@ -75,10 +75,10 @@
     </div>
 
     <h3>2. Inside the network</h3>
-    <p class="muted">Eight channels of the first convolution (what the network extracts from raw pixels) and of the last (<span id="d-last"></span>, the evidence map that is average-pooled into the decision), then Grad-CAM: where the last layer's evidence for "fake" sits on the window.</p>
+    <p class="muted">Eight channels of the first convolution (what the network extracts from raw pixels) and of the last (<span id="d-last"></span>, the evidence map that is average-pooled into the decision), then Grad-CAM: where the last layer's evidence for the model's verdict sits on the window (evidence for "fake" on an image called fake, for "real" on one called real).</p>
     <div class="panel strip"><img id="d-f1"><div class="cap">spatial_conv_1 · 8 of 32 channels · each <span id="d-f1s"></span></div></div>
     <div class="panel strip"><img id="d-f5"><div class="cap"><span id="d-last2"></span> · 8 of 256 channels · each <span id="d-f5s"></span></div></div>
-    <div class="grid g3"><div class="panel"><img id="d-cam"><div class="cap">Grad-CAM on the native window</div></div></div>
+    <div class="grid g3"><div class="panel"><img id="d-cam"><div class="cap">Grad-CAM on the native window, evidence for "<span id="d-camfor"></span>"</div></div></div>
 
     <h3>3. Is the decision stable?</h3>
     <p class="muted">The same image, probed. Window position: five 256² windows from the 512² region. JPEG: the native window re-encoded at quality 95 and 75 before scoring. Downscaling is the one change that should move it.</p>
@@ -132,7 +132,7 @@ function showDeep(k) {
   $('#d-f1').src = j.features.conv1; $('#d-f1s').textContent = j.features.conv1_shape.join('×');
   $('#d-f5').src = j.features.conv5; $('#d-f5s').textContent = j.features.conv5_shape.join('×');
   $('#d-last').textContent = j.features.last_layer; $('#d-last2').textContent = j.features.last_layer;
-  $('#d-cam').src = j.native.gradcam;
+  $('#d-cam').src = j.native.gradcam; $('#d-camfor').textContent = j.native.gradcam_for;
   const row = (k3, v) => `<tr><td>${k3}</td><td class="v ${verdict(v)}">${v.toFixed(4)} → ${verdict(v)}</td></tr>`;
   $('#d-win-tab').innerHTML = '<tr><th colspan="2">window position (256² inside the 512² region)</th></tr>' + Object.entries(j.probes.windows).map(([k3, v]) => row(k3, v)).join('');
   $('#d-probe-tab').innerHTML = '<tr><th colspan="2">same window, perturbed</th></tr>' + row('native, as is', j.native.p_fake) + Object.entries(j.probes.jpeg).map(([q, v]) => row(`JPEG quality ${q}`, v)).join('') + row('downscaled (1024→512→256)', j.downscaled.p_fake);
