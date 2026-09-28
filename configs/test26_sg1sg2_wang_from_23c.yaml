@@ -1,0 +1,47 @@
+# Test26: the two winning levers stacked. Start from test23c (two generators,
+# batch norm, SG3-R 0.777) and continue under Wang et al. 2020's augmentation
+# (the lever that took the headline 0.742 -> 0.772). Same data and mix as
+# test23c, same cache; batchnorm: true because the loaded weights have BN
+# layers; aug: wang; init_from: test23c. Selection on SG3-R; SG3-T once.
+#
+# Why these two and not distillation: both gained (+0.03, +0.035) by different
+# mechanisms -- diversity changes what is learned, corruption changes how
+# robustly -- so their gains can add; distillation lost (-0.08) for a reason
+# augmentation does not remove. checkpoint: last + patience >= epochs, as in
+# test22c: SG2 val is saturated from epoch 1, so early stopping would measure
+# nothing; the quantity of interest is scored afterwards.
+name: test26_sg1sg2_wang_from_23c
+init_from: test23c_sg2_sg1_crop_bn
+aug: wang
+checkpoint: last
+batchnorm: true
+fft_branch: false
+
+real_dir: "/content/drive/MyDrive/Real(FFHQ)"
+fake_dir:
+  - "/content/drive/MyDrive/Fake(SG2-psi1)"
+  - "/content/drive/MyDrive/Research/Dataset New/FakeSG1"
+fake_mix: [12500, 12500]   # sums to limit_per_class; equal share per generator
+
+mask_mode: none
+limit_per_class: 25000
+
+img_size: 256
+native_size: 512            # unused in crop mode
+input_mode: crop
+cache_size: 512             # centre 512^2 at native pixels; 768 keeps the hair, 1024 everything -- see model.Config
+batch_size: 144
+
+epochs: 30                 # fixed; see header
+lr: 0.0003
+patience: 30               # >= epochs: early stopping off
+seed: 42
+
+crop_frac_min: 0.85
+shuffle_buffer: 8192         # train split is 28000; a full-set buffer would be ~5.5 GB of
+                             # uint8 images in RAM -- too much for a standard Colab runtime.
+                             # Raise toward 28000 on a high-RAM runtime if you want the
+                             # notebook's whole-set shuffle.
+
+cache_dir: "/content/cache"
+out_dir: "/content/drive/MyDrive/Research/experiments"

@@ -133,8 +133,10 @@ branch, native-resolution 256² crops. Test AUC 0.9998 ± 0.0002 over three seed
    STARTED, best epoch 58, VM lost at 66, finalized from best weights. **Result
    2026-09-28: SG2 0.9987, SG3-R 0.666 — WORSE than the headline (0.742).** Copies the
    teacher's decisions, not its representation. test25b not needed. NEXT: test24 scale
-   aug (targets the downscaled-input failure, a separate axis), then stacking Wang aug
-   on test23c, then BN-only headline, then quantization (needs the headline cache synced +
+   aug (targets the downscaled-input failure, a separate axis), then
+   `test26_sg1sg2_wang_from_23c.yaml` (written 2026-09-28: Wang aug warm-started from
+   test23c, 30 fixed epochs, checkpoint last; needs test23's cache), then BN-only
+   headline, then quantization. Distillation+Wang aug: low priority, only if budget (needs the headline cache synced +
    `test20_crop_baselines/baselines/efficientnet_b0/model.keras`, on Drive). Then
    test24 scale aug, then stacking (Wang aug from test23c), then the BN-only headline
    for attribution, then quantization.
