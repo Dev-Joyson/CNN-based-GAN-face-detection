@@ -74,29 +74,20 @@
       <div class="panel"><img id="d-dwin"><div class="cap">downscaled 1024→512→256 → <span id="d-pd"></span></div><div class="big" id="d-vd"></div><div class="pbar"><i id="d-bd"></i><b></b></div></div>
     </div>
 
-    <h3>2. What the pixels contain</h3>
-    <p class="muted">High-frequency residual (image minus a 5×5 blur, amplified 4×) and log-spectrum of each view. The native window shows the fine pixel structure the model reads; the downscaled view has been through an interpolation that replaces it. The <em>amount</em> of fine detail is not the signal: a shrunk whole face packs more edges per pixel than a skin patch, and the dataset audit found high-frequency energy does not separate real from fake (AUC 0.55). What differs is the structure. Illustration only; the model reads the pixels, not these views.</p>
-    <div class="grid g4">
-      <div class="panel"><img id="d-resn"><div class="cap">native residual · mean |residual| <span id="d-hfn"></span></div></div>
-      <div class="panel"><img id="d-specn"><div class="cap">native spectrum (log |FFT|)</div></div>
-      <div class="panel"><img id="d-resd"><div class="cap">downscaled residual · mean |residual| <span id="d-hfd"></span></div></div>
-      <div class="panel"><img id="d-specd"><div class="cap">downscaled spectrum</div></div>
-    </div>
-
-    <h3>3. Inside the network</h3>
+    <h3>2. Inside the network</h3>
     <p class="muted">Eight channels of the first convolution (what the network extracts from raw pixels) and of the last (<span id="d-last"></span>, the evidence map that is average-pooled into the decision), then Grad-CAM: where the last layer's evidence for "fake" sits on the window.</p>
     <div class="panel strip"><img id="d-f1"><div class="cap">spatial_conv_1 · 8 of 32 channels · each <span id="d-f1s"></span></div></div>
     <div class="panel strip"><img id="d-f5"><div class="cap"><span id="d-last2"></span> · 8 of 256 channels · each <span id="d-f5s"></span></div></div>
     <div class="grid g3"><div class="panel"><img id="d-cam"><div class="cap">Grad-CAM on the native window</div></div></div>
 
-    <h3>4. Is the decision stable?</h3>
+    <h3>3. Is the decision stable?</h3>
     <p class="muted">The same image, probed. Window position: five 256² windows from the 512² region. JPEG: the native window re-encoded at quality 95 and 75 before scoring. Downscaling is the one change that should move it.</p>
     <div class="grid g2">
       <table class="kv" id="d-win-tab"></table>
       <table class="kv" id="d-probe-tab"></table>
     </div>
 
-    <h3>5. Cost</h3>
+    <h3>4. Cost</h3>
     <table class="kv" id="d-cost"></table>
   </section>
 
@@ -137,7 +128,6 @@ function showDeep(k) {
     $('#d-p' + k2).textContent = `p(fake) = ${v.p_fake.toFixed(4)}`;
     const ve = $('#d-v' + k2); ve.textContent = verdict(v.p_fake).toUpperCase(); ve.className = 'big ' + verdict(v.p_fake);
     $('#d-b' + k2).style.width = (v.p_fake * 100) + '%';
-    $('#d-res' + k2).src = v.residual; $('#d-hf' + k2).textContent = v.highfreq; $('#d-spec' + k2).src = v.spectrum;
   }
   $('#d-f1').src = j.features.conv1; $('#d-f1s').textContent = j.features.conv1_shape.join('×');
   $('#d-f5').src = j.features.conv5; $('#d-f5s').textContent = j.features.conv5_shape.join('×');
