@@ -82,7 +82,8 @@ Dense 128, Dropout 0.4, sigmoid. Native-resolution 256² crops, no resize.
 - Online distillation from EfficientNet-B0 (test25, consistent views): SG2 0.9987 but SG3-R **0.666 — worse than hard labels**. The student copies decisions, not the ImageNet representation (Ojha 2023).
 - Scale augmentation (test24): downscaled-input probe 0.556 → **0.746** (the lever's target), native 0.9982, SG3-R 0.715. Scale robustness and generalisation are separate axes.
 - All four levers done: +0.03, +0.035, −0.08, −0.03 on SG3-R. Reading: at 1M params from scratch, generalisation to StyleGAN3 is not recoverable by training tricks; the gap is representational.
-- Still to run: test26 (Wang aug stacked on the two-generator model), int8 quantization of all four.
+- Stacked levers (test26, Wang aug on the two-generator BN model): SG3-R 0.704 — below both parents; the gains do not add. **Lever phase closed: six runs in 0.67–0.78 on SG3-R vs reference 0.742; pretrained baselines 0.96–0.99.**
+- Still to run: int8 quantization of all four (CPU latency, size, accuracy at equal precision).
 - Selection set = StyleGAN3-R; final test = StyleGAN3-T, scored once.
 
 ## Do not rewrite the proposal

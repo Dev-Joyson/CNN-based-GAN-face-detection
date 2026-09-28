@@ -519,6 +519,7 @@ input, where the frequencies it was designed for have not been resized away.
 | test23c_sg2_sg1_crop_bn | two generators (12.5k SG2 + 12.5k SG1), batch norm | FFHQ + SG2 + SG1 | 0.9999 (acc 0.992) on the mixed split; SG3-R 0.777 | 0.99996 (best 52, stopped 67; unstable val) | `experiments/test23c_sg2_sg1_crop_bn/` |
 | test25_online_kd_effnet | online distillation from EfficientNet-B0, from scratch | same as headline | 0.9987 (acc 0.985); SG3-R 0.666 — **worse** | 0.9986 (best 58, VM lost at 66, finalized) | `experiments/test25_online_kd_effnet/` |
 | test24_sg2_crop_scale_aug | scale augmentation: training windows at native and half scale | same as headline | 0.9982 (acc 0.982); on downscaled input 0.746 (headline 0.556); SG3-R 0.715 | 0.9985 (best 129, stopped 136) | `experiments/test24_sg2_crop_scale_aug/` |
+| test26_sg1sg2_wang_from_23c | Wang aug on the two-generator BN model (stacked levers) | FFHQ + SG2 + SG1 | 0.9982 on the mixed split; SG3-R 0.704 — worse than either parent | 30 fixed epochs, last weights (epoch 30 val 1.0000; BN swings 0.67–1.0 in between) | `experiments/test26_sg1sg2_wang_from_23c/` |
 | test21_stride2_stem | headline with a stride-2 first conv (4× fewer MACs) | same | 0.9990 (acc 0.984); 0.9988 ± 0.0002 over three seeds | 0.9983 (best epoch 129; ran to the 150 cap, plateaued from ~125) | `experiments/test21_stride2_stem/` |
 | test17_sg2 | headline, resize pipeline (1024→512→256) | same | 0.9636 (acc 0.90) | 0.9645 (best epoch 89 of 104, early-stopped) | `experiments/test17_sg2/` |
 | test17_sg2_no_fft | ablation — FFT branch removed | same | 0.9527 (acc 0.88) | 0.9503 (best epoch 114, killed at 116 while grinding) | `experiments/test17_sg2_no_fft/` |
@@ -614,6 +615,17 @@ here before SG3-T is touched.
 | test24_sg2_crop_scale_aug | scale aug [1, 2], from scratch | 0.9982 | 0.715 | 0.085 | −0.03 on SG3-R, but **downscaled-input probe 0.556 → 0.746**: the lever does what it targets (scale robustness), not generalisation. Trained at half scale, probed at quarter; partial by construction |
 | test25_online_kd_effnet | online KD from EfficientNet-B0 (T=2, α=0.7, consistent views), from scratch | 0.9987 | **0.666** | 0.033 | **−0.08: worse than hard labels.** The student copies the teacher's decisions on SG2 images (all near 0/1), not the ImageNet representation behind them — it becomes *more* SG2-specific (Ojha et al. 2023). Best epoch 58 of 66 (VM lost; finalized from best weights) |
 | test25b_online_kd_from_headline | same, warm-started from the headline | | | | not run: the from-scratch result answers the question |
+| test26_sg1sg2_wang_from_23c | the two positive levers stacked: Wang aug warm-started from test23c, 30 fixed epochs, last weights | 0.9982 (SG1+SG2 split) | **0.704** | 0.079 | **the gains do not add**: below both parents (0.777, 0.772) and the headline. Real-image p_fake rose to 0.07 (headline 0.01): heavy corruption on top of BN's unstable statistics de-calibrates rather than generalises |
+
+**Where the lever phase ends (2026-09-28).** Six runs at fixed architecture and cost:
+0.772, 0.777, 0.666, 0.715, 0.704 on SG3-R against a reference of 0.742, with the
+pretrained baselines at 0.96–0.99. Nothing a from-scratch 1M model can be shown or told
+about StyleGAN2 (or StyleGAN1) moves it more than ±0.04 on StyleGAN3. The gap is in the
+features, and features of that kind come from pretraining. The scale lever earned its
+place on a different axis (downscaled input 0.556 → 0.746). Not run: a generator from a
+different family (diffusion), a forensic first layer (Bayar & Stamm 2018 / NPR) — listed
+as future work with the reasoning in `docs/learnings.md`.
+
 
 **The pretrained baselines transfer; this model does not (2026-09-24).** Same held-out
 set, same pipeline, same code path: EfficientNet-B0 ranks StyleGAN3 fakes at 0.993 AUC

@@ -291,6 +291,15 @@ the README says how things *are*, this says how we found out.
   partial recovery was the expectation. Quarter-scale training needs a 1024² cache.
   Four levers done: +0.03 / +0.035 / −0.08 / −0.03 on SG3-R — the from-scratch 1M
   model's StyleGAN3 ceiling is representational, not a training-recipe problem.
+- **2026-09-28 — Stacking the two positive levers (Wang aug on the two-generator BN
+  model): SG3-R 0.704, below both parents.** Gains of +0.03 from different mechanisms did
+  not add; real-image p_fake rose 0.01 → 0.07, i.e. the model got less calibrated, not
+  more general. BN's epoch-to-epoch instability makes "last weights" a gamble even when
+  the last epoch reads 1.0000 on SG2 val (SG2 val does not see the drift on unseen data).
+  **Lever phase closed: six runs in 0.67–0.78 vs reference 0.742 vs pretrained 0.96–0.99.**
+  The from-scratch 1M model's StyleGAN3 ceiling is representational. Future work, with
+  a mechanism each: a generator from a different family (diffusion; Corvi et al. 2023),
+  a forensic residual first layer (Bayar & Stamm 2018; NPR, Tan et al. CVPR 2024).
 - **Latency needs no training; accuracy does.** The efficiency half of the comparison
   can be measured before any baseline is fine-tuned.
 - **Published detectors zero-shot measure generalisation, not architecture.** CNNDetection

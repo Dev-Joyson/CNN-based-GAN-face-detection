@@ -135,10 +135,13 @@ branch, native-resolution 256² crops. Test AUC 0.9998 ± 0.0002 over three seed
    teacher's decisions, not its representation. test25b not needed. test24 scale aug
    DONE 2026-09-28: native 0.9982, downscaled 0.746 (vs 0.556), SG3-R 0.715 — fixes
    scale, not generalisation. **All four levers done: +0.03 / +0.035 / −0.08 / −0.03.**
-   NEXT:
-   `test26_sg1sg2_wang_from_23c.yaml` (written 2026-09-28: Wang aug warm-started from
-   test23c, 30 fixed epochs, checkpoint last; needs test23's cache), then BN-only
-   headline, then quantization. Distillation+Wang aug: low priority, only if budget (needs the headline cache synced +
+   test26 (stacked levers)
+   DONE 2026-09-28: SG3-R 0.704 — below both parents. **LEVER PHASE CLOSED: 0.772 /
+   0.777 / 0.666 / 0.715 / 0.704 vs 0.742; pretrained 0.96–0.99.** test26b (checkpoint
+   best) written but NOT needed — the conclusion does not hinge on it. NEXT: int8
+   quantization of all four (todo 4b), then BN-only headline only if time, then the
+   presentation. Distillation+Wang aug, diffusion generator, forensic first layer:
+   future work, not run (needs the headline cache synced +
    `test20_crop_baselines/baselines/efficientnet_b0/model.keras`, on Drive). Then
    test24 scale aug, then stacking (Wang aug from test23c), then the BN-only headline
    for attribution, then quantization.
