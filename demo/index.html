@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>GAN-face detection - live demonstration</title>
+<title>Lightweight CNN for GAN Synthetic Faces - Demonstration</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
   :root { --ink:#1a1a1a; --muted:#666; --line:#ddd; --accent:#1f4e79; --region:#f5a623; --real:#2e7d32; --fake:#c62828; }
@@ -20,6 +20,7 @@
   .samples img { width:104px; height:104px; object-fit:cover; border:2px solid var(--line); cursor:pointer; }
   .samples img.sel { border-color:var(--accent); }
   .controls { display:flex; gap:14px; align-items:center; flex-wrap:wrap; margin:10px 0; }
+  .controls .right { margin-left:auto; display:flex; gap:10px; align-items:center; }
   button { font:inherit; padding:6px 14px; border:1px solid var(--accent); background:var(--accent); color:#fff; cursor:pointer; }
   button.secondary { background:#fff; color:var(--accent); } button[disabled] { opacity:.5; cursor:default; }
   #results tr.row { cursor:pointer; } #results tr.row:hover td { background:#f9f9f9; } #results tr.open td { background:#eef3f8; }
@@ -42,15 +43,17 @@
 </head>
 <body>
 <main>
-  <h1>Lightweight CNN for StyleGAN-face detection - live demonstration</h1>
-  <p class="muted">The trained headline model (1,011,521 parameters) runs on this laptop. Select images, run, then click any row to see everything the model did with that image.</p>
+  <h1>Lightweight CNN for GAN Synthetic Faces - Demonstration</h1>
+  <p class="muted">Select images, run, then click any row to see everything the model did with that image.</p>
 
   <div class="samples" id="samples"></div>
   <div class="controls">
     <input type="file" id="file" accept="image/*" multiple>
-    <button id="run" disabled>Run selected</button>
-    <button id="clear" class="secondary">Clear</button>
     <span class="muted" id="status"></span>
+    <span class="right">
+      <button id="run" disabled>Run selected</button>
+      <button id="clear" class="secondary">Clear</button>
+    </span>
   </div>
   <div id="summary" class="summary"></div>
   <table id="results" style="display:none">
