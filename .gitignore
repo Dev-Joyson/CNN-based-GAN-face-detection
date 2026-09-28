@@ -22,3 +22,8 @@ venv/
 
 # os
 .DS_Store
+
+# demo sample images are downloaded per machine, not versioned
+demo/samples/*/*.png
+demo/samples/*/*.jpg
+demo/samples/*/*.jpeg

@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Lightweight GAN-face detection — demonstration</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --ink:#1a1a1a; --muted:#666; --line:#ddd; --accent:#1f4e79; --real:#2e7d32; --fake:#c62828; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:16px/1.5 -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif; color:var(--ink); background:#fff; }
+  main { max-width:1080px; margin:0 auto; padding:32px 24px 80px; }
+  h1 { font-size:26px; margin:0 0 4px; }
+  h2 { font-size:20px; margin:48px 0 12px; padding-top:16px; border-top:1px solid var(--line); }
+  p { margin:8px 0; }
+  .muted { color:var(--muted); font-size:14px; }
+  .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin:20px 0; }
+  .stat { border:1px solid var(--line); padding:14px 16px; }
+  .stat .v { font-size:30px; font-weight:600; color:var(--accent); }
+  .stat .l { font-size:13px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }
+  .stat .s { font-size:13px; color:var(--muted); }
+  table { border-collapse:collapse; width:100%; margin:12px 0; font-size:15px; }
+  th, td { text-align:left; padding:7px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { font-weight:600; background:#f6f6f6; }
+  tr.hl td { font-weight:600; }
+  .story { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+  .story .card { border:1px solid var(--line); padding:14px; }
+  .story .auc { font-size:28px; font-weight:600; }
+  .story .bar { height:8px; background:#eee; margin:6px 0 10px; }
+  .story .bar i { display:block; height:100%; background:var(--accent); }
+  figure { margin:20px 0; }
+  figure img { width:100%; border:1px solid var(--line); }
+  figcaption { font-size:14px; color:var(--muted); margin-top:6px; }
+  .figs { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+  .neg li { margin:6px 0; }
+  /* demo */
+  .samples { display:flex; flex-wrap:wrap; gap:10px; margin:12px 0; }
+  .samples img { width:110px; height:110px; object-fit:cover; border:2px solid var(--line); cursor:pointer; }
+  .samples img.sel { border-color:var(--accent); }
+  .controls { display:flex; gap:16px; align-items:center; flex-wrap:wrap; margin:12px 0; }
+  .result { display:grid; grid-template-columns:256px 256px 1fr; gap:20px; align-items:start; margin-top:16px; }
+  .result img { width:256px; height:256px; border:1px solid var(--line); image-rendering:pixelated; }
+  .verdict { font-size:34px; font-weight:700; }
+  .verdict.real { color:var(--real); } .verdict.fake { color:var(--fake); }
+  .pbar { height:14px; background:#eee; margin:8px 0; position:relative; }
+  .pbar i { display:block; height:100%; background:var(--fake); }
+  .pbar b { position:absolute; left:50%; top:-4px; width:2px; height:22px; background:#333; }
+  .kv { font-size:15px; } .kv div { margin:4px 0; }
+  button { font:inherit; padding:6px 14px; border:1px solid var(--accent); background:var(--accent); color:#fff; cursor:pointer; }
+  button[disabled] { opacity:.5; cursor:default; }
+  label.tog { display:flex; gap:6px; align-items:center; cursor:pointer; }
+  @media (max-width:800px) { .stats,.story,.figs,.result { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Lightweight CNN for StyleGAN-face detection</h1>
+  <p class="muted">Every number on this page is copied from the repository's README tables; the live panel at the bottom runs the trained headline model on this laptop.</p>
+
+  <h2>Claim</h2>
+  <p id="claim"></p>
+  <div class="stats" id="stats"></div>
+  <p class="muted" id="arch"></p>
+
+  <h2>How the accuracy was reached</h2>
+  <div class="story" id="story"></div>
+
+  <h2>Comparison with pretrained detectors</h2>
+  <p class="muted" id="cmp-note"></p>
+  <table id="cmp"></table>
+  <div class="figs" id="figs-cmp"></div>
+
+  <h2>Reproducibility: three seeds</h2>
+  <p class="muted" id="seed-note"></p>
+  <table id="seeds"><tr><th>stem</th><th>seed 42</th><th>seed 43</th><th>seed 44</th><th>mean ± std</th></tr></table>
+  <div class="figs" id="figs-seeds"></div>
+
+  <h2>Quantization</h2>
+  <p class="muted" id="q-note"></p>
+  <table id="quant"></table>
+  <p id="q-reading"></p>
+
+  <h2>What did not work, and what was corrected</h2>
+  <ul class="neg" id="neg"></ul>
+
+  <h2>Live demonstration</h2>
+  <p class="muted">Pick a bundled 1024² image or upload one. The page cuts the centre 256² window of native pixels, exactly as at evaluation, and runs the model. "Downscale first" shrinks the whole face to 256² instead — the resize pipeline — to show why native pixels matter.</p>
+  <div class="samples" id="samples"></div>
+  <div class="controls">
+    <input type="file" id="file" accept="image/*">
+    <label class="tog"><input type="checkbox" id="down"> downscale first (1024→512→256)</label>
+    <button id="run" disabled>Run</button>
+    <span class="muted" id="status"></span>
+  </div>
+  <div class="result" id="result" style="display:none">
+    <div><img id="win" alt="model input"><div class="muted">what the model saw (256²)</div></div>
+    <div><img id="cam" alt="Grad-CAM"><div class="muted">Grad-CAM, last conv layer</div></div>
+    <div class="kv">
+      <div class="verdict" id="verdict"></div>
+      <div class="pbar"><i id="pfill"></i><b></b></div>
+      <div id="pval"></div>
+      <div id="lat"></div>
+      <div id="int8"></div>
+      <div id="truth" class="muted"></div>
+      <div id="inp" class="muted"></div>
+    </div>
+  </div>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+const fmt = v => typeof v === 'number' ? v.toFixed(4) : v;
+
+fetch('/data.json').then(r => r.json()).then(d => {
+  $('#claim').textContent = d.claim;
+  $('#stats').innerHTML = d.headline.stats.map(s => `<div class="stat"><div class="l">${s.label}</div><div class="v">${s.value}</div><div class="s">${s.sub}</div></div>`).join('');
+  $('#arch').textContent = `Architecture: ${d.headline.architecture} Input: ${d.headline.input}.`;
+  $('#story').innerHTML = d.story.map(s => `<div class="card"><div class="muted">${s.step}</div><div class="auc">${fmt(s.auc)}</div><div class="bar"><i style="width:${Math.max(2,(s.auc-0.95)/0.05*100)}%"></i></div><div>${s.text}</div></div>`).join('');
+  $('#cmp-note').textContent = d.comparison.note;
+  $('#cmp').innerHTML = '<tr>' + d.comparison.columns.map(c => `<th>${c}</th>`).join('') + '</tr>' +
+    d.comparison.rows.map((r,i) => `<tr class="${i===0?'hl':''}">` + r.map(c => `<td>${c}</td>`).join('') + '</tr>').join('');
+  const fig = f => `<figure><img src="/figures/${f.file}" alt="${f.file}"><figcaption>${f.caption}</figcaption></figure>`;
+  const F = Object.fromEntries(d.figures.map(f => [f.file, f]));
+  $('#figs-cmp').innerHTML = fig(F['efficiency_scatter.png']) + fig(F['efficiency_bars.png']);
+  $('#seed-note').textContent = d.seeds.note;
+  $('#seeds').innerHTML += d.seeds.rows.map(r => '<tr>' + r.map(c => `<td>${c}</td>`).join('') + '</tr>').join('');
+  $('#figs-seeds').innerHTML = fig(F['seeds.png']) + fig(F['curves_overlay.png']);
+  $('#q-note').textContent = d.quantization.note;
+  $('#quant').innerHTML = '<tr>' + d.quantization.columns.map(c => `<th>${c}</th>`).join('') + '</tr>' +
+    d.quantization.rows.map(r => `<tr class="${r[0]==='this model'?'hl':''}">` + r.map(c => `<td>${c}</td>`).join('') + '</tr>').join('');
+  $('#q-reading').textContent = d.quantization.reading;
+  $('#neg').innerHTML = d.negatives.map(n => `<li><b>${n.what}.</b> ${n.result}</li>`).join('');
+});
+
+let chosen = null;   // {blob, truth}
+fetch('/samples.json').then(r => r.json()).then(list => {
+  $('#samples').innerHTML = list.map(s => `<img src="${s.url}" data-cls="${s.cls}" title="${s.cls}: ${s.file}">`).join('');
+  document.querySelectorAll('#samples img').forEach(img => img.onclick = async () => {
+    document.querySelectorAll('#samples img').forEach(i => i.classList.remove('sel')); img.classList.add('sel');
+    chosen = {blob: await (await fetch(img.src)).blob(), truth: img.dataset.cls};
+    $('#run').disabled = false; $('#status').textContent = img.title;
+  });
+});
+$('#file').onchange = e => { const f = e.target.files[0]; if (!f) return;
+  document.querySelectorAll('#samples img').forEach(i => i.classList.remove('sel'));
+  chosen = {blob: f, truth: null}; $('#run').disabled = false; $('#status').textContent = f.name; };
+
+$('#run').onclick = async () => {
+  if (!chosen) return;
+  const mode = $('#down').checked ? 'downscaled' : 'native';
+  $('#run').disabled = true; $('#status').textContent = 'running…';
+  const r = await fetch('/predict?mode=' + mode, {method: 'POST', body: chosen.blob});
+  const j = await r.json(); $('#run').disabled = false;
+  if (j.error) { $('#status').textContent = 'error: ' + j.error; return; }
+  $('#status').textContent = '';
+  $('#result').style.display = '';
+  $('#win').src = j.window; $('#cam').src = j.gradcam;
+  const fake = j.p_fake > 0.5;
+  $('#verdict').textContent = fake ? 'FAKE' : 'REAL'; $('#verdict').className = 'verdict ' + (fake ? 'fake' : 'real');
+  $('#pfill').style.width = (j.p_fake * 100) + '%';
+  $('#pval').textContent = `p(fake) = ${j.p_fake.toFixed(4)}   (threshold 0.5)`;
+  $('#lat').textContent = `latency: ${j.latency_ms} ms on this CPU (fp32, median of 20)`;
+  $('#int8').textContent = j.int8 ? `int8 model: p(fake) = ${j.int8.p_fake.toFixed(4)}, ${j.int8.latency_ms} ms` : '';
+  $('#truth').textContent = chosen.truth ? `ground truth: ${chosen.truth}` : 'ground truth: unknown (uploaded)';
+  $('#inp').textContent = `input ${j.input_size[0]}×${j.input_size[1]} px, mode: ${j.mode}`;
+};
+</script>
+</body>
+</html>

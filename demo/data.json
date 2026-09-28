@@ -1,0 +1,70 @@
+{
+  "_source": "Copied from README.md tables (Results, Baselines, Seeds, Quantization) on 2026-09-28. Regenerate by hand if the README changes; every number here must match it.",
+  "claim": "A 1.01M-parameter CNN trained from scratch matches ImageNet-pretrained detectors 4–20× larger on StyleGAN2-vs-FFHQ detection, at the lowest GPU latency of the four, measured on the identical task, same GPU, same session.",
+  "headline": {
+    "name": "test19_sg2_crop_no_fft",
+    "architecture": "five 3×3 conv blocks (32-64-128-256-256), each followed by max-pooling; global average pooling; Dense 128; Dropout 0.4; sigmoid. No FFT branch, no batch norm, no pretraining.",
+    "input": "a 256×256 window of native pixels from a 1024×256 face; nothing is resized",
+    "stats": [
+      {"label": "test AUC", "value": "0.9998", "sub": "± 0.0002 over three seeds"},
+      {"label": "parameters", "value": "1.01M", "sub": "4.05 MB fp32 weights"},
+      {"label": "GPU latency", "value": "0.97 ms", "sub": "batch 1, NVIDIA L4, median of 1,000"},
+      {"label": "peak GPU memory", "value": "171 MB", "sub": "batch 1, after warm-up"}
+    ]
+  },
+  "story": [
+    {"step": "first dataset", "auc": 0.9995, "text": "Reals were 512², fakes 1024². The model read the resolution, not the face. Found by auditing file properties. A shortcut, discarded."},
+    {"step": "clean data, resized 1024→256", "auc": 0.964, "text": "Both classes 1024² from official sources, shrunk to the model's input. The resize deletes the generator fingerprint: after it no pixel property separates the classes (high-frequency AUC 0.52)."},
+    {"step": "clean data, native 256² crops", "auc": 0.9996, "text": "Same model, same input size, same latency; the 256² is a window of untouched pixels. Verified not a new shortcut: native audit 0.55, JPEG q95 costs 0.001, unseen reals scored correctly."}
+  ],
+  "comparison": {
+    "note": "One L4 session, fp32, batch 1, median of 1,000. CPU = TFLite/XNNPACK fp32 (12 threads); the earlier TensorFlow-CPU column mis-ranked depthwise models and was withdrawn. Baselines are ImageNet-pretrained and fine-tuned on the identical crop pipeline.",
+    "columns": ["model", "params", "MACs @256²", "GPU ms", "CPU ms (TFLite)", "peak MB", "test AUC"],
+    "rows": [
+      ["this model (headline)", "1.01M", "1.11 G", "0.97", "5.04", "171", "0.9998 ± 0.0002"],
+      ["this model, stride-2 stem", "1.01M", "0.28 G", "0.97", "—", "158", "0.9988 ± 0.0002"],
+      ["MobileNetV3-Small", "1.01M", "0.07 G", "4.81", "1.30", "152", "0.9999"],
+      ["EfficientNet-B0", "4.21M", "0.50 G", "7.10", "7.49", "205", "1.0000"],
+      ["Xception", "21.1M", "5.95 G", "4.84", "28.9", "409", "1.0000"]
+    ]
+  },
+  "seeds": {
+    "note": "Same recipe, three random seeds (sample, split, initialisation, shuffle). Test AUC.",
+    "rows": [
+      ["stride 1 (headline)", "0.9996", "0.9998", "0.99995", "0.9998 ± 0.0002"],
+      ["stride 2", "0.9990", "0.9987", "0.9987", "0.9988 ± 0.0002"]
+    ]
+  },
+  "quantization": {
+    "note": "Post-training TFLite conversion, one Xeon session, 12 threads, XNNPACK. int8 weights = dynamic range; int8 full = weights + activations, calibrated on 200 test images. Baselines scored on 2,000 test images.",
+    "columns": ["model", "precision", "file", "CPU ms", "test AUC"],
+    "rows": [
+      ["this model", "fp32", "4.05 MB", "5.04", "0.9996"],
+      ["this model", "int8 weights", "1.03 MB", "3.01", "0.9997"],
+      ["this model", "int8 full", "1.04 MB", "1.76", "0.9995"],
+      ["MobileNetV3-Small", "fp32", "4.02 MB", "1.30", "1.0"],
+      ["MobileNetV3-Small", "int8 weights", "1.18 MB", "13.2", "1.0"],
+      ["MobileNetV3-Small", "int8 full", "1.29 MB", "52 (no delegate)", "0.55 — broken"],
+      ["EfficientNet-B0", "fp32", "16.7 MB", "7.49", "1.0"],
+      ["EfficientNet-B0", "int8 weights", "4.71 MB", "31.2", "0.9999"],
+      ["EfficientNet-B0", "int8 full", "5.07 MB", "4.33", "0.58 — broken"],
+      ["Xception", "fp32", "84.2 MB", "28.9", "1.0"],
+      ["Xception", "int8 weights", "21.8 MB", "65.4", "1.0"],
+      ["Xception", "int8 full", "22.4 MB", "39.6", "1.0"]
+    ],
+    "reading": "Post-training int8 works on plain 3×3 convolutions (this model: 4× smaller, 2.9× faster, accuracy unchanged; Xception fine) and collapses the mobile architectures to chance — hard-swish and squeeze-excite need quantization-aware retraining. On CPU at fp32, MobileNet is the faster model; this model is the fastest one that survives post-training int8."
+  },
+  "negatives": [
+    {"what": "FFT branch", "result": "buys 0 on the mix, +0.011 on resized SG2, 0 on native crops. Dropped; the spatial branch reads the same signal."},
+    {"what": "Offline distillation (test18)", "result": "0.923 vs 0.964 with plain labels. Teacher labelled clean images while the student saw augmented ones — an inconsistent target."},
+    {"what": "Stride-2 first layer", "result": "4× fewer MACs, half the CPU latency, 2.8× less batched memory, for −0.001 AUC and 13× more epochs to converge. Reported as the cheap variant."},
+    {"what": "Peak-memory measurement", "result": "First reported as 1,301 MB: the counter was reset before cuDNN's autotune, so it recorded the largest algorithm trial. Corrected to 171 MB; both numbers kept."},
+    {"what": "CPU-latency column", "result": "TensorFlow's CPU path gave MobileNet 18.7 ms; TFLite gives it 1.30. The column measured the runtime. Re-labelled; the GPU ranking is unaffected."}
+  ],
+  "figures": [
+    {"file": "curves_overlay.png", "caption": "Validation AUC per epoch: the resize pipeline plateaus at 0.96; native crops pass 0.99 within ten epochs; the stride-2 stem takes ~130."},
+    {"file": "efficiency_scatter.png", "caption": "GPU latency against test AUC, one point per model; marker area is the parameter count."},
+    {"file": "efficiency_bars.png", "caption": "MACs, peak memory, CPU and GPU latency per model."},
+    {"file": "seeds.png", "caption": "Test AUC per seed for each stem, with the mean."}
+  ]
+}
