@@ -191,6 +191,9 @@ branch, native-resolution 256² crops. Test AUC 0.9998 ± 0.0002 over three seed
    and `--config configs/test20_crop_baselines.yaml --model <m>` for the three baselines
    (Xception at 7,500 test images on CPU is slow; `--n-eval 2000` is acceptable, stated).
    **DONE 2026-09-28** — README *Quantization*. All experiments are now complete.
+   Pending small add: `quantize.py --config configs/test21_stride2_stem.yaml` on the
+   Xeon so the stride-2 row joins the table (Mac preview: fp32 1.39 / int8 0.84 ms vs
+   headline 4.32 / 1.65 — ~3× faster on CPU).
 5. **Held-out reals** (CelebA-HQ 1024) with `heldout.py --real-dir … --tag celebahq`.
 6. **Sensitivity checks** on the crop pipeline for `docs/hyperparameters.md`:
    lr {1e-4, 1e-3}, augmentation {off, Wang 2020's}. One run each, note the number.

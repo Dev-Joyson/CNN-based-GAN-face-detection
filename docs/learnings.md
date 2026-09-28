@@ -310,6 +310,11 @@ the README says how things *are*, this says how we found out.
   squeeze-excite models to chance (MobileNet, EfficientNet) — the honest "why not compress
   EfficientNet" answer is: not without quantization-aware retraining. Third: int8 costs
   this model its weak SG3 transfer (0.703 → 0.641) but not its SG2 accuracy.
+- **2026-09-29 — Stride-2 stem on TFLite (Mac CPU, 8 threads, same session as the
+  headline): fp32 1.39 vs 4.32 ms, int8 0.84 vs 1.65 ms.** The 4× MAC cut that the GPU
+  hid (both 0.97 ms) shows on the CPU runtime: 3.1× faster. Not same-session with the
+  Xeon table (MobileNet 1.30 there); the Colab quantize run on test21 is the number to
+  quote. Illustrates again that MACs predict CPU latency and not GPU latency.
 - **Latency needs no training; accuracy does.** The efficiency half of the comparison
   can be measured before any baseline is fine-tuned.
 - **Published detectors zero-shot measure generalisation, not architecture.** CNNDetection
