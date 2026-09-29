@@ -205,6 +205,23 @@ stays in speaker notes; it is shown on the StyleGAN3 slide only, where accuracy 
 | stride 2 | 1.01M | 0.28 G | 0.97 | 158 | 0.984 |
 | stride 2 + half width (test27) | 0.26M | 0.073 G | 0.99 | 141 | 0.98 |
 
+**Slide 9 alternative (or backup): single-core CPU, all six models, one chip** (AMD EPYC 7B12,
+1 thread, TFLite fp32, 2026-09-29; accuracy from the full 7,500-image test split)
+
+| model | params | MACs | CPU ms, 1 thread | test accuracy |
+|---|---|---|---|---|
+| test27 (stride-2, half width) | 0.26M | 0.073 G | **1.74** | 0.98 |
+| MobileNetV3-Small | 1.01M | 0.07 G | 2.83 | 0.998 |
+| stride-2 | 1.01M | 0.28 G | 6.72 | 0.984 |
+| EfficientNet-B0 | 4.21M | 0.50 G | 22.7 | 0.999 |
+| headline | 1.01M | 1.11 G | 26.8 | 0.99 |
+| Xception | 21.1M | 5.95 G | 160 | 0.9995 |
+
+Sentence: "On one core, latency follows arithmetic: the order is the MACs order, and the
+one exception is MobileNet's per-operation overhead, which puts it behind our 262k-parameter
+variant at equal MACs. The two fastest models are within two accuracy points of the two
+slowest." Width multiplier = Howard et al. 2017's α (α = 0.5 here).
+
 **Slide 9–10, the two stems over three seeds**
 
 | stem | MACs | test accuracy (seeds 42 / 43 / 44) | mean |
