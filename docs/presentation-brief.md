@@ -259,10 +259,17 @@ the *accuracy reference and the path*; test27 is the *result*: MobileNet's arith
 (0.073 G) at a quarter of its parameters, 1.04 ms on the L4 (6× faster than MobileNet),
 2.28 ms on one Xeon core (1.4× faster than MobileNet's 3.17), 141 MB, accuracy 0.98 /
 AUC 0.9983, for two accuracy points against the full-size model. Its gap was tested three
-ways (distillation null, BN+lr same ceiling → capacity). Pending before the talk: seeds
-43/44 of test27 (`configs/test27_stride2_halfwidth_s43/_s44.yaml`) and its StyleGAN3-T
-score. Until those land, slides say "one seed" and no "[TBD]". Item A of the review
-below is resolved by this decision; B–E still apply.
+ways (distillation null, BN+lr same ceiling → capacity). **Also decided (Joyson, 2026-09-29): NO reproducibility/seeds slide and NO StyleGAN3
+limit slide in the presented deck.** Consequences for the slides: remove the StyleGAN3-T
+column from the comparison table; remove every "[TBD]"; state "one seed" nowhere on a
+slide (the full-size model's "± 0.0002 over three seeds" may stay as a footnote). Keep
+BOTH numbers on backup slides after the references and in the Q&A notes — "unseen
+generator?" and "one seed?" are the two questions examiners in this field ask first;
+the honest answers (SG3-T 0.70 vs 0.96–0.99, gap is pretraining; full-size 0.9998 ±
+0.0002 over three seeds, test27 one seed) take ten seconds each. Seeds 43/44 of test27
+and its SG3-T score are now optional for the talk, still useful for the report. Item A
+of the review below is resolved by the final-model decision; B–E apply minus the seeds
+and StyleGAN3 slides.
 
 ## Review of "V3 Final Presentation", slides 10–18 (Claude, 2026-09-29) — apply these
 
