@@ -251,3 +251,51 @@ One line under it: "six training-only levers at fixed cost: 0.67–0.78 AUC".
 (slide 8), `seeds.png` (slide 10). **Backup slides only**: quantization table, six-lever
 table, JPEG/downscale probes, dataset audit table, distillation detail, `efficiency_bars.png`,
 `heldout_bars.png`.
+
+## Review of "V3 Final Presentation", slides 10–18 (Claude, 2026-09-29) — apply these
+
+Slides 10–18 are the results chain (resize → distil ✗ → crops ✓ → FFT → drop FFT →
+compare → stride 2 → half width → final table); 19 is the demonstration divider.
+
+**A. One structural decision, before any edit.** Slides 17–18 present test27 (262k, one
+seed, "[TBD]") as "the final model". The thesis's claim rests on the full-size model
+(parity, 3 seeds, fastest GPU). Recommended framing: **full-size = the result; stride-2
+and half-width = the deployment variants** ("the compute axis"). If test27 is kept as
+"final", its seeds 43/44 must be run before the talk; a "[TBD]" must never be on a slide.
+
+**B. Missing entirely:** a seeds/reproducibility slide (seeds.png); the two corrections
+(memory 1,301 → 171 autotune; CPU column = runtime, MobileNet 1.3–6.6 across chips); the
+StyleGAN3 limit slide (SG3 currently appears only as a column on slide 18); every figure
+(curves_overlay.png, efficiency_scatter.png, seeds.png, a confusion matrix and a Grad-CAM
+from experiments/test19_sg2_crop_no_fft/). No slide has an image of the data or the model
+looking at a face.
+
+**C. Sessions are mixed.** GPU 0.97 / 4.81 (2026-09-24) on slides 14–18 vs the FINAL
+one-session table (README top of *Baselines*): GPU 1.06 / 1.06 / 1.04 vs 6.40 / 9.47 /
+5.49; CPU 1-thread Xeon 29.9 / 7.82 / 2.28 vs 3.17 / 26.7 / 128.6. Use the final table
+everywhere; the EPYC one-core numbers (26.8 / 6.72 / 1.74 vs 2.83) only as the backup
+"second chip" slide. Slide 13: no-FFT crops accuracy is 0.99 (seed 42), not 0.997.
+
+**D. Per slide.**
+- 10 (resize start): keep diagram + one number 0.964; cut the 4-row table to "0.90 acc";
+  drop the baseline bullets (they return on the compare slide).
+- 11 (distil): keep the 3-bar chart only; cut the table; one line of text.
+- 12 (crops): good structure. Replace the two-pipeline strips with a face + the 512²/256²
+  window drawing; add curves_overlay.png (resize plateau vs crop climb). Keep 0.90 → 0.99.
+- 13 (FFT): keep the bar chart + "+0.011 / none"; cut the table.
+- 14 (drop FFT): merge into 13 as one line ("dropped; 1.02 → 1.01M"); make 14 the seeds
+  slide: seeds.png + "0.9998 ± 0.0002 (acc 0.990 / 0.997 / 0.997)".
+- 15 (compare): the 5-column table (model, params, MACs, GPU ms, accuracy) with final-session
+  numbers, OR efficiency_scatter.png — two slides if both. One number: 6× (GPU).
+- 16 (stride 2): 3 rows × 3 columns (MACs, accuracy, CPU 1-thread); one number: 4×.
+- 17 (half width): same 3-column shape, the compute-journey bar chart is good — keep it,
+  cut the 8-row table and the "Cost" box to one line each. Remove "[TBD]".
+- 18 (10-column table): split. Keep 6 rows × 5 columns (params, MACs, GPU ms, CPU 1-thread,
+  accuracy); move StyleGAN3-T to its own limit slide (with accuracy@0.5 AND AUC, and the
+  six-lever line 0.67–0.78); drop throughput/memory to backup.
+- NEW before 19: corrections slide (two lines) and StyleGAN3 limit slide (4 rows + one line).
+- NEW: "what the model sees" — confusion_matrix.png + gradcam.png of the headline, or leave
+  to the demo and say so in the notes.
+
+**E. Text rule:** ≤ 25 words of body text per slide; one large number; one table (≤ 5
+columns, ≤ 6 rows) or one figure; the "Leads to" strip may stay as the only sentence.
