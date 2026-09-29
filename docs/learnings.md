@@ -354,6 +354,12 @@ the README says how things *are*, this says how we found out.
   beats MobileNet at both thread counts; the headline loses 4–9×. Lesson: the final
   table of a resource-comparison thesis must be ONE session — every earlier table is
   now marked history.
+- **2026-09-29 — Distilling the headline into the 262k model (online, T=4, warm start):
+  0.9986 vs 0.9983, accuracy unchanged at 0.98.** The best possible in-distribution
+  teacher adds nothing measurable. So the small model's two-point gap is capacity or
+  optimisation, not missing supervision — and distillation on this task is now negative
+  or null three times (offline EffNet, online EffNet, online self). Remaining levers
+  for test27: batch norm + lr 1e-3 (optimisation), width 0.75 (capacity).
 - **Latency needs no training; accuracy does.** The efficiency half of the comparison
   can be measured before any baseline is fine-tuned.
 - **Published detectors zero-shot measure generalisation, not architecture.** CNNDetection

@@ -205,6 +205,7 @@ of *Baselines*): GPU 1.06 / 1.06 / 1.04 ms vs MobileNet 6.40, EffNet 9.47, Xcept
    `es_start_epoch: 40`. Goal: the model a mobile-deployment follow-up would start
    from, if it holds 0.99+. Then `evaluate.py`, `--eval-jpeg 95`, and `quantize.py`
    (Xeon) on it AND on test21, so the three variants share one CPU table.
+   **test28 (KD headline→test27, online, T=4): 0.9986 / 0.98 vs 0.9983 / 0.98 — null.**
    **test27 at 150 epochs (2026-09-29): AUC 0.9972, acc 0.969, JPEG q95 0.9940, 0.99 ms
    GPU, 141 MB, 7,876 img/s. Still climbing at the cap → epochs 250, `--resume`:
    **final 0.9983 / acc 0.98, JPEG q95 0.9958 (best 209, stopped 224).** Compute axis
