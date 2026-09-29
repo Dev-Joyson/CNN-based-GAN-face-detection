@@ -22,8 +22,11 @@ without changing the architecture).
 
 Headline model: `configs/test19_sg2_crop_no_fft.yaml` — five plain conv blocks, no FFT
 branch, native-resolution 256² crops. Test AUC 0.9998 ± 0.0002 over three seeds
-(0.9996 on seed 42), 1.01M params, ~1 ms on L4, 171 MB at bs=1. Stride-2 variant
-(test21): 0.9988 ± 0.0002 at 4× fewer MACs — the reported cheap variant, not the headline.
+(0.9996 on seed 42), 1.01M params, ~1 ms on L4, 171 MB at bs=1. Variants: stride-2
+(test21) 0.9988 ± 0.0002 at 0.28 G MACs; stride-2 + half width (test27) 0.9983 at
+0.073 G / 262k params. **FINAL efficiency table = one session 2026-09-29 (README, top
+of *Baselines*): GPU 1.06 / 1.06 / 1.04 ms vs MobileNet 6.40, EffNet 9.47, Xception
+5.49; CPU 1-thread 29.9 / 7.8 / 2.3 vs 3.2 / 26.7 / 128.6.** Earlier tables = history.
 
 ## Standards the panel holds us to
 

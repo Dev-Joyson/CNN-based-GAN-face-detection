@@ -379,7 +379,31 @@ the same `train()` loop. Each backbone's ImageNet preprocessing is a layer insid
 the model — the data pipeline is byte-identical for every model, and the
 preprocessing is timed as part of running it.
 
-**Efficiency, measured — one L4, one session, 2026-09-20.** The accuracy columns are
+**FINAL efficiency table — every model, every measurement, one VM, one session
+(2026-09-29): NVIDIA L4; Intel Xeon @ 2.20 GHz, 12 vCPUs, AVX-512/VNNI; TF 2.20 + XLA for
+the GPU columns; TFLite/XNNPACK fp32 for the CPU columns; batch 1 unless stated; test AUC
+on the full 7,500-image split.** This table supersedes the session-stitched ones below,
+which are kept as history.
+
+| model | params | MACs @256² | **GPU ms, bs=1** | peak MB bs=1 | img/s @144 | CPU ms, 12 threads | **CPU ms, 1 thread** | test AUC |
+|---|---|---|---|---|---|---|---|---|
+| **this model (headline)** | 1.01M | 1.11 G | **1.06** | 171 | 2,095 | 5.43 | 29.9 | 0.9996 |
+| stride-2 stem (test21) | 1.01M | 0.28 G | 1.06 | 158 | 5,447 | 1.55 | 7.82 | 0.9990 |
+| stride-2 + half width (test27) | 0.26M | 0.073 G | 1.04 | 141 | 7,709 | **0.59** | **2.28** | 0.9983 |
+| MobileNetV3-Small | 1.01M | 0.07 G | 6.40 | 152 | 2,604 | 1.40 | 3.17 | 1.0000 |
+| EfficientNet-B0 | 4.21M | 0.50 G | 9.47 | 205 | 537 | 7.74 | 26.7 | 1.0000 |
+| Xception | 21.1M | 5.95 G | 5.49 | 409 | 377 | 33.2 | 128.6 | 1.0000 |
+
+Read: on the GPU all three of ours are ~1 ms against 5.5–9.5 for the pretrained models,
+because plain 3×3 convolutions fill a GPU and depthwise/separable ones do not. On the CPU,
+arithmetic decides: the headline (1.11 G) loses to MobileNet 4× at 12 threads and 9× on
+one; the 0.073 G variant beats MobileNet at both (0.59 vs 1.40; 2.28 vs 3.17). MobileNet's
+1.40 here matches session 1's 1.30 on another AVX-512 Xeon; the 6.62 of session 2 came
+from a chip that was not recorded, and the one-core AMD EPYC (AVX2 only) gave 2.83 — all
+kept below with their chips. Accuracy: all six ≥ 0.998 AUC; the three variants of ours
+give up 0.0004, 0.001 and 0.0015 for 4×, 16× and 80× less arithmetic than Xception.
+
+**Efficiency, measured — one L4, one session, 2026-09-20 (history; superseded above).** The accuracy columns are
 two pipelines: *resize* (1024→512→256, the baselines' original fine-tunes) and *crop*
 (native 256² windows, the headline's pipeline; `configs/test20_crop_baselines.yaml`,
 same data/split/cache as the headline, batch 32 / lr 1e-4 / 30 epochs, run folder

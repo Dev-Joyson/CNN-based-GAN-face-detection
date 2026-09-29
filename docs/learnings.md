@@ -346,6 +346,14 @@ the README says how things *are*, this says how we found out.
   MACs rule and MobileNet wins except against test27. The compute axis exists for this. Completed
   for all six: EfficientNet 22.7 ms, Xception 160 ms on the same core — single-core
   latency is the MACs order, with MobileNet's overhead the one exception.
+- **2026-09-29 — Final single-session table (L4 + AVX-512 Xeon): GPU ~1.05 ms for all
+  three of ours vs 6.4 / 9.5 / 5.5; CPU 1-thread 29.9 / 7.8 / 2.3 vs MobileNet 3.2.**
+  MobileNet 1.40 ms at 12 threads on this AVX-512 chip reproduces session 1's 1.30 —
+  the 6.62 outlier most likely came from a chip without AVX-512 (unrecorded). The
+  compute axis pays off exactly where the theory says: on the CPU, the 0.073 G variant
+  beats MobileNet at both thread counts; the headline loses 4–9×. Lesson: the final
+  table of a resource-comparison thesis must be ONE session — every earlier table is
+  now marked history.
 - **Latency needs no training; accuracy does.** The efficiency half of the comparison
   can be measured before any baseline is fine-tuned.
 - **Published detectors zero-shot measure generalisation, not architecture.** CNNDetection

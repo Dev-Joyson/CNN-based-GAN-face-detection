@@ -188,14 +188,16 @@ stays in speaker notes; it is shown on the StyleGAN3 slide only, where accuracy 
 | clean data, resized 1024→256 | 0.90 | 0.52 |
 | clean data, native 256² crops | 0.99 | 0.55 |
 
-**Slide 8, the comparison** (one L4 session, fp32, batch 1; baselines fine-tuned on the identical crop pipeline)
+**Slide 8, the comparison** (FINAL: one VM, one session, 2026-09-29 — L4 + AVX-512 Xeon; fp32; batch 1; baselines fine-tuned on the identical crop pipeline; use THESE numbers)
 
-| model | params | MACs | GPU ms | peak MB | test accuracy |
-|---|---|---|---|---|---|
-| ours (headline) | 1.01M | 1.11 G | 0.97 | 171 | 0.99 |
-| MobileNetV3-Small | 1.01M | 0.07 G | 4.81 | 152 | 0.998 |
-| EfficientNet-B0 | 4.21M | 0.50 G | 7.10 | 205 | 0.999 |
-| Xception | 21.1M | 5.95 G | 4.84 | 409 | 0.9995 |
+| model | params | MACs | GPU ms | CPU ms, 1 thread | peak MB | test accuracy |
+|---|---|---|---|---|---|---|
+| ours (headline) | 1.01M | 1.11 G | **1.06** | 29.9 | 171 | 0.99 |
+| MobileNetV3-Small | 1.01M | 0.07 G | 6.40 | 3.17 | 152 | 0.998 |
+| EfficientNet-B0 | 4.21M | 0.50 G | 9.47 | 26.7 | 205 | 0.999 |
+| Xception | 21.1M | 5.95 G | 5.49 | 128.6 | 409 | 0.9995 |
+
+Sentence: "6× faster than MobileNet on the GPU; 9× slower on one CPU core — plain convolutions fill a GPU, arithmetic rules a single core. The compute axis on the next slide is the answer for the CPU case."
 
 **Slide 9, the compute axis** (optional third row; test27 is one seed)
 
@@ -205,17 +207,20 @@ stays in speaker notes; it is shown on the StyleGAN3 slide only, where accuracy 
 | stride 2 | 1.01M | 0.28 G | 0.97 | 158 | 0.984 |
 | stride 2 + half width (test27) | 0.26M | 0.073 G | 0.99 | 141 | 0.98 |
 
-**Slide 9 alternative (or backup): single-core CPU, all six models, one chip** (AMD EPYC 7B12,
-1 thread, TFLite fp32, 2026-09-29; accuracy from the full 7,500-image test split)
+**Slide 9: the compute axis, all six models, ONE session** (same VM as slide 8; TFLite fp32,
+1 thread; GPU L4; accuracy from the full 7,500-image test split)
 
-| model | params | MACs | CPU ms, 1 thread | test accuracy |
-|---|---|---|---|---|
-| test27 (stride-2, half width) | 0.26M | 0.073 G | **1.74** | 0.98 |
-| MobileNetV3-Small | 1.01M | 0.07 G | 2.83 | 0.998 |
-| stride-2 | 1.01M | 0.28 G | 6.72 | 0.984 |
-| EfficientNet-B0 | 4.21M | 0.50 G | 22.7 | 0.999 |
-| headline | 1.01M | 1.11 G | 26.8 | 0.99 |
-| Xception | 21.1M | 5.95 G | 160 | 0.9995 |
+| model | params | MACs | GPU ms | CPU ms, 1 thread | test accuracy |
+|---|---|---|---|---|---|
+| test27 (stride-2, half width) | 0.26M | 0.073 G | 1.04 | **2.28** | 0.98 |
+| MobileNetV3-Small | 1.01M | 0.07 G | 6.40 | 3.17 | 0.998 |
+| stride-2 | 1.01M | 0.28 G | 1.06 | 7.82 | 0.984 |
+| EfficientNet-B0 | 4.21M | 0.50 G | 9.47 | 26.7 | 0.999 |
+| headline | 1.01M | 1.11 G | 1.06 | 29.9 | 0.99 |
+| Xception | 21.1M | 5.95 G | 5.49 | 128.6 | 0.9995 |
+
+(The one-core AMD EPYC session gave the same ordering — test27 1.74, MobileNet 2.83, stride-2
+6.72, EffNet 22.7, headline 26.8, Xception 160 — on a different chip; backup slide.)
 
 Sentence: "On one core, latency follows arithmetic: the order is the MACs order, and the
 one exception is MobileNet's per-operation overhead, which puts it behind our 262k-parameter
