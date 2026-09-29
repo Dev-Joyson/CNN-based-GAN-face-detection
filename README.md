@@ -743,6 +743,27 @@ reproducible across machines where MobileNet's is not. The GPU ranking is unaffe
 Neither "ours is faster on CPU" nor "MobileNet is faster on CPU" is supported as a
 general claim; the two-session table is.
 
+**Third session, a CPU-only runtime — AMD EPYC 7B12, one physical core (2 vCPUs; 1 and
+2 threads time the same), AVX2 without AVX-512, recorded by the script (2026-09-29):**
+
+| model | MACs | 1 thread, EPYC | 12 threads, Xeon (session 2) | 12 threads, Xeon (session 1) |
+|---|---|---|---|---|
+| MobileNetV3-Small | 0.07 G | 2.83 ms | 6.62 ms | 1.30 ms |
+| this model (headline) | 1.11 G | 26.8 ms | 4.98 ms | 5.04 ms |
+| stride-2 stem | 0.28 G | 6.72 ms | 1.47 ms | — |
+| stride-2 + half width (test27) | 0.073 G | **1.74 ms** | 0.56 ms | — |
+
+**What three machines say about CPU latency.** With one core there is nothing to hide
+arithmetic behind, and latency follows MACs almost linearly for our plain-conv models
+(1.11 G → 27 ms, 0.28 G → 6.7 ms, 0.073 G → 1.7 ms); MobileNet's 0.07 G comes with
+per-operation overhead that puts it at 2.8 ms. With twelve cores our models parallelise
+5× and MobileNet's many small ops barely do, so the ranking flips. So: **on a many-core
+CPU the headline is competitive with MobileNet and the smaller variants are faster; on
+a single core MobileNet beats the headline 9× and only the 262k-parameter variant
+beats MobileNet (1.6×).** MACs predict single-core CPU latency well and multi-core or
+GPU latency poorly — Ma et al. 2018's point, with our own numbers on three machines.
+The CPU claim in the thesis is this paragraph, not a ranking.
+
 Two more things the table says: dynamic-range int8 is slower than fp32 on every model
 but ours under XNNPACK (the dequantize-on-the-fly cost outweighs the smaller weights);
 and full int8 costs this model its weak StyleGAN3 transfer (0.703 → 0.641) while its

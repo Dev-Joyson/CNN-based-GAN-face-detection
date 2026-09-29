@@ -337,6 +337,13 @@ the README says how things *are*, this says how we found out.
   until now. The CPU claim in either direction is withdrawn; what stands is the
   same-session table and the observation that our latency reproduces across machines.
   Same session: MobileNet 6.62, headline 4.98, stride-2 1.47, test27 0.56 ms.
+- **2026-09-29 — Third CPU: one-core AMD EPYC (AVX2), chip recorded. 1 thread: MobileNet
+  2.83, headline 26.8, stride-2 6.72, test27 1.74 ms.** On one core latency tracks MACs
+  almost linearly for plain convs; our headline's 12-core numbers (5 ms) were 5× parallel
+  speed-up that a single core does not have. MobileNet is overhead-bound (1 thread = 2
+  threads = 2.8 ms) and beats the headline 9× here; only the 0.073 G variant beats
+  MobileNet. Final CPU statement: many cores → ours competitive or faster; one core →
+  MACs rule and MobileNet wins except against test27. The compute axis exists for this.
 - **Latency needs no training; accuracy does.** The efficiency half of the comparison
   can be measured before any baseline is fine-tuned.
 - **Published detectors zero-shot measure generalisation, not architecture.** CNNDetection

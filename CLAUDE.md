@@ -9,11 +9,12 @@ files are the record; do not re-derive what they already say.
 A ~1M-parameter CNN detects StyleGAN2 faces (vs FFHQ) with accuracy competitive with
 detectors 4–20× larger (Xception, EfficientNet-B0, MobileNetV3-Small), measured on the
 **identical task and same GPU**: params, MACs, latency (bs=1 median/p95), peak memory.
-**CPU (2026-09-29): no general claim either way. TFLite fp32 MobileNet read 1.30 ms on
-one Colab VM and 6.62 on another; ours moved 1% (5.04 → 4.98). Same-session table:
-MobileNet 6.62, headline 4.98, stride-2 1.47, test27 0.56 ms. CPU model now recorded by
-quantize.py. Our CPU points: latency reproducible across machines; post-training int8
-works on ours (1.76 ms headline) and breaks MobileNet/EfficientNet.** GPU claim
+**CPU (2026-09-29, three machines, README *Quantization*): on 12-core Xeons the headline
+is ~5 ms and MobileNet 1.3–6.6; on a one-core AMD EPYC (chip recorded) MobileNet 2.83,
+headline 26.8, stride-2 6.72, test27 1.74 ms. Reading: with one core latency follows
+MACs, MobileNet beats the headline 9× and only test27 (0.073 G) beats MobileNet; with
+many cores our plain convs parallelise and are competitive or faster. State this, not
+a ranking. Post-training int8 works on ours and breaks MobileNet/EfficientNet.** GPU claim
 unchanged: fastest at 0.97 vs 4.81 ms. "Edge deployment" was dropped by the panel — the claim is resource
 comparison, not deployment. Cross-generator generalisation is the **stated limit**:
 StyleGAN3-T AUC 0.70 vs the pretrained baselines' 0.96–0.99 (todo 2c tries to close it
