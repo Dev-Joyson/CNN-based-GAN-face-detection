@@ -1,0 +1,52 @@
+# Test28: online distillation of the HEADLINE (1.01M, 0.9998) into the 262k-param
+# test27 architecture (stride 2, half width), warm-started from test27's weights.
+#
+# Why: test27 gives up ~2 accuracy points (0.98 vs 0.99) for 15x less arithmetic.
+# Its hard-label ceiling may be a capacity/optimisation limit rather than a signal
+# limit: the headline's soft outputs rank StyleGAN2 images by how clearly they show
+# the fingerprint, which is in-distribution knowledge a small student can use --
+# Hinton et al. 2015's original setting (big model -> small model, same task), not
+# the cross-generator transfer that test25 asked for and did not get. Teacher and
+# student see the identical augmented batch (online; Beyer et al. 2022).
+#
+# T=4 rather than test25's 2: the headline is a very saturated teacher (outputs
+# near 0/1); Hinton et al. report 2.5-4 best for small students. Alpha 0.7 as
+# before. One seed; compare in AUC (seed spread +/-0.0002) as well as accuracy
+# (spread ~+/-0.004). Same cache as the headline.
+name: test28_kd_headline_to_test27
+fft_branch: false
+stem_stride: 2
+width_mult: 0.5
+init_from: test27_stride2_halfwidth
+
+real_dir: "/content/drive/MyDrive/Real(FFHQ)"
+fake_dir: "/content/drive/MyDrive/Fake(SG2-psi1)"
+
+mask_mode: none
+limit_per_class: 25000
+
+img_size: 256
+native_size: 512
+input_mode: crop
+cache_size: 512
+batch_size: 144
+
+epochs: 100
+lr: 0.0003
+patience: 15
+seed: 42
+
+crop_frac_min: 0.85
+shuffle_buffer: 8192
+
+cache_dir: "/content/cache"
+out_dir: "/content/drive/MyDrive/Research/experiments"
+
+distill:
+  headline: test19_sg2_crop_no_fft   # the teacher's run dir
+  teachers: [self]                   # the headline's own model.keras
+  temperature: 4.0
+  alpha: 0.7
+  extra: false
+  init: false                        # init comes from init_from (test27), not the teacher
+  online: true

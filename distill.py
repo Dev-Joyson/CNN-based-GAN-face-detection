@@ -221,9 +221,13 @@ class StudentCheckpoint(tf.keras.callbacks.Callback):
 
 
 def _load_teachers(hcfg, names):
+    """A teacher is a baseline under experiments/<headline>/baselines/<name>/, or --
+    when the name is "self" -- the headline run's own model.keras (distilling a big
+    variant of this architecture into a small one: Hinton et al.'s original setting)."""
     teachers = []
     for name in names:
-        path = os.path.join(hcfg.run_dir, "baselines", name, "model.keras")
+        path = (os.path.join(hcfg.run_dir, "model.keras") if name == "self"
+                else os.path.join(hcfg.run_dir, "baselines", name, "model.keras"))
         if not os.path.exists(path):
             raise FileNotFoundError(f"teacher not trained: {path}  (run baselines.py --train)")
         teachers.append(tf.keras.models.load_model(path, safe_mode=False))
