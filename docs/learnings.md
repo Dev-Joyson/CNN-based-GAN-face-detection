@@ -321,6 +321,11 @@ the README says how things *are*, this says how we found out.
   the run was still climbing at the cap (extended). Peak memory 141 MB, 7,876 img/s.
   The signal is simple enough that a quarter-size net still reads it; what shrinks
   with capacity is learning speed (chance plateau to epoch ~12, 0.99 only after 100).
+- **2026-09-29 — TFLite on the Mac CPU, one session: headline 4.37 / stride-2 1.51 /
+  test27 0.84 ms fp32; int8 1.57 / 0.87 / 0.43.** Each halving of MACs shows on the CPU
+  runtime roughly as expected; test27 scaled to the Xeon lands near MobileNet's 1.30 ms
+  fp32 — an estimate, not a comparison; the same-session Xeon run is `quantize.py` on
+  test27. int8 at 0.43 ms with 262k params is the mobile follow-up's starting point.
 - **Latency needs no training; accuracy does.** The efficiency half of the comparison
   can be measured before any baseline is fine-tuned.
 - **Published detectors zero-shot measure generalisation, not architecture.** CNNDetection
