@@ -721,6 +721,28 @@ squeeze-excite need quantization-aware training) — so it is the fastest *worki
 int8 model here, and 4× smaller than its own fp32. Ma et al. (ShuffleNetV2, ECCV 2018)
 warned that MACs and latency diverge by platform; this is that, measured twice.
 
+**Second session, fp32 only, all four in one run (2026-09-29, same Xeon family, 12
+threads, XNNPACK, 500 test images):**
+
+| model | params | CPU ms, TFLite fp32 | test acc (n=500) |
+|---|---|---|---|
+| MobileNetV3-Small | 1.01M | **6.62** | 1.0 |
+| this model (headline) | 1.01M | 4.98 | 0.994 |
+| stride-2 stem (test21) | 1.01M | 1.47 | 0.992 |
+| stride-2 + half width (test27) | 0.26M | **0.56** | 0.986 |
+
+**MobileNet's CPU latency is not stable across Colab VMs: 1.30 ms in the first session,
+6.62 in the second — while our three models moved by ~1% (headline 5.04 → 4.98).**
+Neither session recorded the CPU model; the likely cause is the Xeon generation
+(XNNPACK's depthwise kernels depend on the vector ISA, plain 3×3 convolutions much
+less), and `quantize.py` records the CPU model and flags from now on. What can be said
+honestly: on the same machine and runtime, the headline was slower than MobileNet in
+one session and faster in the other; the stride-2 variant was faster than MobileNet in
+the second session by 4.5× and the 262k-param variant by 12×; and our latency is
+reproducible across machines where MobileNet's is not. The GPU ranking is unaffected.
+Neither "ours is faster on CPU" nor "MobileNet is faster on CPU" is supported as a
+general claim; the two-session table is.
+
 Two more things the table says: dynamic-range int8 is slower than fp32 on every model
 but ours under XNNPACK (the dequantize-on-the-fly cost outweighs the smaller weights);
 and full int8 costs this model its weak StyleGAN3 transfer (0.703 → 0.641) while its

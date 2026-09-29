@@ -330,6 +330,13 @@ the README says how things *are*, this says how we found out.
   runtime roughly as expected; test27 scaled to the Xeon lands near MobileNet's 1.30 ms
   fp32 — an estimate, not a comparison; the same-session Xeon run is `quantize.py` on
   test27. int8 at 0.43 ms with 262k params is the mobile follow-up's starting point.
+- **2026-09-29 — MobileNet's TFLite CPU latency: 1.30 ms on one Colab VM, 6.62 on another;
+  ours moved 1%.** Same file, same runtime, same threads. Depthwise kernels are ISA-
+  sensitive; plain convs are not. Lesson (fourth time): a latency is a (model, runtime,
+  hardware) triple — and the hardware must be RECORDED, which quantize.py did not do
+  until now. The CPU claim in either direction is withdrawn; what stands is the
+  same-session table and the observation that our latency reproduces across machines.
+  Same session: MobileNet 6.62, headline 4.98, stride-2 1.47, test27 0.56 ms.
 - **Latency needs no training; accuracy does.** The efficiency half of the comparison
   can be measured before any baseline is fine-tuned.
 - **Published detectors zero-shot measure generalisation, not architecture.** CNNDetection
