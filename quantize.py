@@ -7,6 +7,7 @@ interpreter, same threads), test AUC/accuracy for both, optional held-out AUC.
     (three precisions per model: fp32, int8_dynamic = weights only, int8 = full integer)
     python quantize.py --config configs/test20_crop_baselines.yaml --model efficientnet_b0
     python quantize.py --config ... --fake-dir "/content/drive/MyDrive/Fake(SG3-T-psi1)" --tag sg3t
+    python quantize.py --config ... --precisions fp32     # TFLite CPU latency only, no quantization
 
 Why this file: "why not compress EfficientNet, which generalises?" is a fair
 panel question. The answer has to be measured at equal precision for all four
@@ -112,6 +113,8 @@ def main():
     ap.add_argument("--tag", default="heldout")
     ap.add_argument("--n-eval", type=int, default=0, help="limit test images (0 = all 7,500)")
     ap.add_argument("--threads", type=int, default=os.cpu_count())
+    ap.add_argument("--precisions", nargs="+", default=list(PRECISIONS), choices=list(PRECISIONS),
+                    help="which to measure; e.g. --precisions fp32 for the TFLite CPU latency alone")
     args = ap.parse_args()
 
     cfg = load_config(args.config)
@@ -124,7 +127,7 @@ def main():
 
     out = {"model": name, "threads": args.threads, "params": int(model.count_params()), "precision": {}}
     x1 = rep[:1].astype(np.float32)
-    for prec in PRECISIONS:
+    for prec in args.precisions:
         blob = convert(model, rep, prec)
         path = os.path.join(run_dir, f"model_{prec}.tflite")
         with open(path, "wb") as f:
