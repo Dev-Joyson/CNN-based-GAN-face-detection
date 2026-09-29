@@ -52,6 +52,7 @@
 
   <div class="samplerow"><div class="rowlabel">real (FFHQ photographs)</div><div class="samples" id="samples-real"></div></div>
   <div class="samplerow"><div class="rowlabel">fake (StyleGAN2)</div><div class="samples" id="samples-fake"></div></div>
+  <div class="samplerow" id="uploaded-row" style="display:none"><div class="rowlabel">uploaded (no label; click to remove)</div><div class="samples" id="samples-uploaded"></div></div>
   <div class="controls">
     <span class="muted" id="status"></span>
     <span class="right">
@@ -123,8 +124,17 @@ fetch('/samples.json').then(r => r.json()).then(list => {
     refresh();
   });
 });
-$('#file').onchange = e => { for (const f of e.target.files) items.push({name: f.name, blob: f, truth: null, el: null, thumb: URL.createObjectURL(f)}); refresh(); };
-$('#clear').onclick = () => { items = []; results = []; document.querySelectorAll('.samples img').forEach(i => i.classList.remove('sel')); $('#results').style.display = 'none'; $('#deep').style.display = 'none'; $('#summary').textContent = ''; refresh(); };
+$('#file').onchange = e => {
+  for (const f of e.target.files) {
+    // show the upload like a sample: selected on arrival, click to drop it
+    const img = document.createElement('img'); img.src = URL.createObjectURL(f); img.title = f.name; img.className = 'sel';
+    $('#samples-uploaded').appendChild(img); $('#uploaded-row').style.display = '';
+    const it = {name: f.name, blob: f, truth: null, el: img, thumb: img.src}; items.push(it);
+    img.onclick = () => { const i = items.indexOf(it); if (i >= 0) items.splice(i, 1); img.remove(); if (!$('#samples-uploaded').children.length) $('#uploaded-row').style.display = 'none'; refresh(); };
+  }
+  e.target.value = ''; refresh();
+};
+$('#clear').onclick = () => { items = []; results = []; document.querySelectorAll('.samples img').forEach(i => i.classList.remove('sel')); $('#samples-uploaded').innerHTML = ''; $('#uploaded-row').style.display = 'none'; $('#results').style.display = 'none'; $('#deep').style.display = 'none'; $('#summary').textContent = ''; refresh(); };
 
 const verdict = p => p > 0.5 ? 'fake' : 'real';
 function showDeep(k) {
