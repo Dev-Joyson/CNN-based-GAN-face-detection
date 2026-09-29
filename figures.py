@@ -28,7 +28,9 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-DEFAULT_OVERLAY = ["test19_sg2_crop_no_fft", "test21_stride2_stem", "test19_sg2_crop", "test17_sg2"]
+DEFAULT_OVERLAY = ["test19_sg2_crop_no_fft", "test21_stride2_stem", "test27_stride2_halfwidth", "test17_sg2"]
+# (test19_sg2_crop, the FFT variant, is left out: its first history was lost to a VM
+#  reclaim and the resumed curve starts at its checkpoint value, which misleads.)
 EFFICIENCY_ROWS = [  # (run folder relative to experiments/, label)
     ("test19_sg2_crop_no_fft", "this model (headline)"),
     ("test21_stride2_stem", "this model, stride-2 stem"),

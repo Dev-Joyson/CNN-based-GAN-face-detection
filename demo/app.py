@@ -3,7 +3,7 @@
 order of the talk and runs the headline model live on the presenter's laptop.
 
     python demo/app.py                      # then open http://localhost:8000
-    python demo/app.py --model <model.keras> --figures <dir> --port 8000
+    python demo/app.py --config configs/test27_stride2_halfwidth.yaml --model <model.keras> --port 8000
 
 Why this file: the guidelines score a "presentation and demonstration". The
 slides carry the argument; this page is the instrument. For one image it shows
@@ -47,13 +47,19 @@ from predict import preprocess                            # noqa: E402
 from PIL import ImageDraw                                 # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-DEFAULT_MODEL = os.path.expanduser("~/Downloads/thesis-figures/test19_sg2_crop_no_fft/model.keras")
+DEFAULT_CONFIG = os.path.join(ROOT, "configs", "test27_stride2_halfwidth.yaml")     # the final model
+DEFAULT_MODEL = os.path.expanduser("~/Downloads/thesis-figures/test27_stride2_halfwidth/model.keras")
 
 
 class Engine:
-    def __init__(self, model_path, tflite_path=None):
-        self.cfg = {"native": load_config(os.path.join(ROOT, "configs", "test19_sg2_crop_no_fft.yaml")),
-                    "downscaled": load_config(os.path.join(ROOT, "configs", "probe_test19_no_fft_on_resize.yaml"))}
+    def __init__(self, model_path, config_path, tflite_path=None):
+        # native: the model's own config (architecture knobs + crop pipeline);
+        # downscaled: the same architecture with the resize pipeline (the probe view)
+        native = load_config(config_path)
+        from dataclasses import replace
+        self.cfg = {"native": native,
+                    "downscaled": replace(native, input_mode="resize", scale_aug=None)}
+        self.total_params = None
         try:
             self.model = tf.keras.models.load_model(model_path, safe_mode=False)
         except Exception as e:
@@ -263,14 +269,15 @@ def make_handler(engine, samples_dir):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--config", default=DEFAULT_CONFIG, help="the model's config (architecture knobs)")
     ap.add_argument("--model", default=DEFAULT_MODEL)
     ap.add_argument("--tflite", default=os.path.join(os.path.dirname(DEFAULT_MODEL), "model_int8.tflite"),
                     help="optional int8 .tflite of the same model; shown beside fp32 if present")
     ap.add_argument("--samples", default=os.path.join(HERE, "samples"))
     ap.add_argument("--port", type=int, default=8000)
     args = ap.parse_args()
-    print(f"loading {args.model} ...", flush=True)
-    engine = Engine(args.model, args.tflite)
+    print(f"loading {args.model} with {os.path.basename(args.config)} ...", flush=True)
+    engine = Engine(args.model, args.config, args.tflite)
     print(f"model ready ({'fp32 + int8' if engine.tflite else 'fp32'}); samples from {args.samples}")
     print(f"open  http://localhost:{args.port}   (Ctrl+C to stop)", flush=True)
     HTTPServer(("127.0.0.1", args.port), make_handler(engine, args.samples)).serve_forever()

@@ -97,10 +97,11 @@
 </main>
 <script>
 const $ = s => document.querySelector(s);
-let items = [], results = [];
+let items = [], results = [], MODEL = {};
 const refresh = () => { $('#run').disabled = !items.length; $('#status').textContent = items.length ? `${items.length} selected` : ''; };
 
 fetch('/model.json').then(r => r.json()).then(m => {
+  MODEL = m;
   $('#m-note').textContent = `${m.total_params.toLocaleString()} parameters. Five 3×3 convolution blocks with max-pooling, global average pooling, Dense 128, Dropout 0.4, sigmoid. Trained from scratch; no pretraining, no batch norm, no FFT branch.`;
   $('#model').innerHTML += m.layers.map(l => `<tr><td>${l.layer}</td><td>${l.type}</td><td>${l.shape}</td><td>${l.params.toLocaleString()}</td></tr>`).join('');
 });
@@ -136,7 +137,7 @@ function showDeep(k) {
   const row = (k3, v) => `<tr><td>${k3}</td><td class="v ${verdict(v)}">${v.toFixed(4)} → ${verdict(v)}</td></tr>`;
   $('#d-win-tab').innerHTML = '<tr><th colspan="2">window position (256² inside the 512² region)</th></tr>' + Object.entries(j.probes.windows).map(([k3, v]) => row(k3, v)).join('');
   $('#d-probe-tab').innerHTML = '<tr><th colspan="2">same window, perturbed</th></tr>' + row('native, as is', j.native.p_fake) + Object.entries(j.probes.jpeg).map(([q, v]) => row(`JPEG quality ${q}`, v)).join('') + row('downscaled (1024→512→256)', j.downscaled.p_fake);
-  $('#d-cost').innerHTML = `<tr><td>latency, fp32, this CPU</td><td>${j.latency_ms} ms (median of 20)</td></tr>` + (j.int8 ? `<tr><td>latency, int8 model</td><td>${j.int8.latency_ms} ms · p(fake) = ${j.int8.p_fake.toFixed(4)}</td></tr>` : '') + `<tr><td>parameters</td><td>1,011,521 (4.05 MB fp32)</td></tr>`;
+  $('#d-cost').innerHTML = `<tr><td>latency, fp32, this CPU</td><td>${j.latency_ms} ms (median of 20)</td></tr>` + (j.int8 ? `<tr><td>latency, int8 model</td><td>${j.int8.latency_ms} ms · p(fake) = ${j.int8.p_fake.toFixed(4)}</td></tr>` : '') + `<tr><td>parameters</td><td>${MODEL.total_params ? MODEL.total_params.toLocaleString() : ''} (${MODEL.total_params ? (MODEL.total_params*4/1e6).toFixed(2) : ''} MB fp32)</td></tr>`;
   $('#deep').scrollIntoView({behavior: 'smooth', block: 'start'});
 }
 
