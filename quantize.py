@@ -45,6 +45,24 @@ PRECISIONS = ("fp32", "int8_dynamic", "int8")
 #               squeeze-excite / hard-swish (EfficientNet collapsed to 0.5).
 
 
+def cpu_info():
+    """CPU model and the vector extensions XNNPACK cares about. MobileNet's TFLite
+    latency read 1.30 ms on one Colab VM and 6.62 on another (our models moved 1%):
+    depthwise kernels depend on the ISA, plain convs do not. Recorded from now on."""
+    info = {"model": "?", "flags": []}
+    try:
+        txt = open("/proc/cpuinfo").read()
+        for line in txt.splitlines():
+            if line.startswith("model name"):
+                info["model"] = line.split(":", 1)[1].strip(); break
+        flags = next((l.split(":", 1)[1].split() for l in txt.splitlines() if l.startswith("flags")), [])
+        info["flags"] = sorted(f for f in flags if f.startswith(("avx", "fma", "sse4", "f16c")))
+    except OSError:
+        import platform
+        info["model"] = platform.processor() or platform.machine()
+    return info
+
+
 def convert(model, rep_images, precision):
     conv = tf.lite.TFLiteConverter.from_keras_model(model)
     if precision != "fp32":
@@ -123,9 +141,11 @@ def main():
     model = tf.keras.models.load_model(os.path.join(run_dir, "model.keras"), safe_mode=False)
     ds = build_datasets(cfg)["test"]
     rep = np.concatenate([xb.numpy() for xb, _ in ds.take(max(1, N_REP // cfg.batch_size + 1))])[:N_REP]
-    print(f"=== quantize {name} | {model.count_params():,} params | {len(rep)} calibration images | {args.threads} threads ===")
+    ci = cpu_info()
+    print(f"=== quantize {name} | {model.count_params():,} params | {len(rep)} calibration images | {args.threads} threads | {ci['model']} | {' '.join(ci['flags'])} ===")
 
-    out = {"model": name, "threads": args.threads, "params": int(model.count_params()), "precision": {}}
+    out = {"model": name, "threads": args.threads, "params": int(model.count_params()),
+           "cpu": cpu_info(), "precision": {}}
     x1 = rep[:1].astype(np.float32)
     for prec in args.precisions:
         blob = convert(model, rep, prec)
