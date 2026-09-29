@@ -140,3 +140,29 @@ methodology 6 · results & discussion 9 · demo 2 · conclusions/recommendations
 8. Why did you drop the FFT branch? — Four-way ablation, all zero.
 9. Why 25k per class? — Budget; Bouthillier 2021; three seeds show stability.
 10. What is the novelty? — Not the architecture: the measured resource comparison on an identical task, the resize/crop finding that lifted every model, the honest generalisation accounting, and (if it lands) a training-only lever at fixed cost.
+
+## Joyson's part: methodology → results → conclusions as a chain of questions (2026-09-29)
+
+One question per slide, answered in the same shape every time: what the literature
+said, what we tested, the number, the decision. ~12 slides, ~14 minutes. One large
+number per slide; at most one table or one figure per slide. Every figure from
+`figures/`, every number from README.
+
+Methodology (4): data and split as proposed · the plain model and why plain ·
+the evaluation protocol (test AUC not val; measured latency, same session; audit,
+JPEG probe, held-out) · **where we started: 0.9995 and the audit row that exposed it
+(reals 512², fakes 1024²)** — the hook.
+
+Results & discussion (7): does the fingerprint survive resizing? (Wang/Chai crop,
+Durall/Frank frequency; 0.964, post-resize highfreq AUC 0.52) · native crops
+(0.9996; audit 0.55, JPEG −0.001, unseen reals; `curves_overlay.png`) · FFT branch?
+(0 / +0.011 / 0; dropped) · comparison (efficiency table + `efficiency_scatter.png`;
+all saturate, cost differs, 5× on GPU, memory within 12%) · can compute be cut?
+(stride-2: 4× MACs, ½ CPU, −0.001, 13× slower to train; Gragnaniello 2021 tested not
+assumed; "the deployment variant") · reproducible + corrections (seeds 0.9998 ±
+0.0002 / 0.9988 ± 0.0002; memory 1,301 → 171 was autotune; CPU column measured the
+runtime, TFLite: MobileNet faster on CPU) · what it costs (SG3 0.70 vs 0.96–0.99;
+six levers ±0.04; the gap is pretraining) → hand-off to the demo.
+
+Conclusions (1): four lines against the objectives; recommendation: pretrained or
+distilled features for generalisation, stride-2 variant for a mobile follow-up.
