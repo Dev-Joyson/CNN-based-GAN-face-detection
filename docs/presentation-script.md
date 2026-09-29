@@ -116,21 +116,22 @@ the compute.
 
 ## Slide 17: A stride-2 first layer makes the model faster
 
-The first cut was simple. The very first convolution layer works on the full 256 by
-256 input, and that one layer is a big share of the whole cost. We made it step two
-pixels at a time instead of one. Only that layer changes, the other four are untouched,
-but everything after it now works on a quarter of the area.
+Our first change was a small one. The first conv layer looks at the whole 256 by 256
+image, so it does a lot of the work. We made it move two pixels at a time instead of
+one. That's what stride 2 means. Only this first layer changes. The other four stay as
+they are, but because the first one now gives out a smaller picture, every layer after
+it has a quarter of the work to do.
 
-Point 2 on the slide is the payoff: a quarter of the arithmetic. MACs, which is just
-the multiply-adds per image, go from 1.11 billion to 0.28. On one CPU core that's 30
-milliseconds down to under 8.
+That's the second point: a quarter of the arithmetic. The table says it in MACs, which
+is just the number of multiply-adds for one image: 1.11 billion down to 0.28. On one
+CPU core, that's 30 milliseconds down to under 8.
 
-The price is half a point of accuracy, 0.99 to 0.984, and the number of parameters
-doesn't change at all, still 1.01 million, because stride changes how the filters
-move, not how many there are.
+What does it cost? Half a point of accuracy, 0.99 to 0.984. And the number of
+parameters is exactly the same, 1.01 million, because stride only changes how the
+filters move, not how many there are.
 
-Good, but MobileNet still needs less arithmetic per image than this. So we cut the
-width in half.
+That's better, but MobileNet still needs less arithmetic per image than this. So the
+next step was to cut the width in half.
 ---
 
 ## Slide 18: 4× smaller than MobileNet, and faster on one CPU core
