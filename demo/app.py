@@ -4,6 +4,7 @@ order of the talk and runs the headline model live on the presenter's laptop.
 
     python demo/app.py                      # then open http://localhost:8000
     python demo/app.py --config configs/test27_stride2_halfwidth.yaml --model <model.keras> --port 8000
+    python demo/app.py --compare-model <mobilenet model.keras>     # second model beside ours in the table
 
 Why this file: the guidelines score a "presentation and demonstration". The
 slides carry the argument; this page is the instrument. For one image it shows
@@ -13,6 +14,12 @@ spectrum of each view, first- and last-layer feature maps, Grad-CAM, JPEG and
 window-position probes, latency, and the architecture table. Same preprocessing
 as training (predict.preprocess -> load_and_resize -> eval_view); nothing is
 re-implemented. No internet; standard library only (no Flask).
+
+--compare-model: one pretrained baseline (MobileNetV3-Small by default) scored
+and timed on the identical native window, shown as two extra columns in the
+results table. The thesis claim is a resource comparison, so the demo shows one
+live. Latency on the laptop is for feel only; the page says so, and the
+measured numbers are the one-session table in README.
 
 Routes: /                                   the page
         /model.json                         layer table (from the loaded model)
@@ -49,10 +56,11 @@ from PIL import ImageDraw                                 # noqa: E402
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_CONFIG = os.path.join(ROOT, "configs", "test27_stride2_halfwidth.yaml")     # the final model
 DEFAULT_MODEL = os.path.expanduser("~/Downloads/thesis-figures/test27_stride2_halfwidth/model.keras")
+DEFAULT_COMPARE = os.path.expanduser("~/Downloads/mobile_net_pretrained.keras")   # test20 baseline, fine-tuned on crops
 
 
 class Engine:
-    def __init__(self, model_path, config_path, tflite_path=None):
+    def __init__(self, model_path, config_path, tflite_path=None, compare_path=None, compare_name=None):
         # native: the model's own config (architecture knobs + crop pipeline);
         # downscaled: the same architecture with the resize pipeline (the probe view)
         native = load_config(config_path)
@@ -91,6 +99,23 @@ class Engine:
         if self.tflite:
             for _ in range(20):
                 self._tflite(x.numpy())
+        # the comparison model: same [0,1] window in, its own preprocessing inside
+        self.compare = None
+        if compare_path and os.path.exists(compare_path):
+            try:
+                cm = tf.keras.models.load_model(compare_path, safe_mode=False)
+            except Exception as e:
+                print(f"compare load_model failed ({type(e).__name__}); rebuilding and loading weights only")
+                from baselines import build_baseline
+                cm = build_baseline("mobilenet_v3_small", c, pretrained=False)
+                cm.load_weights(compare_path)
+            infer = tf.function(lambda x: cm(x, training=False))
+            for _ in range(20):
+                infer(x).numpy()
+            self.compare = {"name": compare_name or cm.name, "model": cm, "infer": infer,
+                            "params": int(cm.count_params())}
+        elif compare_path:
+            print(f"compare model not found at {compare_path}; running ours only")
 
     def _tflite(self, x):
         self.tflite.set_tensor(self.t_in, x.astype(np.float32)); self.tflite.invoke()
@@ -213,6 +238,13 @@ class Engine:
             for _ in range(20):
                 t0 = time.perf_counter(); q = self._tflite(xn.numpy()); tt.append((time.perf_counter() - t0) * 1e3)
             out["int8"] = {"p_fake": round(q, 4), "latency_ms": round(float(np.median(tt)), 2)}
+        if self.compare:
+            tc = []
+            for _ in range(20):
+                t0 = time.perf_counter(); pc = float(self.compare["infer"](xn).numpy().ravel()[0])
+                tc.append((time.perf_counter() - t0) * 1e3)
+            out["compare"] = {"name": self.compare["name"], "p_fake": round(pc, 4),
+                              "latency_ms": round(float(np.median(tc)), 2)}
         return out
 
 
@@ -239,7 +271,10 @@ def make_handler(engine, samples_dir):
                 return self._file(os.path.join(HERE, "index.html"))
             if p == "/model.json":
                 return self._send(json.dumps({"layers": engine.table, "total_params": engine.total_params,
-                                              "last_layer": engine.layer}))
+                                              "last_layer": engine.layer,
+                                              "compare": ({"name": engine.compare["name"],
+                                                           "params": engine.compare["params"]}
+                                                          if engine.compare else None)}))
             if p == "/samples.json":
                 items = []
                 for cls in ("real", "fake"):
@@ -273,12 +308,17 @@ def main():
     ap.add_argument("--model", default=DEFAULT_MODEL)
     ap.add_argument("--tflite", default=os.path.join(os.path.dirname(DEFAULT_MODEL), "model_int8.tflite"),
                     help="optional int8 .tflite of the same model; shown beside fp32 if present")
+    ap.add_argument("--compare-model", default=DEFAULT_COMPARE,
+                    help="a baseline .keras scored and timed beside ours; '' to disable")
+    ap.add_argument("--compare-name", default="MobileNetV3-Small")
     ap.add_argument("--samples", default=os.path.join(HERE, "samples"))
     ap.add_argument("--port", type=int, default=8000)
     args = ap.parse_args()
     print(f"loading {args.model} with {os.path.basename(args.config)} ...", flush=True)
-    engine = Engine(args.model, args.config, args.tflite)
-    print(f"model ready ({'fp32 + int8' if engine.tflite else 'fp32'}); samples from {args.samples}")
+    engine = Engine(args.model, args.config, args.tflite, args.compare_model or None, args.compare_name)
+    print(f"model ready ({'fp32 + int8' if engine.tflite else 'fp32'})"
+          + (f"; comparing against {engine.compare['name']} ({engine.compare['params']:,} params)" if engine.compare else "")
+          + f"; samples from {args.samples}")
     print(f"open  http://localhost:{args.port}   (Ctrl+C to stop)", flush=True)
     HTTPServer(("127.0.0.1", args.port), make_handler(engine, args.samples)).serve_forever()
 

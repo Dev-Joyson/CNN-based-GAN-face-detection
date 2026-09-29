@@ -59,8 +59,9 @@
     </span>
   </div>
   <div id="summary" class="summary"></div>
+  <p id="cmp-note" class="muted" style="display:none"></p>
   <table id="results" style="display:none">
-    <tr><th>image</th><th>native window → verdict</th><th>p(fake), native</th><th>p(fake), downscaled</th><th>latency</th><th>ground truth</th></tr>
+    <tr><th>image</th><th>native window → verdict</th><th>p(fake), native</th><th>p(fake), downscaled</th><th>latency</th><th class="cmp" id="cmp-h1"></th><th class="cmp" id="cmp-h2"></th><th>ground truth</th></tr>
   </table>
 
   <section id="deep" style="display:none">
@@ -102,6 +103,10 @@ const refresh = () => { $('#run').disabled = !items.length; $('#status').textCon
 
 fetch('/model.json').then(r => r.json()).then(m => {
   MODEL = m;
+  if (m.compare) {
+    $('#cmp-h1').textContent = `p(fake), ${m.compare.name}`; $('#cmp-h2').textContent = `latency, ${m.compare.name}`;
+    $('#cmp-note').style.display = ''; $('#cmp-note').textContent = `Both models see the same 256² native window. ${m.compare.name} has ${m.compare.params.toLocaleString()} parameters, ours ${m.total_params.toLocaleString()}. Latency here is this laptop, all cores, fp32, for feel only; the measured numbers (one session, one GPU, one CPU core) are in the results table of the talk.`;
+  } else document.querySelectorAll('.cmp').forEach(e => e.style.display = 'none');
   $('#m-note').textContent = `${m.total_params.toLocaleString()} parameters. Five 3×3 convolution blocks with max-pooling, global average pooling, Dense 128, Dropout 0.4, sigmoid. Trained from scratch; no pretraining, no batch norm, no FFT branch.`;
   $('#model').innerHTML += m.layers.map(l => `<tr><td>${l.layer}</td><td>${l.type}</td><td>${l.shape}</td><td>${l.params.toLocaleString()}</td></tr>`).join('');
 });
@@ -137,31 +142,39 @@ function showDeep(k) {
   const row = (k3, v) => `<tr><td>${k3}</td><td class="v ${verdict(v)}">${v.toFixed(4)} → ${verdict(v)}</td></tr>`;
   $('#d-win-tab').innerHTML = '<tr><th colspan="2">window position (256² inside the 512² region)</th></tr>' + Object.entries(j.probes.windows).map(([k3, v]) => row(k3, v)).join('');
   $('#d-probe-tab').innerHTML = '<tr><th colspan="2">same window, perturbed</th></tr>' + row('native, as is', j.native.p_fake) + Object.entries(j.probes.jpeg).map(([q, v]) => row(`JPEG quality ${q}`, v)).join('') + row('downscaled (1024→512→256)', j.downscaled.p_fake);
-  $('#d-cost').innerHTML = `<tr><td>latency, fp32, this CPU</td><td>${j.latency_ms} ms (median of 20)</td></tr>` + (j.int8 ? `<tr><td>latency, int8 model</td><td>${j.int8.latency_ms} ms · p(fake) = ${j.int8.p_fake.toFixed(4)}</td></tr>` : '') + `<tr><td>parameters</td><td>${MODEL.total_params ? MODEL.total_params.toLocaleString() : ''} (${MODEL.total_params ? (MODEL.total_params*4/1e6).toFixed(2) : ''} MB fp32)</td></tr>`;
+  $('#d-cost').innerHTML = `<tr><td>latency, fp32, this CPU</td><td>${j.latency_ms} ms (median of 20)</td></tr>` + (j.int8 ? `<tr><td>latency, int8 model</td><td>${j.int8.latency_ms} ms · p(fake) = ${j.int8.p_fake.toFixed(4)}</td></tr>` : '') + (j.compare ? `<tr><td>${j.compare.name}, same window, this CPU</td><td>${j.compare.latency_ms} ms · p(fake) = ${j.compare.p_fake.toFixed(4)} (${verdict(j.compare.p_fake)})</td></tr>` : '') + `<tr><td>parameters</td><td>${MODEL.total_params ? MODEL.total_params.toLocaleString() : ''} (${MODEL.total_params ? (MODEL.total_params*4/1e6).toFixed(2) : ''} MB fp32)</td></tr>`;
   $('#deep').scrollIntoView({behavior: 'smooth', block: 'start'});
 }
 
 $('#run').onclick = async () => {
   const tbl = $('#results'); tbl.style.display = ''; [...tbl.querySelectorAll('tr')].slice(1).forEach(r => r.remove());
   $('#summary').textContent = ''; $('#deep').style.display = 'none'; $('#run').disabled = true; results = [];
-  let correct = 0, judged = 0, lat = [];
+  let correct = 0, judged = 0, lat = [], ccorrect = 0, clat = [];
   for (const [k, it] of items.entries()) {
     $('#status').textContent = `running ${k + 1} / ${items.length}…`;
     const j = await (await fetch('/predict', {method: 'POST', body: it.blob})).json();
     results[k] = j.error ? null : j;
     const tr = tbl.insertRow(); tr.className = 'row';
-    if (j.error) { tr.innerHTML = `<td colspan="6">${it.name}: error - ${j.error}</td>`; continue; }
+    if (j.error) { tr.innerHTML = `<td colspan="8">${it.name}: error - ${j.error}</td>`; continue; }
     const vn = verdict(j.native.p_fake); let truth = 'unknown (uploaded)';
     if (it.truth) { judged++; const ok = it.truth === vn; if (ok) correct++; truth = `${it.truth} <span class="${ok ? 'ok' : 'bad'}">${ok ? '✓' : '✗'}</span>`; }
     lat.push(j.latency_ms);
+    let cmp = '';
+    if (j.compare) {
+      const vc = verdict(j.compare.p_fake); clat.push(j.compare.latency_ms);
+      const cok = it.truth ? (it.truth === vc) : null; if (cok) ccorrect++;
+      cmp = `<td>${j.compare.p_fake.toFixed(4)} <span class="muted">(${vc})</span>${cok === null ? '' : ` <span class="${cok ? 'ok' : 'bad'}">${cok ? '✓' : '✗'}</span>`}</td><td>${j.compare.latency_ms} ms</td>`;
+    } else if (MODEL.compare) cmp = '<td></td><td></td>';
     tr.innerHTML = `<td><img src="${it.thumb}"><span class="muted" style="font-size:12px">${it.name}</span></td>
       <td><img src="${j.native.window}" style="display:inline-block;vertical-align:middle;margin-right:10px"><span class="v ${vn}">${vn.toUpperCase()}</span></td>
       <td>${j.native.p_fake.toFixed(4)}</td><td>${j.downscaled.p_fake.toFixed(4)} <span class="muted">(${verdict(j.downscaled.p_fake)})</span></td>
-      <td>${j.latency_ms} ms</td><td>${truth}</td>`;
+      <td>${j.latency_ms} ms</td>${cmp}<td>${truth}</td>`;
     tr.onclick = () => showDeep(k);
   }
-  const med = lat.length ? lat.sort((a, b) => a - b)[Math.floor(lat.length / 2)] : null;
-  $('#summary').innerHTML = (judged ? `<b>${correct} of ${judged}</b> correct on labelled images (native window)` : `${items.length} images scored`) + (med !== null ? ` · median latency ${med} ms per image on this CPU (fp32)` : '') + ` · click a row for the full analysis`;
+  const median = a => a.length ? a.slice().sort((x, y) => x - y)[Math.floor(a.length / 2)] : null;
+  const med = median(lat), cmed = median(clat), cname = MODEL.compare ? MODEL.compare.name : '';
+  $('#summary').innerHTML = (judged ? `<b>${correct} of ${judged}</b> correct on labelled images (native window)` + (clat.length ? `, ${cname} ${ccorrect} of ${judged}` : '') : `${items.length} images scored`)
+    + (med !== null ? ` · median latency ours ${med} ms` + (cmed !== null ? `, ${cname} ${cmed} ms` : '') + ` per image on this CPU (fp32)` : '') + ` · click a row for the full analysis`;
   $('#status').textContent = ''; $('#run').disabled = false;
   if (results.length === 1 && results[0]) showDeep(0);
 };
