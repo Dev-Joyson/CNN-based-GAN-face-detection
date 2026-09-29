@@ -95,7 +95,7 @@ against the pretrained models.
 
 ---
 
-## Slide 16: Full-size model: 6× faster than MobileNet on GPU, but 16× in compute
+## Slide 16: Base model: 6× faster than MobileNet on GPU, but 16× in compute
 
 Here's that comparison, against MobileNetV3-Small, which is the closest pretrained
 model in size. Both are about one million parameters.
@@ -116,130 +116,124 @@ the compute.
 
 ## Slide 17: A stride-2 first layer makes the model faster
 
-The first cut was simple. The very first convolution layer works at full resolution,
-and that layer alone is a big share of the cost. We gave it a stride of two, so it
-steps two pixels at a time and every layer after it works on a quarter of the area.
+The first cut was simple. The very first convolution layer works on the full 256 by
+256 input, and that one layer is a big share of the whole cost. We made it step two
+pixels at a time instead of one. Only that layer changes, the other four are untouched,
+but everything after it now works on a quarter of the area.
 
-Compute dropped four times, from 1.11 to 0.28 billion multiply-adds. CPU time went
-from 30 milliseconds to under 8. Accuracy went from 0.99 to 0.984, so we lost about
-half a point. The parameter count doesn't change, because stride doesn't touch the
-weights.
+Point 2 on the slide is the payoff: a quarter of the arithmetic. MACs, which is just
+the multiply-adds per image, go from 1.11 billion to 0.28. On one CPU core that's 30
+milliseconds down to under 8.
 
-That's a good trade, but we were still at four times MobileNet's compute and two and
-a half times slower on one core. So we went one step further.
+The price is half a point of accuracy, 0.99 to 0.984, and the number of parameters
+doesn't change at all, still 1.01 million, because stride changes how the filters
+move, not how many there are.
 
+Good, but MobileNet still needs less arithmetic per image than this. So we cut the
+width in half.
 ---
 
-## Slide 18: Final model: 1/4 of MobileNet's size and faster on a single CPU core
+## Slide 18: 4× smaller than MobileNet, and faster on one CPU core
 
-The second cut was width. We halved the number of channels in every layer. Instead of
-32, 64, 128, 256, 256, it's now 16, 32, 64, 128, 128.
+This is the final model. On top of stride 2, we made every layer half as wide: 16, 32,
+64, 128, 128 filters instead of double that.
 
-This chart is the whole journey in one picture. We started at 1.2 billion multiply-adds
-and 0.90 accuracy with the resized dual-branch model. Crops took us to 0.99 at the same
-cost. Dropping the FFT trimmed it slightly. Stride two brought it down to 0.28. Half
-width brings it to 0.073 billion, and that's the final model.
+That takes the arithmetic down to 0.073 billion MACs per image, which is the same as
+MobileNet, with a quarter of its parameters. The chart shows the whole journey. The
+two light bars on the left are the dual-branch model, resized and then on crops. The
+three purple bars are the base model, the stride-2 model, and the final one. The red
+dashed line is MobileNet, and the last bar sits right on it.
 
-What did it cost us? About two accuracy points, 0.99 down to 0.98. And it's slow to
-train, it took over two hundred epochs to converge. But at inference it's now smaller
-than MobileNet in both parameters and compute.
+It cost us about two accuracy points, 0.99 down to 0.98. And it was slow to train,
+over two hundred epochs. But at inference this is now the lightest thing in the room.
 
-So the natural question is: at 0.98, what do those errors actually look like?
-
+So at 0.98, what do the mistakes actually look like?
 ---
 
-## Slide 19: Final model on 7,500 test images
+## Slide 19: The final model gets 98 out of 100 test images right
 
-The test set is 7,500 images the model has never seen, half real, half StyleGAN2.
+The test set is 7,500 images the model never saw: 3,750 real faces from FFHQ, 3,750
+from StyleGAN2.
 
-At a threshold of 0.5, it gets 0.98. Out of 3,750 real faces, 45 were called fake.
-Out of 3,750 fakes, 106 slipped through. So the model is slightly more likely to miss
-a fake than to accuse a real photo, and both error types are small.
+At a threshold of 0.5, 45 real faces were called fake, and 106 fakes got through. So
+it's slightly more likely to let a fake through than to doubt a real photo, and both
+numbers are small. That's the 0.98.
 
-I want to be clear that this is one seed and one threshold. We didn't tune the
-threshold on the test set.
+We didn't tune the threshold on the test set, it's just 0.5, and this is one seed.
 
-Now, we can count the errors, but we also wanted to know what the model is actually
-looking at when it decides.
-
+So it works. But which parts of the face is it actually using to decide?
 ---
 
-## Slide 20: What the final model looks at in a 256² crop
+## Slide 20: Where the final model looks before it decides
 
-This is Grad-CAM on the last convolution layer. The warm colours show which parts of
-the crop pushed the decision. Top row is four real faces, bottom row is four fakes,
-and all eight are classified correctly.
+This is Grad-CAM on the last convolution layer. The warm colours are the parts of the
+crop that pushed the decision. Top row is four real faces, bottom row four fakes, all
+eight classified correctly.
 
-The thing to notice is that it isn't looking at anything semantic. It's not checking
-whether the eyes match or the teeth look right. The hot spots sit on skin, on hair, on
-texture, on the regions where the generator's upsampling pattern is strongest. That's
-consistent with the fingerprint story: the model learned a texture-level statistic,
-not a face-level one.
+One thing to be clear about: this shows where the evidence was, not what the model
+"thinks". And what you see is that it isn't checking eyes or mouths. The hot patches
+sit on skin texture, which is where the generator's upsampling fingerprint lives. That's
+consistent with the whole story since slide 13: the model learned a texture-level
+statistic, not a face-level one.
 
-On the fakes, the attention is broad and confident. On the reals, it's more scattered,
-which fits: a real photo has no fingerprint to find, so the model is confirming an
-absence.
+The third fake, with the thinnest heat, is also the least confident of the eight, at
+0.69. That fits.
 
-So it works, and we have a reasonable idea why. Let's put it next to everything else
-we measured.
-
+So how does it stack up against the other models?
 ---
 
-## Slide 21: Our final model is the smallest and fastest, for about 2 accuracy points
+## Slide 21: Our final model is the smallest and fastest, and 2% less accurate
 
-Everything in this table was measured in one session, on the same L4 GPU and the same
-Xeon CPU, at batch size one, in fp32. That matters, and I'll come back to why.
+Everything in this table was measured in one session: same L4 GPU, same Xeon core,
+fp32, one image at a time. That matters, and I'll come back to why.
+
+Our three are the top rows, in the order we built them. Base model, stride-2 model,
+final model. Then the three pretrained ones. The bold number in each column is the
+best.
 
 Final model: 262 thousand parameters, about one millisecond on the GPU, 2.3
-milliseconds on a single CPU core, 0.98 accuracy.
+milliseconds on one CPU core, 0.98 accuracy. Against MobileNet, the closest competitor:
+four times fewer parameters, six times faster on the GPU, 1.4 times faster on one CPU
+core.
 
-Against MobileNetV3-Small, the closest competitor: a quarter of the parameters, six
-times faster on the GPU, and 1.4 times faster on one CPU core. Against EfficientNet
-and Xception, the gap is much larger on every resource column.
-
-And the price is accuracy. The pretrained models are all at 0.998 or above. We're at
-0.98. Two points is real, and we don't hide it. But this is a model trained from
-scratch, on one dataset, with no pretraining, at a quarter of the size of the smallest
-thing it's compared against.
-
+And the price is accuracy. They're all at 0.998 or above, we're at 0.98. Two points
+is real and we don't hide it. But this is a model trained from scratch, on one dataset,
+with no pretraining, at a quarter the size of the smallest thing it's compared to.
 ---
 
-## Slide 22: On the GPU ours run in about 1 ms, pretrained models take 5.5–9.5 ms
+## Slide 22: On one CPU core, our final model is the fastest of the six
 
-Same numbers, as a picture. Latency along the bottom, accuracy up the side, and the
-size of each circle is the number of parameters.
+Same numbers as a picture, and this time the axis is one CPU core, no GPU. That's the
+setting a phone or a small device would run in. Latency along the bottom on a log scale,
+accuracy up the side, circle size is parameters.
 
-Our three models are the small circles on the left, all at about one millisecond. The
-pretrained models sit between five and nine and a half milliseconds, and they're higher
-on the accuracy axis. Xception is the big circle: twenty-one million parameters for
-half a point over our full-size model.
+Read it left to right. Our final model is the leftmost circle, MobileNet is just behind
+it. Then the stride-2 model, then EfficientNet, and the base model sits next to it at
+about 30 milliseconds. Xception is the big one out at 128.
 
-This is the trade-off in one glance. You can have the last point of accuracy, or you
-can have a model that costs almost nothing to run. We chose the second one, and the
-gap is small enough to be honest about.
+So two changes took our model from 30 milliseconds to 2.3 on a single core, the fastest
+of the six, and it still runs in about one millisecond on the GPU. The pretrained ones
+are higher on the accuracy axis. That's the trade-off in one glance.
 
-Before the demo, I want to mention two things we got wrong along the way, because I
-think they matter.
-
+Before the demo, two things we got wrong along the way, because I think they matter.
 ---
 
 ## Slide 23: Two corrections we made along the way
 
-First, memory. Early on we reported that our full-size model used 1.3 gigabytes of GPU
-memory, which looked terrible next to MobileNet's 150 megabytes. It turned out that
-number was cuDNN's autotuning scratch space on the first call. After a warm-up, the
-real figure is 171 megabytes. We re-measured every model the same way.
+First, memory. Early on we reported that our base model used 1.3 gigabytes of GPU
+memory, which looked terrible next to MobileNet's 150 megabytes. That number turned out
+to be cuDNN's autotuning scratch space on the first call. After a warm-up, the real
+figure is 171 megabytes. We re-measured every model the same way.
 
 Second, CPU latency. Our first CPU numbers for MobileNet varied from 1.3 milliseconds
-to 6.6 depending on which Colab machine we happened to land on. Different CPUs, different
-instruction sets. So every number you saw in that table comes from one machine, in one
-session, and the machine is recorded alongside the results.
+to 6.6 depending on which Colab machine we happened to land on. Different chips,
+different instruction sets. So every number in that table comes from one machine, in
+one session, and the machine is recorded next to the results.
 
 I mention these because a resource comparison is only as good as its measurement, and
 we'd rather show you the correction than the wrong number.
 
-That's the results. Now let me show you the final model running live.
-
+That's the results. Now the final model live, next to MobileNet, on the same images.
 ---
 
-*Next: slide 24, Demonstration.*
+*Next: slide 24, Demonstration. The demo page scores both models on every image and shows both latencies; say once that laptop latency is for feel and the measured numbers are on slide 21.*
