@@ -746,12 +746,17 @@ general claim; the two-session table is.
 **Third session, a CPU-only runtime — AMD EPYC 7B12, one physical core (2 vCPUs; 1 and
 2 threads time the same), AVX2 without AVX-512, recorded by the script (2026-09-29):**
 
-| model | MACs | 1 thread, EPYC | 12 threads, Xeon (session 2) | 12 threads, Xeon (session 1) |
-|---|---|---|---|---|
-| MobileNetV3-Small | 0.07 G | 2.83 ms | 6.62 ms | 1.30 ms |
-| this model (headline) | 1.11 G | 26.8 ms | 4.98 ms | 5.04 ms |
-| stride-2 stem | 0.28 G | 6.72 ms | 1.47 ms | — |
-| stride-2 + half width (test27) | 0.073 G | **1.74 ms** | 0.56 ms | — |
+| model | params | MACs | 1 thread, EPYC | 12 threads, Xeon (session 2) | 12 threads, Xeon (session 1) |
+|---|---|---|---|---|---|
+| stride-2 + half width (test27) | 0.26M | 0.073 G | **1.74 ms** | 0.56 ms | — |
+| MobileNetV3-Small | 1.01M | 0.07 G | 2.83 ms | 6.62 ms | 1.30 ms |
+| stride-2 stem | 1.01M | 0.28 G | 6.72 ms | 1.47 ms | — |
+| EfficientNet-B0 | 4.21M | 0.50 G | 22.7 ms | — | 7.49 ms |
+| this model (headline) | 1.01M | 1.11 G | 26.8 ms | 4.98 ms | 5.04 ms |
+| Xception | 21.1M | 5.95 G | 160 ms | — | 28.9 ms |
+
+Sorted by single-core latency, the order is the MACs order except for the two lightest,
+where MobileNet's per-op overhead puts it behind the 0.073 G variant.
 
 **What three machines say about CPU latency.** With one core there is nothing to hide
 arithmetic behind, and latency follows MACs almost linearly for our plain-conv models

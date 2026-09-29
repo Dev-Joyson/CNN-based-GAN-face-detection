@@ -343,7 +343,9 @@ the README says how things *are*, this says how we found out.
   speed-up that a single core does not have. MobileNet is overhead-bound (1 thread = 2
   threads = 2.8 ms) and beats the headline 9× here; only the 0.073 G variant beats
   MobileNet. Final CPU statement: many cores → ours competitive or faster; one core →
-  MACs rule and MobileNet wins except against test27. The compute axis exists for this.
+  MACs rule and MobileNet wins except against test27. The compute axis exists for this. Completed
+  for all six: EfficientNet 22.7 ms, Xception 160 ms on the same core — single-core
+  latency is the MACs order, with MobileNet's overhead the one exception.
 - **Latency needs no training; accuracy does.** The efficiency half of the comparison
   can be measured before any baseline is fine-tuned.
 - **Published detectors zero-shot measure generalisation, not architecture.** CNNDetection
