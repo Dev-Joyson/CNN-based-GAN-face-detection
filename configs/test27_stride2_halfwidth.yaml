@@ -24,7 +24,7 @@ input_mode: crop
 cache_size: 512             # centre 512^2 at native pixels; 768 keeps the hair, 1024 everything -- see model.Config
 batch_size: 144
 
-epochs: 150               # let patience decide
+epochs: 250               # ran to 150 still climbing (val 0.9967 at 149); extended
 lr: 0.0003
 patience: 15              # 6 cut the test16 ablation off mid-climb; both runs sat at 0.960 at epoch 61
 seed: 42
