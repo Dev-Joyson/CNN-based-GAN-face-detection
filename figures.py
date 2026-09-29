@@ -32,6 +32,7 @@ DEFAULT_OVERLAY = ["test19_sg2_crop_no_fft", "test21_stride2_stem", "test19_sg2_
 EFFICIENCY_ROWS = [  # (run folder relative to experiments/, label)
     ("test19_sg2_crop_no_fft", "this model (headline)"),
     ("test21_stride2_stem", "this model, stride-2 stem"),
+    ("test27_stride2_halfwidth", "this model, stride-2 + half width"),
     ("test19_sg2_crop", "this model, +FFT"),
     ("test20_crop_baselines/baselines/mobilenet_v3_small", "MobileNetV3-Small"),
     ("test20_crop_baselines/baselines/efficientnet_b0", "EfficientNet-B0"),
