@@ -194,6 +194,11 @@ branch, native-resolution 256² crops. Test AUC 0.9998 ± 0.0002 over three seed
    Pending small add: `quantize.py --config configs/test21_stride2_stem.yaml` on the
    Xeon so the stride-2 row joins the table (Mac preview: fp32 1.39 / int8 0.84 ms vs
    headline 4.32 / 1.65 — ~3× faster on CPU).
+4c. **Compute axis, one more point (decided 2026-09-29):** `test27_stride2_halfwidth.yaml`
+   — stride 2 + `width_mult: 0.5` → 261,665 params, 0.073 G MACs, headline's cache,
+   `es_start_epoch: 40`. Goal: the model a mobile-deployment follow-up would start
+   from, if it holds 0.99+. Then `evaluate.py`, `--eval-jpeg 95`, and `quantize.py`
+   (Xeon) on it AND on test21, so the three variants share one CPU table.
 5. **Held-out reals** (CelebA-HQ 1024) with `heldout.py --real-dir … --tag celebahq`.
 6. **Sensitivity checks** on the crop pipeline for `docs/hyperparameters.md`:
    lr {1e-4, 1e-3}, augmentation {off, Wang 2020's}. One run each, note the number.

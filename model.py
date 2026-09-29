@@ -89,6 +89,11 @@ class Config:
     # cost: BN folds into the conv weights, so latency/memory are unchanged;
     # params +0.2% (two per channel). Ablation knob, not a headline change.
     batchnorm: bool = False
+    # channel-width multiplier on the five conv blocks (32-64-128-256-256 × this).
+    # 1.0 = the headline. 0.5 halves every width: ~4× fewer MACs and params. The
+    # "how low can it go" knob for the compute axis; MobileNet's own alpha
+    # (Howard et al. 2017) is the same idea. Not in the cache key.
+    width_mult: float = 1.0
 
     # augmentation (train split only)
     # ours: 3x3 box blur p=0.3, JPEG q~U[60,100] p=0.3 (the notebook's).
@@ -159,6 +164,8 @@ class Config:
                 raise ValueError(f"scale_aug factors must be ints >= 1, got {self.scale_aug}")
             if self.img_size * max(self.scale_aug) > self.cache_size:
                 raise ValueError(f"scale_aug {self.scale_aug}: img_size*f exceeds cache_size {self.cache_size}")
+        if not (0 < self.width_mult <= 1.0):
+            raise ValueError(f"width_mult must be in (0, 1], got {self.width_mult}")
         if self.checkpoint not in ("best", "last"):
             raise ValueError(f"checkpoint must be best or last, got {self.checkpoint!r}")
         if self.aug not in ("ours", "wang"):
@@ -524,11 +531,12 @@ def build_model(cfg):
 
     # Spatial branch -- fixed names so Grad-CAM can ask for "spatial_conv_5"
     bn = cfg.batchnorm
-    x = conv_block(input_img, 32, name="spatial_conv_1", stride=cfg.stem_stride, batchnorm=bn)
-    x = conv_block(x, 64, name="spatial_conv_2", batchnorm=bn)
-    x = conv_block(x, 128, name="spatial_conv_3", batchnorm=bn)
-    x = conv_block(x, 256, name="spatial_conv_4", batchnorm=bn)
-    x = conv_block(x, 256, name="spatial_conv_5", batchnorm=bn)
+    w = lambda c: max(8, int(round(c * cfg.width_mult)))
+    x = conv_block(input_img, w(32), name="spatial_conv_1", stride=cfg.stem_stride, batchnorm=bn)
+    x = conv_block(x, w(64), name="spatial_conv_2", batchnorm=bn)
+    x = conv_block(x, w(128), name="spatial_conv_3", batchnorm=bn)
+    x = conv_block(x, w(256), name="spatial_conv_4", batchnorm=bn)
+    x = conv_block(x, w(256), name="spatial_conv_5", batchnorm=bn)
     x = layers.GlobalAveragePooling2D()(x)
 
     if cfg.fft_branch:
