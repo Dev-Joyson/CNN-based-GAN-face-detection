@@ -256,6 +256,82 @@ That's the results. Now the final model live, next to MobileNet, on the same ima
 
 ---
 
-*Next: slide 24, Demonstration. The demo page scores both models on every image and
-shows both latencies; say once that laptop latency is for feel and the measured numbers
-are on slide 21.*
+## Slide 24: Demonstration
+
+About three minutes. Do the actions in brackets, say the lines. Before the talk: run
+`python demo/app.py` in a terminal, wait for "open http://localhost:8000" (about a
+minute, it loads both models), open that address in the browser, and leave it on the
+sample grid with nothing selected.
+
+[Switch to the browser.]
+
+This is the final model running live, on this laptop, no GPU. The twenty faces on the
+screen were never used in training. Top row is real photos from FFHQ, bottom row is
+StyleGAN2 fakes. The model doesn't know which is which. I do, because they're labelled,
+so we can check it.
+
+[Click three or four from each row. Mix them up. Click Run selected.]
+
+Both models get the exact same input: the middle 256 by 256 of the original image, at
+native pixels, no resizing. Ours on the left, MobileNet on the right, the model we've
+been comparing against all along.
+
+[Wait for the rows to fill. Point along one row.]
+
+For each image you get the crop the model saw, then the verdict, the score, and the time
+it took, for both models. The tick means it agrees with the label. The line above the
+table adds it up.
+
+[Point at the two latency columns.]
+
+On this laptop ours takes under a millisecond and MobileNet about four. I'll say this
+once: laptop time is for feel, it uses all the cores and it isn't the number in the
+thesis. The measured numbers, one core, one sitting, are the table on slide 21. But the
+ordering is the same.
+
+[Click one row, preferably a fake. The deep view opens.]
+
+Now everything the model did with this one image, top to bottom.
+
+[Section 1, the original with the boxes.]
+
+The blue box is the 512 region we keep at native pixels. The red box is the 256 window
+the model actually sees. Next to it, the same image the old way, resized down. Same
+model, two inputs: on the native window it says fake with a high score, on the resized
+one it's guessing. That's slide 13, live.
+
+[Section 2, feature maps and Grad-CAM.]
+
+These strips are what the first layer and the last layer respond to. The first layer is
+edges and texture, the last one is a handful of coarse blobs. And this is the Grad-CAM
+from slide 20, on this image: the warm patches are what pushed it to say fake. Skin,
+not eyes.
+
+[Section 3, the probes.]
+
+Is the decision stable? Same window, saved as JPEG at quality 95 and 75, and the window
+moved to the four corners of the region. The score barely moves. It's not reacting to
+one lucky patch.
+
+[Section 4, the cost.]
+
+And the cost of that decision: time on this CPU for ours and for MobileNet, and the
+parameter count, 262 thousand. Below it is the layer table, the same five conv blocks
+from the methodology.
+
+[If a sample is misclassified during the run, don't skip it. Click it.]
+
+That one is the two percent. You can see the score sits close to 0.5, and the heat map
+is thin. That's what a miss looks like, and it's why the number on the slide is 0.98 and
+not 1.
+
+[Back to the slides.]
+
+That's the model. Now the conclusions.
+
+---
+
+*Fallbacks: if the server isn't up, `python demo/app.py` takes about a minute. If the
+browser shows an error on an image, click Clear and run again. If MobileNet fails to
+load, the page runs ours only and the note above the table disappears; the talk still
+works, skip the MobileNet lines.*
