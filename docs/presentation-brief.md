@@ -166,3 +166,57 @@ six levers ±0.04; the gap is pretraining) → hand-off to the demo.
 
 Conclusions (1): four lines against the objectives; recommendation: pretrained or
 distilled features for generalisation, stride-2 variant for a mobile follow-up.
+
+### The five slide tables, in ACCURACY (Joyson's decision, 2026-09-29)
+
+Accuracy is at the 0.5 threshold, from the README (evaluate.py test split). AUC
+stays in speaker notes; it is shown on the StyleGAN3 slide only, where accuracy at
+0.5 undersells the pretrained models. No other table goes on a presented slide.
+
+**Slide 4, where we started** — the one number that predates the protocol: 0.9995 AUC
+(validation, original notebook; accuracy not recorded — say so).
+
+| | reals | fakes |
+|---|---|---|
+| resolution in the first dataset | 512² | 1024² |
+
+**Slide 5–6, the accuracy story**
+
+| pipeline | test accuracy | high-frequency audit AUC |
+|---|---|---|
+| clean data, resized 1024→256 | 0.90 | 0.52 |
+| clean data, native 256² crops | 0.99 | 0.55 |
+
+**Slide 8, the comparison** (one L4 session, fp32, batch 1; baselines fine-tuned on the identical crop pipeline)
+
+| model | params | MACs | GPU ms | peak MB | test accuracy |
+|---|---|---|---|---|---|
+| ours (headline) | 1.01M | 1.11 G | 0.97 | 171 | 0.99 |
+| MobileNetV3-Small | 1.01M | 0.07 G | 4.81 | 152 | 0.998 |
+| EfficientNet-B0 | 4.21M | 0.50 G | 7.10 | 205 | 0.999 |
+| Xception | 21.1M | 5.95 G | 4.84 | 409 | 0.9995 |
+
+**Slide 9–10, the two stems over three seeds**
+
+| stem | MACs | test accuracy (seeds 42 / 43 / 44) | mean |
+|---|---|---|---|
+| stride 1 (headline) | 1.11 G | 0.990 / 0.997 / 0.997 | 0.995 |
+| stride 2 (deployment variant) | 0.28 G | 0.984 / 0.984 / 0.986 | 0.985 |
+
+(AUC for the notes: 0.9998 ± 0.0002 and 0.9988 ± 0.0002. CPU TFLite latency: headline 5.04 ms on the Xeon; stride-2 not yet measured on the Xeon — omit the column or mark pending.)
+
+**Slide 11, what it costs** (StyleGAN3-T, 1,500 unseen fakes + 1,500 unseen reals)
+
+| model | StyleGAN2 accuracy | StyleGAN3 accuracy at 0.5 | StyleGAN3 AUC |
+|---|---|---|---|
+| ours | 0.99 | 0.53 | 0.70 |
+| MobileNetV3-Small | 0.998 | 0.68 | 0.96 |
+| EfficientNet-B0 | 0.999 | 0.84 | 0.99 |
+| Xception | 0.9995 | 0.65 | 0.97 |
+
+One line under it: "six training-only levers at fixed cost: 0.67–0.78 AUC".
+
+**Figures on presented slides**: `curves_overlay.png` (slide 6), `efficiency_scatter.png`
+(slide 8), `seeds.png` (slide 10). **Backup slides only**: quantization table, six-lever
+table, JPEG/downscale probes, dataset audit table, distillation detail, `efficiency_bars.png`,
+`heldout_bars.png`.
