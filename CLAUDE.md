@@ -200,7 +200,12 @@ of *Baselines*): GPU 1.06 / 1.06 / 1.04 ms vs MobileNet 6.40, EffNet 9.47, Xcept
    Pending small add: `quantize.py --config configs/test21_stride2_stem.yaml` on the
    Xeon so the stride-2 row joins the table (Mac preview: fp32 1.39 / int8 0.84 ms vs
    headline 4.32 / 1.65 — ~3× faster on CPU).
-4c. **Compute axis, one more point (decided 2026-09-29):** `test27_stride2_halfwidth.yaml`
+4c. **THESIS FINAL MODEL = test27 (Joyson, 2026-09-29).** Repo "headline" naming stays
+   (test19 is the accuracy reference); the presentation and thesis call test27 the final
+   model. Pending: seeds `test27_stride2_halfwidth_s43/_s44` (train + evaluate, ~2 h each,
+   new caches) and `heldout.py --config configs/test27_stride2_halfwidth.yaml --fake-dir
+   "…/Fake(SG3-T-psi1)" --tag sg3t` (once).
+   **Compute axis, one more point (decided 2026-09-29):** `test27_stride2_halfwidth.yaml`
    — stride 2 + `width_mult: 0.5` → 261,665 params, 0.073 G MACs, headline's cache,
    `es_start_epoch: 40`. Goal: the model a mobile-deployment follow-up would start
    from, if it holds 0.99+. Then `evaluate.py`, `--eval-jpeg 95`, and `quantize.py`

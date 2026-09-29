@@ -252,6 +252,18 @@ One line under it: "six training-only levers at fixed cost: 0.67–0.78 AUC".
 table, JPEG/downscale probes, dataset audit table, distillation detail, `efficiency_bars.png`,
 `heldout_bars.png`.
 
+## DECISION 2026-09-29: the FINAL MODEL is test27 (stride 2, half width, 261,665 params)
+
+Joyson's call. Framing for every slide: the full-size model (1.01M, 0.9998, 3 seeds) is
+the *accuracy reference and the path*; test27 is the *result*: MobileNet's arithmetic
+(0.073 G) at a quarter of its parameters, 1.04 ms on the L4 (6× faster than MobileNet),
+2.28 ms on one Xeon core (1.4× faster than MobileNet's 3.17), 141 MB, accuracy 0.98 /
+AUC 0.9983, for two accuracy points against the full-size model. Its gap was tested three
+ways (distillation null, BN+lr same ceiling → capacity). Pending before the talk: seeds
+43/44 of test27 (`configs/test27_stride2_halfwidth_s43/_s44.yaml`) and its StyleGAN3-T
+score. Until those land, slides say "one seed" and no "[TBD]". Item A of the review
+below is resolved by this decision; B–E still apply.
+
 ## Review of "V3 Final Presentation", slides 10–18 (Claude, 2026-09-29) — apply these
 
 Slides 10–18 are the results chain (resize → distil ✗ → crops ✓ → FFT → drop FFT →
