@@ -199,6 +199,10 @@ branch, native-resolution 256² crops. Test AUC 0.9998 ± 0.0002 over three seed
    `es_start_epoch: 40`. Goal: the model a mobile-deployment follow-up would start
    from, if it holds 0.99+. Then `evaluate.py`, `--eval-jpeg 95`, and `quantize.py`
    (Xeon) on it AND on test21, so the three variants share one CPU table.
+   **test27 at 150 epochs (2026-09-29): AUC 0.9972, acc 0.969, JPEG q95 0.9940, 0.99 ms
+   GPU, 141 MB, 7,876 img/s. Still climbing at the cap → epochs 250, `--resume`
+   continuation running (log /content/train27b.log). Quantization of test21/test27 on
+   the Xeon: Joyson chose to leave it out of the chain; still open if wanted.**
 5. **Held-out reals** (CelebA-HQ 1024) with `heldout.py --real-dir … --tag celebahq`.
 6. **Sensitivity checks** on the crop pipeline for `docs/hyperparameters.md`:
    lr {1e-4, 1e-3}, augmentation {off, Wang 2020's}. One run each, note the number.

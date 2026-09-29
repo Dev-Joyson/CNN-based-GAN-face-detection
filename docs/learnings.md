@@ -315,6 +315,12 @@ the README says how things *are*, this says how we found out.
   hid (both 0.97 ms) shows on the CPU runtime: 3.1× faster. Not same-session with the
   Xeon table (MobileNet 1.30 there); the Colab quantize run on test21 is the number to
   quote. Illustrates again that MACs predict CPU latency and not GPU latency.
+- **2026-09-29 — The compute axis, third point: stride 2 + half width = 262k params,
+  0.073 G MACs (MobileNet's arithmetic), test AUC 0.9972 / acc 0.969 at the 150 cap,
+  JPEG q95 0.9940.** 15× less arithmetic than the headline for ~2 accuracy points, and
+  the run was still climbing at the cap (extended). Peak memory 141 MB, 7,876 img/s.
+  The signal is simple enough that a quarter-size net still reads it; what shrinks
+  with capacity is learning speed (chance plateau to epoch ~12, 0.99 only after 100).
 - **Latency needs no training; accuracy does.** The efficiency half of the comparison
   can be measured before any baseline is fine-tuned.
 - **Published detectors zero-shot measure generalisation, not architecture.** CNNDetection
