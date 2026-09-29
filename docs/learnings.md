@@ -321,6 +321,10 @@ the README says how things *are*, this says how we found out.
   the run was still climbing at the cap (extended). Peak memory 141 MB, 7,876 img/s.
   The signal is simple enough that a quarter-size net still reads it; what shrinks
   with capacity is learning speed (chance plateau to epoch ~12, 0.99 only after 100).
+  Extended to 250 (`--resume`): best epoch 209, stopped 224, **final 0.9983 / acc 0.98,
+  JPEG q95 0.9958**. The 150 cap had cost it 0.001 AUC and one accuracy point — a
+  smaller net needs the epochs a bigger one does not; caps must be checked against the
+  curve, not fixed.
 - **2026-09-29 — TFLite on the Mac CPU, one session: headline 4.37 / stride-2 1.51 /
   test27 0.84 ms fp32; int8 1.57 / 0.87 / 0.43.** Each halving of MACs shows on the CPU
   runtime roughly as expected; test27 scaled to the Xeon lands near MobileNet's 1.30 ms

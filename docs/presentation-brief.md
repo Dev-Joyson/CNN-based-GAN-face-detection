@@ -196,6 +196,14 @@ stays in speaker notes; it is shown on the StyleGAN3 slide only, where accuracy 
 | EfficientNet-B0 | 4.21M | 0.50 G | 7.10 | 205 | 0.999 |
 | Xception | 21.1M | 5.95 G | 4.84 | 409 | 0.9995 |
 
+**Slide 9, the compute axis** (optional third row; test27 is one seed)
+
+| variant | params | MACs | GPU ms | peak MB | test accuracy |
+|---|---|---|---|---|---|
+| headline (stride 1) | 1.01M | 1.11 G | 0.97 | 171 | 0.99 |
+| stride 2 | 1.01M | 0.28 G | 0.97 | 158 | 0.984 |
+| stride 2 + half width (test27) | 0.26M | 0.073 G | 0.99 | 141 | 0.98 |
+
 **Slide 9–10, the two stems over three seeds**
 
 | stem | MACs | test accuracy (seeds 42 / 43 / 44) | mean |

@@ -317,7 +317,13 @@ vs 0.99, and ~130 epochs to converge against ~10 — Gragnaniello et al. 2021's 
 that early downsampling hurts is measurable here, but as a slower climb to nearly the
 same place, not a ceiling. Three seeds each (2026-09-25): stride 1 0.9998 ± 0.0002, stride 2 0.9988 ± 0.0002 —
 the gap is real (five spreads), so the headline stays stride 1 and stride 2 is the
-reported cheap variant (README *Seeds*). GPU latencies this session are
+reported cheap variant (README *Seeds*). **A third point on the compute axis
+(test27, 2026-09-29): stride 2 + half width, 261,665 params, 0.073 G MACs — MobileNet's
+arithmetic at a quarter of its parameters — reaches 0.9983 / accuracy 0.98, JPEG q95
+0.9958, 141 MB at bs=1, 7,846 img/s.** Fifteen times less arithmetic than the headline
+for two accuracy points; on TFLite (Mac, one session) 0.84 ms fp32 / 0.43 ms int8
+against the headline's 4.37 / 1.57. What capacity buys is learning speed (chance
+plateau to epoch ~12, 0.99 only after 100, best at 209) more than accuracy. GPU latencies this session are
 within 5% of the table's (0.96 / 1.45 / 4.81 / 7.10 / 4.84 vs 1.02 / 1.49 / 4.71 /
 6.82 / 4.78): the session-to-session noise floor, ranking unchanged.
 
@@ -393,7 +399,7 @@ StyleGAN3-T generalisation gap is the open question (`heldout.py --model <baseli
 |---|---|---|---|---|---|---|---|---|
 | **this model, native crops, no FFT (headline)** | 1.01M | 1.11G | **1.02** | **8.4** | 2,098 | 171 | — | **0.9996** |
 | this model, **stride-2 stem** (test21) | 1.01M | **0.28G** | 0.97 | **4.0** (6.4 for the headline, same session) | **5,547** | **158** | — | 0.9990 (acc 0.98) |
-| this model, stride-2 + half width (test27) | **0.26M** | **0.073G** | 0.99 | 2.7 | **7,876** | **141** | — | 0.9972 (acc 0.969) at the 150 cap, still climbing; extended run pending |
+| this model, stride-2 + half width (test27) | **0.26M** | **0.073G** | 0.99 | 2.7 | **7,846** | **141** | — | 0.9983 (acc 0.98) |
 | this model, native crops, with FFT (test19) | 1.02M | 1.20G | 1.49 | 8.6 | 1,564 | 171 | — | 0.9994 |
 | this model, resize pipeline (test17) | 1.02M | 1.20G | 1.34 | 8.7 | 1,564 | 171 (same network) | 0.964 (mix 0.973) | — |
 | this model, no FFT branch, resize pipeline | 1.01M | 1.11G | **0.99** | **6.6** | 2,098 | 171 (same network) | 0.953 (mix 0.975) | — |
@@ -522,7 +528,7 @@ input, where the frequencies it was designed for have not been resized away.
 | test25_online_kd_effnet | online distillation from EfficientNet-B0, from scratch | same as headline | 0.9987 (acc 0.985); SG3-R 0.666 — **worse** | 0.9986 (best 58, VM lost at 66, finalized) | `experiments/test25_online_kd_effnet/` |
 | test24_sg2_crop_scale_aug | scale augmentation: training windows at native and half scale | same as headline | 0.9982 (acc 0.982); on downscaled input 0.746 (headline 0.556); SG3-R 0.715 | 0.9985 (best 129, stopped 136) | `experiments/test24_sg2_crop_scale_aug/` |
 | test26_sg1sg2_wang_from_23c | Wang aug on the two-generator BN model (stacked levers) | FFHQ + SG2 + SG1 | 0.9982 on the mixed split; SG3-R 0.704 — worse than either parent | 30 fixed epochs, last weights (epoch 30 val 1.0000; BN swings 0.67–1.0 in between) | `experiments/test26_sg1sg2_wang_from_23c/` |
-| test27_stride2_halfwidth | stride 2 + every width halved: 261,665 params, 0.073 G MACs (MobileNetV3-Small's arithmetic at ¼ its params) | same | 0.9972 (acc 0.969) at the 150 cap, val still rising 0.001/10 epochs; JPEG q95 0.9940 | 0.9968 (best 142 of 150; extended to 250, pending) | `experiments/test27_stride2_halfwidth/` |
+| test27_stride2_halfwidth | stride 2 + every width halved: 261,665 params, 0.073 G MACs (MobileNetV3-Small's arithmetic at ¼ its params) | same | **0.9983 (acc 0.98)**; JPEG q95 0.9958. At the original 150 cap it read 0.9972 / 0.969, still climbing, so the cap was raised to 250 and the run resumed | 0.9978 (best 209, stopped 224) | `experiments/test27_stride2_halfwidth/` |
 | test21_stride2_stem | headline with a stride-2 first conv (4× fewer MACs) | same | 0.9990 (acc 0.984); 0.9988 ± 0.0002 over three seeds | 0.9983 (best epoch 129; ran to the 150 cap, plateaued from ~125) | `experiments/test21_stride2_stem/` |
 | test17_sg2 | headline, resize pipeline (1024→512→256) | same | 0.9636 (acc 0.90) | 0.9645 (best epoch 89 of 104, early-stopped) | `experiments/test17_sg2/` |
 | test17_sg2_no_fft | ablation — FFT branch removed | same | 0.9527 (acc 0.88) | 0.9503 (best epoch 114, killed at 116 while grinding) | `experiments/test17_sg2_no_fft/` |
