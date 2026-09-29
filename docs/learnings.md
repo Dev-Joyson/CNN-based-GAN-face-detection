@@ -360,6 +360,14 @@ the README says how things *are*, this says how we found out.
   optimisation, not missing supervision — and distillation on this task is now negative
   or null three times (offline EffNet, online EffNet, online self). Remaining levers
   for test27: batch norm + lr 1e-3 (optimisation), width 0.75 (capacity).
+- **2026-09-29 — test27 + batch norm + lr 1e-3: AUC 0.9984, best epoch 52 (test27: 209).**
+  Optimisation was the speed problem, not the ceiling: 4× faster to the identical AUC.
+  With test28 (supervision: null) this closes the question — the 262k model's gap is
+  capacity. Side finding, twice now: BN shifts the 0.5 threshold (accuracy 0.95 at
+  identical ranking), so BN models need calibration before an accuracy is quoted. The
+  lr sensitivity row is answered on the small variant: 1e-3 vs 3e-4 changes convergence
+  speed, not the ceiling. Keras' in-training AUC (0.9949) under-read sklearn's (0.9984)
+  on this run — bunched BN scores and the 200-threshold approximation; quote evaluate.py.
 - **Latency needs no training; accuracy does.** The efficiency half of the comparison
   can be measured before any baseline is fine-tuned.
 - **Published detectors zero-shot measure generalisation, not architecture.** CNNDetection

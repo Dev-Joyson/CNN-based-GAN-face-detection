@@ -323,7 +323,11 @@ arithmetic at a quarter of its parameters — reaches 0.9983 / accuracy 0.98, JP
 0.9958, 141 MB at bs=1, 7,846 img/s.** Fifteen times less arithmetic than the headline
 for two accuracy points; on TFLite (Mac, one session) 0.84 ms fp32 / 0.43 ms int8
 against the headline's 4.37 / 1.57. What capacity buys is learning speed (chance
-plateau to epoch ~12, 0.99 only after 100, best at 209) more than accuracy. GPU latencies this session are
+plateau to epoch ~12, 0.99 only after 100, best at 209) more than accuracy. The
+262k model's remaining gap to the headline (0.9983 vs 0.9998) was then tested three
+ways: distilling the headline into it (test28, +0.0003, noise), batch norm + lr 1e-3
+(test29, 0.9984, converges 4× faster to the same ceiling), so it is **capacity**, not
+supervision or optimisation. Width is the knob that would recover it (0.75 untested). GPU latencies this session are
 within 5% of the table's (0.96 / 1.45 / 4.81 / 7.10 / 4.84 vs 1.02 / 1.49 / 4.71 /
 6.82 / 4.78): the session-to-session noise floor, ranking unchanged.
 
@@ -554,6 +558,7 @@ input, where the frequencies it was designed for have not been resized away.
 | test26_sg1sg2_wang_from_23c | Wang aug on the two-generator BN model (stacked levers) | FFHQ + SG2 + SG1 | 0.9982 on the mixed split; SG3-R 0.704 — worse than either parent | 30 fixed epochs, last weights (epoch 30 val 1.0000; BN swings 0.67–1.0 in between) | `experiments/test26_sg1sg2_wang_from_23c/` |
 | test27_stride2_halfwidth | stride 2 + every width halved: 261,665 params, 0.073 G MACs (MobileNetV3-Small's arithmetic at ¼ its params) | same | **0.9983 (acc 0.98)**; JPEG q95 0.9958. At the original 150 cap it read 0.9972 / 0.969, still climbing, so the cap was raised to 250 and the run resumed | 0.9978 (best 209, stopped 224) | `experiments/test27_stride2_halfwidth/` |
 | test28_kd_headline_to_test27 | online distillation of the headline (T=4) into the test27 architecture, warm-started from test27 | same | 0.9986 (acc 0.98) vs test27's 0.9983 / 0.98 — **+0.0003, within seed noise**; the small model's ceiling is not a lack of guidance | early-stopped ~epoch 20 | `experiments/test28_kd_headline_to_test27/` |
+| test29_test27_bn_lr1e3 | test27 architecture + batch norm + lr 1e-3, from scratch | same | 0.9984 — same ceiling as test27 (0.9983); accuracy at 0.5 fell to 0.95 (fake recall 0.90) from BN's running-statistics calibration shift, not a ranking loss | best epoch 52, stopped 67 — converges 4× faster than test27 (best 209) to the same AUC | `experiments/test29_test27_bn_lr1e3/` |
 | test21_stride2_stem | headline with a stride-2 first conv (4× fewer MACs) | same | 0.9990 (acc 0.984); 0.9988 ± 0.0002 over three seeds | 0.9983 (best epoch 129; ran to the 150 cap, plateaued from ~125) | `experiments/test21_stride2_stem/` |
 | test17_sg2 | headline, resize pipeline (1024→512→256) | same | 0.9636 (acc 0.90) | 0.9645 (best epoch 89 of 104, early-stopped) | `experiments/test17_sg2/` |
 | test17_sg2_no_fft | ablation — FFT branch removed | same | 0.9527 (acc 0.88) | 0.9503 (best epoch 114, killed at 116 while grinding) | `experiments/test17_sg2_no_fft/` |
