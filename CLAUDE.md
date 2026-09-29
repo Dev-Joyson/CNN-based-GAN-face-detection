@@ -202,9 +202,9 @@ of *Baselines*): GPU 1.06 / 1.06 / 1.04 ms vs MobileNet 6.40, EffNet 9.47, Xcept
    headline 4.32 / 1.65 — ~3× faster on CPU).
 4c. **THESIS FINAL MODEL = test27 (Joyson, 2026-09-29).** Repo "headline" naming stays
    (test19 is the accuracy reference); the presentation and thesis call test27 the final
-   model. Pending: seeds `test27_stride2_halfwidth_s43/_s44` (train + evaluate, ~2 h each,
-   new caches) and `heldout.py --config configs/test27_stride2_halfwidth.yaml --fake-dir
-   "…/Fake(SG3-T-psi1)" --tag sg3t` (once).
+   model. Joyson also decided: no seeds slide and no StyleGAN3 slide in the talk (backup
+   + Q&A only). Seeds `test27_stride2_halfwidth_s43/_s44` and test27's SG3-T score are
+   therefore optional for the talk, still worth running for the report if GPU allows.
    **Compute axis, one more point (decided 2026-09-29):** `test27_stride2_halfwidth.yaml`
    — stride 2 + `width_mult: 0.5` → 261,665 params, 0.073 G MACs, headline's cache,
    `es_start_epoch: 40`. Goal: the model a mobile-deployment follow-up would start
