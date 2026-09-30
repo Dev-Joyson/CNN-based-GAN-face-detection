@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Post-training int8 quantization of a trained model, and the measurements that
 make it comparable: TFLite file size, CPU latency (fp32 vs int8, same
 interpreter, same threads), test AUC/accuracy for both, optional held-out AUC.
@@ -32,18 +31,10 @@ from sklearn.metrics import roc_auc_score
 from model import (augment_and_mask, build_datasets, cached_dataset, feathered_ellipse,
                    load_config, load_paths)
 
-N_REP = 200          # representative images for calibration
-N_LAT = 300          # latency runs per precision
-
+N_REP = 200
+N_LAT = 300
 
 PRECISIONS = ("fp32", "int8_dynamic", "int8")
-# fp32:         the float model through TFLite -- the CPU runtime a device would use
-# int8_dynamic: weights int8, activations float (no calibration). The 4x size cut
-#               and a speedup on matmul-heavy layers; accuracy essentially intact.
-# int8:         full integer, calibrated on 200 test images; fastest on int8
-#               hardware, but post-training it can break models with
-#               squeeze-excite / hard-swish (EfficientNet collapsed to 0.5).
-
 
 def cpu_info():
     """CPU model and the vector extensions XNNPACK cares about. MobileNet's TFLite
@@ -62,7 +53,6 @@ def cpu_info():
         info["model"] = platform.processor() or platform.machine()
     return info
 
-
 def convert(model, rep_images, precision):
     conv = tf.lite.TFLiteConverter.from_keras_model(model)
     if precision != "fp32":
@@ -74,7 +64,6 @@ def convert(model, rep_images, precision):
         conv.inference_output_type = tf.float32
     return conv.convert()
 
-
 class Runner:
     def __init__(self, tflite_bytes, threads):
         self.delegate = "xnnpack"
@@ -82,8 +71,6 @@ class Runner:
             self.interp = tf.lite.Interpreter(model_content=tflite_bytes, num_threads=threads)
             self.interp.allocate_tensors()
         except RuntimeError as e:
-            # XNNPACK refuses some quantized ops (MobileNetV3's hard-swish); the
-            # reference kernels run everything, slower. Recorded, not hidden.
             print(f"  XNNPACK delegate failed ({str(e).strip().splitlines()[-1]}); using builtin kernels")
             self.delegate = "builtin"
             self.interp = tf.lite.Interpreter(
@@ -93,11 +80,10 @@ class Runner:
         self.inp = self.interp.get_input_details()[0]["index"]
         self.out = self.interp.get_output_details()[0]["index"]
 
-    def __call__(self, x):                      # x: (1, H, W, 3) float32
+    def __call__(self, x):
         self.interp.set_tensor(self.inp, x)
         self.interp.invoke()
         return float(self.interp.get_tensor(self.out).ravel()[0])
-
 
 def latency_ms(runner, x, warmup=20, runs=N_LAT):
     for _ in range(warmup):
@@ -107,7 +93,6 @@ def latency_ms(runner, x, warmup=20, runs=N_LAT):
         t0 = time.perf_counter(); runner(x); t.append((time.perf_counter() - t0) * 1e3)
     t = np.array(t)
     return {"median": round(float(np.median(t)), 2), "p95": round(float(np.percentile(t, 95)), 2), "runs": runs}
-
 
 def score(runner, ds, limit=None):
     y_true, y_score, n = [], [], 0
@@ -121,7 +106,6 @@ def score(runner, ds, limit=None):
     y_true, y_score = np.array(y_true), np.array(y_score)
     return {"auc": round(float(roc_auc_score(y_true, y_score)), 4),
             "accuracy": round(float(((y_score > 0.5) == (y_true == 1)).mean()), 4), "n": int(n)}
-
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -173,7 +157,6 @@ def main():
     with open(os.path.join(run_dir, "eval_quant.json"), "w") as f:
         json.dump(out, f, indent=2)
     print(f"wrote {run_dir}/eval_quant.json")
-
 
 if __name__ == "__main__":
     main()

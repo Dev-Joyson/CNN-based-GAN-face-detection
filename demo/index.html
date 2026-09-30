@@ -32,7 +32,6 @@
   .v.real { color:var(--real); font-weight:700; } .v.fake { color:var(--fake); font-weight:700; }
   .ok { color:var(--real); } .bad { color:var(--fake); }
   .summary { font-size:17px; margin:8px 0; }
-  /* deep view */
   .grid { display:grid; gap:18px; } .g2 { grid-template-columns:1fr 1fr; } .g3 { grid-template-columns:1fr 1fr 1fr; } .g4 { grid-template-columns:repeat(4,1fr); }
   .panel { border:1px solid var(--line); padding:12px; }
   .panel img { width:100%; border:1px solid var(--line); display:block; image-rendering:pixelated; }
@@ -126,7 +125,6 @@ fetch('/samples.json').then(r => r.json()).then(list => {
 });
 $('#file').onchange = e => {
   for (const f of e.target.files) {
-    // show the upload like a sample: selected on arrival, click to drop it
     const img = document.createElement('img'); img.src = URL.createObjectURL(f); img.title = f.name; img.className = 'sel';
     $('#samples-uploaded').appendChild(img); $('#uploaded-row').style.display = '';
     const it = {name: f.name, blob: f, truth: null, el: img, thumb: img.src}; items.push(it);
@@ -169,7 +167,6 @@ $('#run').onclick = async () => {
     results[k] = j.error ? null : j;
     const tr = tbl.insertRow(); tr.className = 'row';
     if (j.error) { tr.innerHTML = `<td colspan="9">${it.name}: error - ${j.error}</td>`; continue; }
-    // verdict cell: the word, and a tick against ground truth when we have it
     const vcell = (p, cls) => { const v = verdict(p); const ok = it.truth ? it.truth === v : null;
       return `<td class="${cls}"><span class="v ${v}">${v.toUpperCase()}</span>${ok === null ? '' : ` <span class="${ok ? 'ok' : 'bad'}">${ok ? '✓' : '✗'}</span>`}</td>`; };
     const vn = verdict(j.native.p_fake);

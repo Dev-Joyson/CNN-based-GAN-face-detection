@@ -1,10 +1,8 @@
-#!/usr/bin/env python3
 """Entry point: python train.py --config configs/test13_face.yaml"""
 
 import argparse
 
 from model import load_config, train
-
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
@@ -19,7 +17,6 @@ def main():
         distill(cfg)
     else:
         train(cfg, resume=args.resume)
-
 
 if __name__ == "__main__":
     main()

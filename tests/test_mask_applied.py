@@ -15,9 +15,8 @@ import tensorflow as tf
 from model import Config, build_dataset
 
 IMG_SIZE = 32
-CORNER = (2, 2)                     # well outside the face ellipse
+CORNER = (2, 2)
 CENTRE = (IMG_SIZE // 2, IMG_SIZE // 2)
-
 
 @pytest.fixture(scope="module")
 def white_images(tmp_path_factory):
@@ -30,7 +29,6 @@ def white_images(tmp_path_factory):
         tf.io.write_file(str(p), tf.io.encode_jpeg(white, quality=100))
         paths.append(str(p))
     return paths
-
 
 def _first_batch(paths, tmp_path, mask_mode, split, training):
     cfg = Config(
@@ -45,7 +43,6 @@ def _first_batch(paths, tmp_path, mask_mode, split, training):
     images, _ = next(iter(ds))
     return images.numpy()
 
-
 @pytest.mark.parametrize("split,training", [("train", True), ("val", False), ("test", False)])
 def test_face_only_zeroes_background_in_every_split(white_images, tmp_path, split, training):
     batch = _first_batch(white_images, tmp_path, "face_only", split, training)
@@ -57,7 +54,6 @@ def test_face_only_zeroes_background_in_every_split(white_images, tmp_path, spli
         f"{split} (training={training}): background pixel not masked -- "
         "is the mask line indented inside `if training:` again?")
     assert np.all(centre > 0.5), f"{split}: face region should survive face_only"
-
 
 @pytest.mark.parametrize("split,training", [("train", True), ("val", False), ("test", False)])
 def test_background_only_zeroes_face_in_every_split(white_images, tmp_path, split, training):
@@ -71,11 +67,9 @@ def test_background_only_zeroes_face_in_every_split(white_images, tmp_path, spli
         "is the mask line indented inside `if training:` again?")
     assert np.all(corner > 0.5), f"{split}: background should survive background_only"
 
-
 def test_mask_mode_none_leaves_image_untouched(white_images, tmp_path):
     batch = _first_batch(white_images, tmp_path, "none", "val", False)
     assert np.all(batch > 0.5)
-
 
 def test_bad_mask_mode_is_rejected():
     with pytest.raises(ValueError):

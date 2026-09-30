@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Keep the tf.data caches in Drive so a reclaimed VM costs minutes, not hours.
 
     python cache_sync.py --config configs/test17_sg2.yaml --to-drive     # after a build
@@ -20,7 +19,6 @@ import shutil
 import time
 
 from model import load_config
-
 
 def sync(src_dir, dst_dir):
     if not os.path.isdir(src_dir):
@@ -44,7 +42,6 @@ def sync(src_dir, dst_dir):
         print(f" {(time.time() - t0) / 60:.1f} min")
     print(f"done: {dst_dir}")
 
-
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -55,13 +52,12 @@ def main():
     args = ap.parse_args()
 
     cfg = load_config(args.config)
-    local = os.path.dirname(cfg.cache_path("x"))                 # /content/cache/<key>
-    drive = os.path.join(cfg.out_dir, "cache", os.path.basename(local))   # <out_dir>/cache/<key>
+    local = os.path.dirname(cfg.cache_path("x"))
+    drive = os.path.join(cfg.out_dir, "cache", os.path.basename(local))
     if args.to_drive:
         sync(local, drive)
     else:
         sync(drive, local)
-
 
 if __name__ == "__main__":
     main()

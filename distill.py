@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Knowledge distillation: train this architecture to match a fine-tuned
 baseline's probabilities instead of the hard labels.
 
@@ -43,15 +42,9 @@ from model import (HistoryCSV, augment_and_mask, build_datasets, build_model, ca
 
 EPS = 1e-6
 
-
-# --------------------------------------------------------------------------- #
-# Loss and metrics on a packed target: y_true = [hard label, teacher logit]
-# --------------------------------------------------------------------------- #
-
 def _logit(p):
     p = tf.clip_by_value(p, EPS, 1.0 - EPS)
     return tf.math.log(p / (1.0 - p))
-
 
 def make_kd_loss(temperature, alpha):
     bce = tf.keras.losses.BinaryCrossentropy()
@@ -66,21 +59,14 @@ def make_kd_loss(temperature, alpha):
     loss.__name__ = "kd_loss"
     return loss
 
-
 class HardAUC(tf.keras.metrics.AUC):
     """AUC against the hard label only (column 0 of the packed target)."""
     def update_state(self, y_true, y_pred, sample_weight=None):
         return super().update_state(y_true[:, :1], y_pred, sample_weight)
 
-
 class HardAccuracy(tf.keras.metrics.BinaryAccuracy):
     def update_state(self, y_true, y_pred, sample_weight=None):
         return super().update_state(y_true[:, :1], y_pred, sample_weight)
-
-
-# --------------------------------------------------------------------------- #
-# Data
-# --------------------------------------------------------------------------- #
 
 def extra_pool(cfg, splits):
     """Images in the folders that the headline did not sample, BALANCED: the
@@ -100,7 +86,6 @@ def extra_pool(cfg, splits):
     fake = sorted(rng.sample(fake, n)) if len(fake) > n else fake
     return real + fake, [0] * n + [1] * n
 
-
 def teacher_logits(teachers, base_ds, batch=144):
     """Mean teacher logit per image, in dataset order. Offline, un-augmented."""
     ds = base_ds.map(lambda x, y: tf.cast(x, tf.float32) / 255.0).batch(batch)
@@ -109,7 +94,6 @@ def teacher_logits(teachers, base_ds, batch=144):
         p = np.concatenate([t(xb, training=False).numpy().ravel() for xb in ds])
         per.append(np.log(np.clip(p, EPS, 1 - EPS) / (1 - np.clip(p, EPS, 1 - EPS))))
     return np.mean(per, axis=0).astype(np.float32)
-
 
 def fit_calibration(z_val, y_val):
     """Temperature scaling (Guo et al. 2017): one scalar T_cal such that
@@ -127,7 +111,6 @@ def fit_calibration(z_val, y_val):
             best_t, best_nll = float(t), float(nll)
     return best_t, best_nll
 
-
 def kd_dataset(base_ds, z_t, cfg, face_mask, training, shuffle):
     """(augmented image, [y, z_t]) batches, aligned by zipping in cache order."""
     zt = tf.data.Dataset.from_tensor_slices(z_t)
@@ -143,13 +126,6 @@ def kd_dataset(base_ds, z_t, cfg, face_mask, training, shuffle):
         return x, tf.stack([tf.cast(y, tf.float32), z])
     ds = ds.map(pack, num_parallel_calls=tf.data.AUTOTUNE)
     return ds.batch(cfg.batch_size).prefetch(tf.data.AUTOTUNE)
-
-
-# --------------------------------------------------------------------------- #
-
-# --------------------------------------------------------------------------- #
-# Online distillation: teacher and student see the SAME augmented batch
-# --------------------------------------------------------------------------- #
 
 class OnlineKD(tf.keras.Model):
     """Student trained against a frozen teacher's logits computed in-graph on the
@@ -205,7 +181,6 @@ class OnlineKD(tf.keras.Model):
         p = self.student(x, training=False)
         return self._track(self.bce(y, p), y, p)
 
-
 class StudentCheckpoint(tf.keras.callbacks.Callback):
     """Save the STUDENT's weights (not the wrapper's, which carry the teacher)
     on every val_auc improvement, so finalize() and --finalize work unchanged."""
@@ -218,7 +193,6 @@ class StudentCheckpoint(tf.keras.callbacks.Callback):
         if v is not None and v > self.best:
             self.best = v
             self.model.student.save_weights(self.path)
-
 
 def _load_teachers(hcfg, names):
     """A teacher is a baseline under experiments/<headline>/baselines/<name>/, or --
@@ -234,19 +208,18 @@ def _load_teachers(hcfg, names):
         print(f"teacher {name}: {teachers[-1].count_params():,} params")
     return teachers
 
-
 def distill_online(cfg):
     d = cfg.distill
     if d["extra"] or d["calibrate"]:
         raise ValueError("online distillation: extra/calibrate are offline-path options")
-    hcfg = replace(cfg, name=d["headline"], distill=None)   # where the teachers live
+    hcfg = replace(cfg, name=d["headline"], distill=None)
     os.makedirs(cfg.run_dir, exist_ok=True)
     tf.keras.utils.set_random_seed(cfg.seed)
     print(f"=== {cfg.name}: ONLINE distill from {d['teachers']} of {hcfg.name} -> {cfg.run_dir}\n"
           f"    T={d['temperature']} alpha={d['alpha']} init={d['init']}  aug={cfg.aug} scale_aug={cfg.scale_aug}")
 
     teachers = _load_teachers(hcfg, d["teachers"])
-    ds = build_datasets(cfg)            # the standard augmented pipeline; same cache key as the headline
+    ds = build_datasets(cfg)
 
     student = build_model(cfg)
     init_run = cfg.init_from or (d["headline"] if d["init"] else None)
@@ -271,18 +244,16 @@ def distill_online(cfg):
         json.dump({"distill": d}, f, indent=2)
     finalize(cfg, student.get_weights())
 
-
 def distill(cfg):
     d = cfg.distill
     if d["online"]:
         return distill_online(cfg)
-    hcfg = replace(cfg, name=d["headline"], distill=None)      # the headline: same data, its run dir
+    hcfg = replace(cfg, name=d["headline"], distill=None)
     os.makedirs(cfg.run_dir, exist_ok=True)
     tf.keras.utils.set_random_seed(cfg.seed)
     print(f"=== {cfg.name}: distill from {d['teachers']} of {hcfg.name} -> {cfg.run_dir}\n"
           f"    T={d['temperature']} alpha={d['alpha']} extra={d['extra']} init={d['init']}")
 
-    # --- teachers ----------------------------------------------------------------
     teachers = []
     for name in d["teachers"]:
         path = os.path.join(hcfg.run_dir, "baselines", name, "model.keras")
@@ -291,22 +262,18 @@ def distill(cfg):
         teachers.append(tf.keras.models.load_model(path, safe_mode=False))
         print(f"teacher {name}: {teachers[-1].count_params():,} params")
 
-    # --- data: the headline's splits (+ extra), the headline's caches ---------------
     splits = load_paths(hcfg)
     face_mask = feathered_ellipse(cfg.img_size, cfg.mask_rx, cfg.mask_ry, cfg.mask_feather)
     train_paths, train_labels = splits["train"]
-    train_ds = cached_dataset(train_paths, train_labels, hcfg, "train")   # the headline's own cache
+    train_ds = cached_dataset(train_paths, train_labels, hcfg, "train")
     if d["extra"]:
         xp, xl = extra_pool(hcfg, splits)
         print(f"extra pool: {xl.count(0)} real + {xl.count(1)} fake unused by the headline (balanced)")
-        # a separate cache for the extras, concatenated after: the 35k are not
-        # re-read, and the train cache stays shared with train.py
         train_ds = train_ds.concatenate(cached_dataset(xp, xl, hcfg, "extra"))
         train_paths, train_labels = train_paths + xp, train_labels + xl
     base = {"train": train_ds, "val": cached_dataset(*splits["val"], hcfg, "val")}
     print(f"train: {len(train_paths)}   val: {len(splits['val'][0])}")
 
-    # --- teacher logits, once, in cache order -----------------------------------------
     z = {}
     for split, ds in base.items():
         print(f"teacher labels: {split} ...", flush=True)
@@ -328,7 +295,6 @@ def distill(cfg):
     ds_train = kd_dataset(base["train"], z["train"], cfg, face_mask, training=True, shuffle=True)
     ds_val = kd_dataset(base["val"], z["val"], cfg, face_mask, training=False, shuffle=False)
 
-    # --- student -------------------------------------------------------------------------
     student = build_model(cfg)
     if d["init"]:
         src = os.path.join(hcfg.run_dir, "model.keras")
@@ -355,7 +321,6 @@ def distill(cfg):
                    "t_cal": t_cal if d["calibrate"] else None}, f, indent=2)
     finalize(cfg, student.get_weights())
 
-
 def finalize(cfg, weights=None):
     """Write a PLAIN model.keras (no custom loss in its config, so evaluate.py
     and predict.py load it) and evaluate. Called at the end of training, or via
@@ -371,7 +336,6 @@ def finalize(cfg, weights=None):
     from evaluate import evaluate
     evaluate(cfg)
 
-
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -383,7 +347,6 @@ def main():
     if not cfg.distill:
         raise SystemExit(f"{args.config} has no distill: block")
     finalize(cfg) if args.finalize else distill(cfg)
-
 
 if __name__ == "__main__":
     main()

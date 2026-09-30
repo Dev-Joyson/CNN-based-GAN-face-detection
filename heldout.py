@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Held-out generalisation test: score trained models on images from a
 generator, or a real-image source, that they never trained on.
 
@@ -37,7 +36,6 @@ from sklearn.metrics import roc_auc_score
 from model import (augment_and_mask, cached_dataset, feathered_ellipse, list_images,
                    load_config, load_paths)
 
-
 def pick(folder, n, exclude, seed):
     folders = folder if isinstance(folder, (list, tuple)) else [folder]
     files = [p for f in folders for p in list_images(f) if p not in exclude]
@@ -45,7 +43,6 @@ def pick(folder, n, exclude, seed):
         print(f"  {folder}: only {len(files)} usable images (asked {n})")
         n = len(files)
     return sorted(random.Random(seed).sample(files, n))
-
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
@@ -59,13 +56,10 @@ def main():
     args = ap.parse_args()
 
     cfg = load_config(args.config)
-    # a baseline lives under the headline's run dir; its ImageNet preprocessing is a
-    # layer inside model.keras, so it takes the same pipeline output as the headline
     run_dir = os.path.join(cfg.run_dir, "baselines", args.model) if args.model else cfg.run_dir
     model_name = f"{cfg.name}/baselines/{args.model}" if args.model else cfg.name
     model = tf.keras.models.load_model(os.path.join(run_dir, "model.keras"), safe_mode=False)
 
-    # everything the headline touched -- the held-out set must not overlap it
     used = set()
     for paths, _ in load_paths(cfg).values():
         used.update(paths)
@@ -80,11 +74,9 @@ def main():
 
     face_mask = feathered_ellipse(cfg.img_size, cfg.mask_rx, cfg.mask_ry, cfg.mask_feather)
     paths, labels = real + fake, [0] * n + [1] * n
-    ds = cached_dataset(paths, labels, cfg, f"heldout_{args.tag}")      # its own cache file
+    ds = cached_dataset(paths, labels, cfg, f"heldout_{args.tag}")
     ds = ds.map(lambda x, y: augment_and_mask(x, y, cfg, face_mask, training=False),
                 num_parallel_calls=tf.data.AUTOTUNE).batch(32)
-    # 32, not cfg.batch_size: scoring is batch-independent, and Xception's separable
-    # convs run eagerly here (no tf.function) -- at 144 that OOMed a 20 GB L4
 
     y_true, y_score = [], []
     for xb, yb in ds:
@@ -107,7 +99,6 @@ def main():
     print(f"{model_name} on {args.tag}:  AUC {auc:.4f}   acc@0.5 {acc:.3f}   "
           f"mean p_fake real={p_real.mean():.3f} fake={p_fake.mean():.3f}   "
           f"fake recall {out['fake_recall_at_0.5']:.3f}")
-
 
 if __name__ == "__main__":
     main()

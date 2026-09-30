@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Baselines on the SAME task as the headline: same data, split, mask, input
 size, GPU, timing code. Without that, a comparison is two numbers from two
 different experiments.
@@ -36,16 +35,11 @@ from tensorflow.keras import applications, layers, models
 
 from model import build_datasets, compile_model, load_config, train
 
-# name -> (constructor, layer(s) that map [0,1] to what the backbone expects)
-# Xception: [-1, 1].  EfficientNet / MobileNetV3 in Keras 3: raw [0, 255], the
-# model rescales internally.  ResNet50 wants caffe BGR mean-subtraction, which
-# needs a Lambda; omitted -- it is the least informative of the four anyway.
 MODELS = {
     "xception":          (applications.Xception,       lambda: [layers.Rescaling(2.0, offset=-1.0)]),
     "efficientnet_b0":   (applications.EfficientNetB0, lambda: [layers.Rescaling(255.0)]),
     "mobilenet_v3_small": (applications.MobileNetV3Small, lambda: [layers.Rescaling(255.0)]),
 }
-
 
 def build_baseline(name, cfg, pretrained):
     ctor, preprocess = MODELS[name]
@@ -53,22 +47,16 @@ def build_baseline(name, cfg, pretrained):
     x = inp
     for layer in preprocess():
         x = layer(x)
-    # input_tensor, not a nested Model: the backbone's layers land FLAT in this
-    # graph, so evaluate.py's Grad-CAM can get_layer() the last conv and
-    # count_macs sees every layer without descending. A nested Model breaks
-    # both in Keras 3.
     backbone = ctor(include_top=False,
                     weights="imagenet" if pretrained else None,
                     input_tensor=x)
-    backbone.trainable = True                              # full fine-tune
+    backbone.trainable = True
     x = backbone.output
     x = layers.GlobalAveragePooling2D()(x)
-    # the same head as build_model, so the comparison is backbone vs backbone
     x = layers.Dense(128, activation="relu")(x)
     x = layers.Dropout(0.4)(x)
     out = layers.Dense(1, activation="sigmoid")(x)
     return models.Model(inp, out, name=name)
-
 
 def baseline_cfgs(cfg, name, lr, batch, epochs):
     """(train config, eval config) for one baseline.
@@ -85,7 +73,6 @@ def baseline_cfgs(cfg, name, lr, batch, epochs):
     ecfg = replace(tcfg, batch_size=cfg.batch_size)
     return tcfg, ecfg
 
-
 def efficiency_only(bcfg, name):
     """No training: build, save, measure. Latency does not depend on weights."""
     import json
@@ -94,8 +81,8 @@ def efficiency_only(bcfg, name):
     os.makedirs(bcfg.run_dir, exist_ok=True)
     model = compile_model(build_baseline(name, bcfg, pretrained=False), bcfg)
     model.summary(line_length=100)
-    model.save(os.path.join(bcfg.run_dir, "model.keras"))  # measure_efficiency reads its size
-    ds = build_datasets(bcfg)                              # headline's cache, test split only
+    model.save(os.path.join(bcfg.run_dir, "model.keras"))
+    ds = build_datasets(bcfg)
     print(f"=== efficiency-only | {name} | untrained ===")
     eff = measure_efficiency(model, bcfg, ds["test"])
     out = {"name": bcfg.name, "baseline_of": bcfg.name.split("/")[0], "trained": False,
@@ -103,7 +90,6 @@ def efficiency_only(bcfg, name):
     with open(os.path.join(bcfg.run_dir, "eval.json"), "w") as f:
         json.dump(out, f, indent=2)
     print(f"wrote {bcfg.run_dir}/eval.json  (efficiency only; run with --train for accuracy)")
-
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
@@ -134,7 +120,6 @@ def main():
     train(tcfg, resume=args.resume,
           build_fn=lambda c: build_baseline(args.model, c, pretrained=True))
     evaluate(ecfg)
-
 
 if __name__ == "__main__":
     main()

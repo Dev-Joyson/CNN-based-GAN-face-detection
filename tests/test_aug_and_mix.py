@@ -9,11 +9,9 @@ import tensorflow as tf
 
 from model import Config, load_paths, random_gaussian_blur
 
-
 def _cfg(tmp_path, **kw):
     return Config(name="u", real_dir=str(tmp_path / "real"), input_mode="crop", mask_mode="none",
                   cache_dir=str(tmp_path / "cache"), out_dir=str(tmp_path / "out"), **kw)
-
 
 def _folder(tmp_path, name, n):
     d = tmp_path / name
@@ -22,22 +20,17 @@ def _folder(tmp_path, name, n):
         (d / f"{i:05d}.png").write_bytes(b"")
     return str(d)
 
-
 def test_gaussian_blur_keeps_shape_and_mean():
     tf.random.set_seed(0)
     img = tf.random.uniform([64, 64, 3])
     out = random_gaussian_blur(img)
     assert out.shape == img.shape
-    # a normalised kernel preserves the mean (up to SAME-padding edge effects)
     assert abs(float(tf.reduce_mean(out)) - float(tf.reduce_mean(img))) < 0.02
 
-
 def test_gaussian_blur_actually_blurs():
-    img = tf.cast(tf.random.uniform([64, 64, 3]) > 0.5, tf.float32)   # hard edges
-    # force a wide sigma by sampling until we get one (sigma is internal; use variance drop)
+    img = tf.cast(tf.random.uniform([64, 64, 3]) > 0.5, tf.float32)
     outs = [random_gaussian_blur(img) for _ in range(8)]
     assert min(float(tf.math.reduce_std(o)) for o in outs) < float(tf.math.reduce_std(img)) * 0.7
-
 
 def test_fake_mix_counts_are_exact(tmp_path):
     real = _folder(tmp_path, "real", 40)
@@ -50,23 +43,18 @@ def test_fake_mix_counts_are_exact(tmp_path):
     assert sum(p.startswith(a) for p in fakes) == 18
     assert sum(p.startswith(b) for p in fakes) == 12
 
-
 def test_fake_mix_must_sum_to_limit(tmp_path):
     with pytest.raises(ValueError):
         _cfg(tmp_path, fake_dir=["x", "y"], fake_mix=[10, 10], limit_per_class=25)
 
-
 def test_single_folder_cache_key_unchanged(tmp_path):
-    # existing caches must stay valid: a plain string fake_dir hashes as before
     c1 = _cfg(tmp_path, fake_dir="/f")
     key = os.path.basename(os.path.dirname(c1.cache_path("train")))
     assert key.endswith("_crop512") and "mix" not in key
 
-
 def test_unknown_aug_rejected(tmp_path):
     with pytest.raises(ValueError):
         _cfg(tmp_path, fake_dir="/f", aug="strong")
-
 
 def test_scale_window_shapes_and_validation(tmp_path):
     from model import random_scale_window
@@ -75,10 +63,9 @@ def test_scale_window_shapes_and_validation(tmp_path):
         out = random_scale_window(img, 256, [1, 2])
         assert out.shape == (256, 256, 3) and out.dtype == tf.uint8
     with pytest.raises(ValueError):
-        _cfg(tmp_path, fake_dir="/f", scale_aug=[1, 4])          # 256*4 > cache 512
+        _cfg(tmp_path, fake_dir="/f", scale_aug=[1, 4])
     with pytest.raises(ValueError):
         Config(name="u", real_dir="-", fake_dir="/f", input_mode="resize", mask_mode="none", scale_aug=[1, 2])
-
 
 def test_online_kd_trains_student_only():
     from distill import OnlineKD

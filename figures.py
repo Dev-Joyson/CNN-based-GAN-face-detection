@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Thesis figures, regenerated from the record (history.csv, eval.json,
 eval_heldout_*.json on Drive) so no number is hand-copied from a table.
 
@@ -29,9 +28,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 DEFAULT_OVERLAY = ["test19_sg2_crop_no_fft", "test21_stride2_stem", "test27_stride2_halfwidth", "test17_sg2"]
-# (test19_sg2_crop, the FFT variant, is left out: its first history was lost to a VM
-#  reclaim and the resumed curve starts at its checkpoint value, which misleads.)
-EFFICIENCY_ROWS = [  # (run folder relative to experiments/, label)
+EFFICIENCY_ROWS = [
     ("test19_sg2_crop_no_fft", "this model (headline)"),
     ("test21_stride2_stem", "this model, stride-2 stem"),
     ("test27_stride2_halfwidth", "this model, stride-2 + half width"),
@@ -42,19 +39,16 @@ EFFICIENCY_ROWS = [  # (run folder relative to experiments/, label)
 ]
 SEED_STEMS = {"stride 1 (headline)": "test19_sg2_crop_no_fft", "stride 2": "test21_stride2_stem"}
 
-
 def read_history(path):
     with open(path) as f:
         rows = list(csv.DictReader(f))
     h = {k: [float(r[k]) for r in rows] for k in rows[0]}
-    h["epoch"] = [int(e) + 1 for e in h["epoch"]]            # Keras counts from 0
+    h["epoch"] = [int(e) + 1 for e in h["epoch"]]
     return h
-
 
 def read_json(path):
     with open(path) as f:
         return json.load(f)
-
 
 def curves(run_dir, out):
     hp = os.path.join(run_dir, "history.csv")
@@ -63,8 +57,6 @@ def curves(run_dir, out):
         return
     h = read_history(hp)
     parts = run_dir.rstrip("/").split(os.sep)
-    # a baseline lives at <headline>/baselines/<model>: name it by both, or the
-    # resize-pipeline and crop-pipeline baselines overwrite each other
     name = f"{parts[-3]}__{parts[-1]}" if len(parts) >= 3 and parts[-2] == "baselines" else parts[-1]
     best = max(range(len(h["val_auc"])), key=lambda i: h["val_auc"][i])
     fig, ax = plt.subplots(1, 2, figsize=(11, 4))
@@ -78,7 +70,6 @@ def curves(run_dir, out):
     fig.tight_layout()
     p = os.path.join(out, f"curves_{name}.png"); fig.savefig(p, dpi=150); plt.close(fig)
     print(f"  wrote {p}")
-
 
 def overlay(experiments, names, out):
     fig, ax = plt.subplots(figsize=(8, 4.5))
@@ -95,7 +86,6 @@ def overlay(experiments, names, out):
     fig.tight_layout(); p = os.path.join(out, "curves_overlay.png"); fig.savefig(p, dpi=150); plt.close(fig)
     print(f"  wrote {p}")
 
-
 def efficiency(experiments, out):
     rows = []
     for rel, label in EFFICIENCY_ROWS:
@@ -103,8 +93,6 @@ def efficiency(experiments, out):
         if not os.path.exists(ep):
             print(f"  efficiency: no eval.json for {rel}, skipped"); continue
         e = read_json(ep); eff = e["efficiency"]
-        # CPU: prefer the TFLite/XNNPACK fp32 number from eval_quant.json (the device
-        # runtime); TensorFlow's CPU path mis-ranks depthwise models (README *Quantization*)
         qp = os.path.join(experiments, rel, "eval_quant.json")
         cpu = read_json(qp)["precision"]["fp32"]["cpu_latency_ms"]["median"] if os.path.exists(qp) else None
         cpu_src = "TFLite fp32" if cpu is not None else "TF path"
@@ -115,7 +103,6 @@ def efficiency(experiments, out):
                      "mem": eff["peak_gpu_memory_mb"]["bs1"]})
     if not rows:
         return
-    # scatter: latency vs AUC, marker area ~ params
     fig, ax = plt.subplots(figsize=(7, 4.5))
     for r in rows:
         ax.scatter(r["gpu_ms"], r["auc"], s=30 + r["params"] / 4e4, alpha=0.75)
@@ -126,7 +113,6 @@ def efficiency(experiments, out):
     ax.set_title("accuracy vs latency; marker area ~ parameters")
     fig.tight_layout(); p = os.path.join(out, "efficiency_scatter.png"); fig.savefig(p, dpi=150); plt.close(fig)
     print(f"  wrote {p}")
-    # bars
     cpu_title = "CPU ms @ bs=1 (" + ("/".join(sorted({r["cpu_src"] for r in rows}))) + ")"
     keys = [("macs", "MACs (G)", 1e-9), ("mem", "peak GPU MB @ bs=1", 1), ("cpu_ms", cpu_title, 1), ("gpu_ms", "GPU ms @ bs=1 (L4)", 1)]
     fig, ax = plt.subplots(1, len(keys), figsize=(4 * len(keys), 4))
@@ -141,9 +127,8 @@ def efficiency(experiments, out):
     fig.tight_layout(); p = os.path.join(out, "efficiency_bars.png"); fig.savefig(p, dpi=150); plt.close(fig)
     print(f"  wrote {p}")
 
-
 def heldout(experiments, out):
-    found = {}   # tag -> {label: auc}
+    found = {}
     for rel, label in EFFICIENCY_ROWS:
         for hp in glob.glob(os.path.join(experiments, rel, "eval_heldout_*.json")):
             h = read_json(hp); found.setdefault(h["tag"], {})[label] = h["auc"]
@@ -163,7 +148,6 @@ def heldout(experiments, out):
     ax.set_title("held-out generator / source"); ax.legend(); ax.grid(alpha=0.3, axis="y")
     fig.tight_layout(); p = os.path.join(out, "heldout_bars.png"); fig.savefig(p, dpi=150); plt.close(fig)
     print(f"  wrote {p}")
-
 
 def seeds(experiments, out):
     fig, ax = plt.subplots(figsize=(6, 4))
@@ -192,7 +176,6 @@ def seeds(experiments, out):
     fig.tight_layout(); p = os.path.join(out, "seeds.png"); fig.savefig(p, dpi=150); plt.close(fig)
     print(f"  wrote {p}")
 
-
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--experiments", default="/content/drive/MyDrive/Research/experiments")
@@ -214,7 +197,6 @@ def main():
     efficiency(args.experiments, args.out)
     heldout(args.experiments, args.out)
     seeds(args.experiments, args.out)
-
 
 if __name__ == "__main__":
     main()

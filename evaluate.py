@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Evaluate a trained run: confusion matrix, ROC curve, Grad-CAM.
 
     python evaluate.py --config configs/test13_face.yaml
@@ -29,7 +28,7 @@ import time
 from datetime import datetime, timezone
 
 import matplotlib
-matplotlib.use("Agg")                  # no display on a Colab VM
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
@@ -41,16 +40,12 @@ from model import build_datasets, feathered_ellipse, load_config
 
 CLASSES = ["Real", "Fake"]
 
-
 def load_run_model(cfg):
     path = os.path.join(cfg.run_dir, "model.keras")
     if not os.path.exists(path):
         raise FileNotFoundError(
             f"No trained model at {path}. Run:  python train.py --config <cfg>")
-    # safe_mode=False: the FFT branch is a Lambda. Importing model.py has already
-    # registered fft_layer as serializable, but Keras 3 still gates Lambda loads.
     return tf.keras.models.load_model(path, safe_mode=False)
-
 
 def predict_split(model, ds):
     """One pass over a split -> (y_true, y_score)."""
@@ -59,11 +54,6 @@ def predict_split(model, ds):
         y_score.extend(model.predict(images, verbose=0).flatten())
         y_true.extend(labels.numpy())
     return np.array(y_true), np.array(y_score)
-
-
-# --------------------------------------------------------------------------- #
-# Figures
-# --------------------------------------------------------------------------- #
 
 def plot_confusion(y_true, y_pred, out_path):
     cm = confusion_matrix(y_true, y_pred)
@@ -84,7 +74,6 @@ def plot_confusion(y_true, y_pred, out_path):
     plt.close(fig)
     return cm
 
-
 def plot_roc(y_true, y_score, out_path):
     fpr, tpr, _ = roc_curve(y_true, y_score)
     roc_auc = auc(fpr, tpr)
@@ -100,11 +89,6 @@ def plot_roc(y_true, y_score, out_path):
     fig.savefig(out_path, dpi=150)
     plt.close(fig)
     return float(roc_auc)
-
-
-# --------------------------------------------------------------------------- #
-# Grad-CAM
-# --------------------------------------------------------------------------- #
 
 def last_spatial_conv(model):
     """The deepest conv of the SPATIAL branch.
@@ -123,7 +107,6 @@ def last_spatial_conv(model):
     widest = max(l.filters for l in convs)
     return [l for l in convs if l.filters == widest][-1].name
 
-
 def compute_gradcam(model, img_batch, layer_name):
     grad_model = tf.keras.models.Model(
         inputs=model.inputs,
@@ -140,13 +123,11 @@ def compute_gradcam(model, img_batch, layer_name):
     heatmap /= tf.reduce_max(heatmap) + 1e-8
     return heatmap.numpy()
 
-
 def overlay(image, heatmap, alpha=0.4):
     """Blend a [0,1] HxW heatmap over a [0,1] HxWx3 image (matplotlib, no cv2)."""
     hm = tf.image.resize(heatmap[..., None], image.shape[:2]).numpy()[..., 0]
     hm = plt.get_cmap("jet")(hm)[..., :3]
     return np.clip((1 - alpha) * image + alpha * hm, 0, 1)
-
 
 def plot_gradcam(model, ds, out_path, n_per_class=4):
     """A grid of Grad-CAMs: n real and n fake, drawn from the first test batch.
@@ -189,14 +170,6 @@ def plot_gradcam(model, ds, out_path, n_per_class=4):
     plt.close(fig)
     return layer_name
 
-
-# --------------------------------------------------------------------------- #
-# Shortcut checks -- what does THIS trained model actually use?
-# --------------------------------------------------------------------------- #
-# Retraining with face_only / background_only says where signal exists in the
-# DATA. The panel asked what the trained model USES. These two run on the
-# trained model at test time, no retraining, and answer that directly.
-
 def _collect(ds, n_per_class):
     """Up to n test images per class, uint8 (N,H,W,3). Only meaningful when the
     split is unmasked (mask_mode none) -- a masked image has no background."""
@@ -210,14 +183,12 @@ def _collect(ds, n_per_class):
     n = min(len(reals), len(fakes), n_per_class)
     return np.stack(reals[:n]), np.stack(fakes[:n])
 
-
 def _predict_uint8(model, x, batch=64):
     out = []
     for i in range(0, len(x), batch):
         xb = tf.cast(x[i:i + batch], tf.float32) / 255.0
         out.append(model(xb, training=False).numpy().ravel())
     return np.concatenate(out)
-
 
 def swap_test(model, ds, face_mask, n_per_class=500):
     """Does the prediction follow the face or the background?
@@ -243,16 +214,16 @@ def swap_test(model, ds, face_mask, n_per_class=500):
     n = len(reals)
     if n < 20:
         return {"skipped": f"only {n} per class collected"}
-    m = face_mask.numpy()                                     # (H, W, 1) in [0, 1]
+    m = face_mask.numpy()
     r, f = reals.astype(np.float32), fakes.astype(np.float32)
-    other = lambda a: np.roll(a, 1, axis=0)                   # a different image, same class
+    other = lambda a: np.roll(a, 1, axis=0)
     comp = lambda face, bg: np.clip(face * m + bg * (1 - m), 0, 255).astype(np.uint8)
 
     p = {
-        "real_face_real_bg": _predict_uint8(model, comp(r, other(r))),   # control
-        "fake_face_fake_bg": _predict_uint8(model, comp(f, other(f))),   # control
-        "real_face_fake_bg": _predict_uint8(model, comp(r, f)),          # swap
-        "fake_face_real_bg": _predict_uint8(model, comp(f, r)),          # swap
+        "real_face_real_bg": _predict_uint8(model, comp(r, other(r))),
+        "fake_face_fake_bg": _predict_uint8(model, comp(f, other(f))),
+        "real_face_fake_bg": _predict_uint8(model, comp(r, f)),
+        "fake_face_real_bg": _predict_uint8(model, comp(f, r)),
     }
     y = [0] * n + [1] * n
     control_auc = roc_auc_score(y, np.concatenate([p["real_face_real_bg"], p["fake_face_fake_bg"]]))
@@ -265,7 +236,6 @@ def swap_test(model, ds, face_mask, n_per_class=500):
         "read": ("control near test AUC => seams benign; then swap >0.5 follows face, "
                  "<0.5 follows background, ~0.5 uses both. background = outside the ellipse."),
     }
-
 
 def attention_in_face(model, ds, face_mask, layer_name, max_images=6000):
     """Fraction of Grad-CAM heat inside the face ellipse, over the test set.
@@ -282,12 +252,10 @@ def attention_in_face(model, ds, face_mask, layer_name, max_images=6000):
     grad_model = tf.keras.models.Model(
         inputs=model.inputs,
         outputs=[model.get_layer(layer_name).output, model.output])
-    m = face_mask[..., 0]                                     # (H, W)
+    m = face_mask[..., 0]
     hw = [int(m.shape[0]), int(m.shape[1])]
     frac = {0: [], 1: []}
     seen = 0
-    # The tape keeps every activation of the backbone for the whole chunk.
-    # 144 x 256^2 through EfficientNet-B0 does not fit on 24 GB; 16 does.
     chunk = 16
     for images, labels in ds:
         for i in range(0, int(images.shape[0]), chunk):
@@ -295,14 +263,14 @@ def attention_in_face(model, ds, face_mask, layer_name, max_images=6000):
             with tf.GradientTape() as tape:
                 conv, preds = grad_model(xb, training=False)
                 pf = preds[:, 0]
-                score = tf.where(pf > 0.5, pf, 1.0 - pf)      # toward the predicted class
-            grads = tape.gradient(score, conv)                # (b, h, w, C)
+                score = tf.where(pf > 0.5, pf, 1.0 - pf)
+            grads = tape.gradient(score, conv)
             pooled = tf.reduce_mean(grads, axis=(1, 2), keepdims=True)
-            heat = tf.nn.relu(tf.reduce_sum(conv * pooled, axis=-1))   # (b, h, w)
-            heat = tf.image.resize(heat[..., None], hw)[..., 0]        # (b, H, W)
+            heat = tf.nn.relu(tf.reduce_sum(conv * pooled, axis=-1))
+            heat = tf.image.resize(heat[..., None], hw)[..., 0]
             total = tf.reduce_sum(heat, axis=(1, 2))
             inside = tf.reduce_sum(heat * m, axis=(1, 2))
-            ok = total > 1e-6                                 # skip all-zero maps
+            ok = total > 1e-6
             f = (inside / tf.where(ok, total, 1.0)).numpy()
             for fi, oki, y in zip(f, ok.numpy(), yb.numpy()):
                 if oki:
@@ -319,11 +287,6 @@ def attention_in_face(model, ds, face_mask, layer_name, max_images=6000):
         "read": "share of Grad-CAM heat inside the face ellipse; compare to uniform_baseline. spatial branch only.",
     }
 
-
-# --------------------------------------------------------------------------- #
-# Efficiency -- the numbers the resource claim actually rests on
-# --------------------------------------------------------------------------- #
-
 def _device_name():
     gpus = tf.config.list_physical_devices("GPU")
     if not gpus:
@@ -332,7 +295,6 @@ def _device_name():
         return tf.config.experimental.get_device_details(gpus[0]).get("device_name", "GPU")
     except Exception:
         return "GPU"
-
 
 def _cpu_name():
     try:
@@ -344,7 +306,6 @@ def _cpu_name():
         pass
     return platform.processor() or "unknown"
 
-
 def _peak_memory_mb():
     if not tf.config.list_physical_devices("GPU"):
         return None
@@ -352,7 +313,6 @@ def _peak_memory_mb():
         return round(tf.config.experimental.get_memory_info("GPU:0")["peak"] / 1e6, 1)
     except Exception:
         return None
-
 
 def count_macs(model):
     """Multiply-accumulates per image, counted analytically from layer shapes.
@@ -380,18 +340,15 @@ def count_macs(model):
         hw = int(out_h) * int(out_w)
         k_h, k_w = layer.kernel_size
         c_in = int(layer.input.shape[-1])
-        # order matters: SeparableConv2D and DepthwiseConv2D are NOT Conv2D
-        # subclasses in Keras 3, but check the specific ones first anyway
         if isinstance(layer, layers.SeparableConv2D):
             dm = layer.depth_multiplier
-            macs += hw * c_in * dm * k_h * k_w            # depthwise
-            macs += hw * c_in * dm * layer.filters         # pointwise 1x1
+            macs += hw * c_in * dm * k_h * k_w
+            macs += hw * c_in * dm * layer.filters
         elif isinstance(layer, layers.DepthwiseConv2D):
             macs += hw * c_in * layer.depth_multiplier * k_h * k_w
-        else:                                              # plain Conv2D
+        else:
             macs += hw * layer.filters * k_h * k_w * c_in // int(layer.groups or 1)
     return int(macs)
-
 
 def activation_memory_mb(model):
     """Analytic activation footprint at bs=1, fp32: the largest single output
@@ -406,7 +363,6 @@ def activation_memory_mb(model):
             sizes.append(int(np.prod(shape)) * 4)
     return {"largest_tensor": round(max(sizes) / 1e6, 2), "sum_all": round(sum(sizes) / 1e6, 2)}
 
-
 def _iter_layers(model):
     """Layers, descending into nested models -- Keras applications wrapped in
     a head are a Model inside a Model."""
@@ -416,7 +372,6 @@ def _iter_layers(model):
         else:
             yield layer
 
-
 def _git_sha():
     try:
         return subprocess.check_output(["git", "rev-parse", "--short", "HEAD"],
@@ -425,7 +380,6 @@ def _git_sha():
                                        ).decode().strip()
     except Exception:
         return None
-
 
 def system_under_test(cfg, warmup, runs):
     """Everything a reader needs to judge whether a latency number is comparable.
@@ -453,7 +407,6 @@ def system_under_test(cfg, warmup, runs):
         "latency_runs": runs,
         "img_size": cfg.img_size,
     }
-
 
 def measure_efficiency(model, cfg, ds, warmup=50, runs=1000):
     """Params, file size, peak GPU memory, single-image latency, batch throughput.
@@ -486,17 +439,6 @@ def measure_efficiency(model, cfg, ds, warmup=50, runs=1000):
     images, _ = next(iter(ds))
     infer = tf.function(lambda x: model(x, training=False))
 
-    # single image: the latency number, and the memory number that matters for
-    # a "how much does it need to run" claim.
-    #
-    # Two peaks, because the first calls are not inference: tf.function traces
-    # and cuDNN autotunes, trying every conv algorithm -- including FFT/Winograd
-    # variants whose scratch workspace for a 256^2 x 32-channel conv runs to
-    # hundreds of MB. A peak read over the warmup is the largest autotune trial,
-    # not the model (it read 1.3 GB for a 4 MB model). So: read that number and
-    # keep it (incl_autotune), then reset and read the peak over the timed loop
-    # alone -- weights + live activations + the chosen algorithm's workspace,
-    # which is what a deployed process holds.
     reset_peak()
     x1 = images[:1]
     for _ in range(warmup):
@@ -511,8 +453,6 @@ def measure_efficiency(model, cfg, ds, warmup=50, runs=1000):
     times = np.array(times)
     peak_bs1 = _peak_memory_mb()
 
-    # full batch: the throughput number; its peak is activations x batch, not
-    # the model's footprint
     reset_peak()
     batch_size = int(images.shape[0])
     for _ in range(3):
@@ -525,12 +465,6 @@ def measure_efficiency(model, cfg, ds, warmup=50, runs=1000):
     batch_seconds = (time.perf_counter() - t0) / 10.0
     peak_batch = _peak_memory_mb()
 
-    # CPU, bs=1: the second hardware leg. The GPU ranking favours few large
-    # kernels; a CPU is where MobileNet's 17x fewer MACs should finally count.
-    # If the order flips here, that is the finding. Plain TF on CPU, no XLA
-    # (state it). Fewer runs than the GPU loop -- Xception at 256^2 is
-    # hundreds of ms per image on a Colab CPU -- so p95 rests on ~15 samples;
-    # the median is the number to quote.
     cpu_runs = 300
     with tf.device("/CPU:0"):
         x1_cpu = tf.identity(x1)
@@ -550,8 +484,6 @@ def measure_efficiency(model, cfg, ds, warmup=50, runs=1000):
         "macs": macs,
         "macs_note": "conv+dense multiply-accumulates per image; FLOPs ~= 2x this",
         "system_under_test": system_under_test(cfg, warmup, runs),
-        # the inference artifact: params x 4 bytes (fp32). model.keras on disk is
-        # ~3x that -- it carries Adam's two moment tensors for resuming training.
         "weights_mb_fp32": round(int(model.count_params()) * 4 / 1e6, 2),
         "checkpoint_file_mb": round(os.path.getsize(os.path.join(cfg.run_dir, "model.keras")) / 1e6, 2),
         "peak_gpu_memory_mb": {
@@ -561,7 +493,6 @@ def measure_efficiency(model, cfg, ds, warmup=50, runs=1000):
                     "chosen conv workspace). *_incl_autotune: peak over the warmup, i.e. the "
                     "largest cuDNN autotune trial -- the number reported before 2026-09-24",
         },
-        # hardware-independent: what the network's tensors occupy at bs=1, fp32
         "activation_mb_bs1": activation_memory_mb(model),
         "latency_bs1_ms": {
             "median": round(float(np.median(times)), 3),
@@ -599,21 +530,14 @@ def measure_efficiency(model, cfg, ds, warmup=50, runs=1000):
           f"(n={cpu_runs}, {sut['cpu_threads']} threads, {sut['cpu']})")
     return eff
 
-
-# --------------------------------------------------------------------------- #
-
 def evaluate(cfg, tag=""):
     model = load_run_model(cfg)
     ds = build_datasets(cfg)
-    # probes (JPEG, a different input pipeline) write beside the clean results,
-    # never over them
     sfx = (f"_{tag}" if tag else "") + (f"_jpeg{cfg.eval_jpeg}" if cfg.eval_jpeg else "")
 
     print(f"=== eval {cfg.name} | mask_mode={cfg.mask_mode}"
           + (f" | EVAL JPEG q={cfg.eval_jpeg} on both classes" if cfg.eval_jpeg else "") + " ===")
 
-    # first, on a clean device: peak memory should reflect inference, not the
-    # GradientTape that Grad-CAM allocates later
     eff = measure_efficiency(model, cfg, ds["test"])
 
     y_true, y_score = predict_split(model, ds["test"])
@@ -667,7 +591,6 @@ def evaluate(cfg, tag=""):
     print(f"wrote figures + eval.json to {cfg.run_dir}")
     return out
 
-
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--config", required=True, help="path to a configs/*.yaml")
@@ -681,7 +604,6 @@ def main():
         from dataclasses import replace
         cfg = replace(cfg, eval_jpeg=args.eval_jpeg)
     evaluate(cfg, tag=args.tag)
-
 
 if __name__ == "__main__":
     main()

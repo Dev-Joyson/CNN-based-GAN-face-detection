@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Audit the real/fake folders for shortcuts.
 
 Asks one question: can a single trivial property of the FILES separate real from
@@ -26,7 +25,6 @@ from sklearn.metrics import roc_auc_score
 
 from model import eval_view, list_images, load_and_resize, load_config
 
-
 def file_features(path):
     """Cheap properties readable without decoding pixels properly."""
     f = {"file_size": float(os.path.getsize(path))}
@@ -34,14 +32,12 @@ def file_features(path):
         f["width"], f["height"] = float(im.width), float(im.height)
         f["format"], f["mode"] = im.format, im.mode
         f["bytes_per_pixel"] = f["file_size"] / (im.width * im.height)
-        # JPEG quantization tables -> a proxy for the encoder's quality setting
         q = getattr(im, "quantization", None)
         f["jpeg_q_table"] = float(np.mean(q[0])) if q else np.nan
         small = np.asarray(im.convert("RGB").resize((64, 64)), dtype=np.float32)
     f["brightness"] = float(small.mean())
     f["contrast"] = float(small.std())
     return f
-
 
 def highfreq_energy(path, cfg):
     """High-frequency energy AFTER cfg's preprocessing.
@@ -53,7 +49,7 @@ def highfreq_energy(path, cfg):
     the resize-mode audit could not see.
     """
     img, _ = load_and_resize(tf.constant(path), tf.constant(0), cfg)
-    img = eval_view(img, cfg)          # crop mode: the centre native patch the model sees
+    img = eval_view(img, cfg)
     g = tf.image.rgb_to_grayscale(tf.cast(img, tf.float32) / 255.0)[..., 0]
     mag = np.fft.fftshift(np.log1p(np.abs(tf.signal.fft2d(tf.cast(g, tf.complex64)).numpy())))
     n = cfg.img_size
@@ -61,7 +57,6 @@ def highfreq_energy(path, cfg):
     yy, xx = np.mgrid[0:n, 0:n]
     r = np.sqrt((xx - c) ** 2 + (yy - c) ** 2)
     return float(mag[r >= 0.75 * c].mean())
-
 
 def collect(paths, cfg, label):
     rows = []
@@ -72,14 +67,11 @@ def collect(paths, cfg, label):
             f["highfreq"] = highfreq_energy(p, cfg)
             f["label"] = label
             rows.append(f)
-        except Exception as e:                     # corrupt file, odd format
+        except Exception as e:
             print(f"  skipped {os.path.basename(p)}: {e}")
         if i % 100 == 0 or i == len(paths):
-            # each image is two Drive reads of a ~1-2 MB PNG; this is slow and
-            # silent without a heartbeat
             print(f"  {name}: {i}/{len(paths)}", flush=True)
     return rows
-
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
@@ -103,7 +95,6 @@ def main():
 
     y = np.array([r["label"] for r in rows])
 
-    # --- categorical: formats and modes -------------------------------------
     print("=" * 62)
     print("FILE FORMATS")
     for name, lbl in (("real", 0), ("fake", 1)):
@@ -117,13 +108,6 @@ def main():
         print("     (JPEG leaves block artifacts in the pixels; PNG does not. If one class is")
         print("      JPEG and the other PNG, the model can read that after any resize.)")
 
-    # --- numeric: one AUC per property --------------------------------------
-    # Two groups, because they mean different things. FILE properties are erased
-    # by decode+resize -- the model never sees a width. PIXEL properties survive
-    # the pipeline, so the model CAN use them; that group decides the verdict.
-    # A file-level gap is still a warning: if real and fake come at different
-    # native sizes they travel different resampling paths to 256, and that can
-    # leave a pixel-level trace -- which is exactly what `highfreq` measures.
     def score(keys):
         out = []
         for key in keys:
@@ -131,7 +115,7 @@ def main():
             if np.isnan(v).any() or len(np.unique(v)) < 2:
                 continue
             auc = roc_auc_score(y, v)
-            auc = max(auc, 1 - auc)                # direction doesn't matter
+            auc = max(auc, 1 - auc)
             out.append((auc, key, v[y == 0].mean(), v[y == 1].mean()))
         return sorted(out, reverse=True)
 
@@ -167,7 +151,6 @@ def main():
         print(f"VERDICT: clean. No single file property beats AUC {worst:.3f},")
         print("so the classes are not trivially separable by metadata.")
     print("This checks metadata only. A held-out generator is the real test.")
-
 
 if __name__ == "__main__":
     main()

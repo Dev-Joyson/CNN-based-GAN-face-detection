@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """The demonstration page: one local HTML page that lays out the research in the
 order of the talk and runs the headline model live on the presenter's laptop.
 
@@ -45,24 +44,21 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 
-import tensorflow as tf                                   # noqa: E402
-from PIL import Image                                     # noqa: E402
+import tensorflow as tf
+from PIL import Image
 
-from evaluate import last_spatial_conv, overlay   # noqa: E402
-from model import build_model, eval_view, feathered_ellipse, load_and_resize, load_config   # noqa: E402
-from predict import preprocess                            # noqa: E402
-from PIL import ImageDraw                                 # noqa: E402
+from evaluate import last_spatial_conv, overlay
+from model import build_model, eval_view, feathered_ellipse, load_and_resize, load_config
+from predict import preprocess
+from PIL import ImageDraw
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-DEFAULT_CONFIG = os.path.join(ROOT, "configs", "test27_stride2_halfwidth.yaml")     # the final model
+DEFAULT_CONFIG = os.path.join(ROOT, "configs", "test27_stride2_halfwidth.yaml")
 DEFAULT_MODEL = os.path.expanduser("~/Downloads/thesis-figures/test27_stride2_halfwidth/model.keras")
-DEFAULT_COMPARE = os.path.expanduser("~/Downloads/mobile_net_pretrained.keras")   # test20 baseline, fine-tuned on crops
-
+DEFAULT_COMPARE = os.path.expanduser("~/Downloads/mobile_net_pretrained.keras")
 
 class Engine:
     def __init__(self, model_path, config_path, tflite_path=None, compare_path=None, compare_name=None):
-        # native: the model's own config (architecture knobs + crop pipeline);
-        # downscaled: the same architecture with the resize pipeline (the probe view)
         native = load_config(config_path)
         from dataclasses import replace
         self.cfg = {"native": native,
@@ -71,9 +67,6 @@ class Engine:
         try:
             self.model = tf.keras.models.load_model(model_path, safe_mode=False)
         except Exception as e:
-            # the checkpoint was written by a newer Keras than this laptop has
-            # (e.g. a Dense config key it does not know). The architecture is
-            # the config's; only the weights are needed from the file.
             print(f"load_model failed ({type(e).__name__}); rebuilding from config and loading weights only")
             self.model = build_model(self.cfg["native"])
             self.model.load_weights(model_path)
@@ -99,7 +92,6 @@ class Engine:
         if self.tflite:
             for _ in range(20):
                 self._tflite(x.numpy())
-        # the comparison model: same [0,1] window in, its own preprocessing inside
         self.compare = None
         if compare_path and os.path.exists(compare_path):
             try:
@@ -136,12 +128,12 @@ class Engine:
         evaluate.py's version differentiates the sigmoid output for 'fake' only:
         flat on a confident real (no positive evidence) AND flat on a confident
         fake (sigmoid saturated at 0.9999, gradient ~0). The logit has neither problem."""
-        dense = self.model.layers[-1]                       # Dense(1, sigmoid)
+        dense = self.model.layers[-1]
         grad_model = tf.keras.models.Model(self.model.inputs,
                                            [self.model.get_layer(self.layer).output, dense.input])
         with tf.GradientTape() as tape:
             conv_out, h = grad_model(x)
-            logit = tf.matmul(h, dense.kernel) + dense.bias    # pre-activation
+            logit = tf.matmul(h, dense.kernel) + dense.bias
             target = logit[:, 0] if for_fake else -logit[:, 0]
         grads = tape.gradient(target, conv_out)
         pooled = tf.reduce_mean(grads, axis=(0, 1, 2))
@@ -150,7 +142,7 @@ class Engine:
         return (heat / (tf.reduce_max(heat) + 1e-8)).numpy()
 
     @staticmethod
-    def _gray(x):                                   # (1,H,W,3) float -> (H,W) numpy
+    def _gray(x):
         return tf.image.rgb_to_grayscale(x)[0, ..., 0].numpy()
 
     def _residual(self, x):
@@ -182,13 +174,12 @@ class Engine:
             with Image.open(path) as im:
                 w, h = im.size
                 thumb = im.convert("RGB").copy(); thumb.thumbnail((512, 512))
-            xn = preprocess(path, self.cfg["native"], self.mask)          # the training pipeline, unchanged
-            xd = preprocess(path, self.cfg["downscaled"], self.mask)      # the resize pipeline
-            region, _ = load_and_resize(tf.constant(path), tf.constant(0), self.cfg["native"])   # centre 512^2 uint8
+            xn = preprocess(path, self.cfg["native"], self.mask)
+            xd = preprocess(path, self.cfg["downscaled"], self.mask)
+            region, _ = load_and_resize(tf.constant(path), tf.constant(0), self.cfg["native"])
         finally:
             os.unlink(path)
 
-        # pipeline drawing: the 512^2 cached region and the 256^2 eval window on the original
         sx = thumb.width / w
         d = ImageDraw.Draw(thumb)
         c = self.cfg["native"]
@@ -208,7 +199,6 @@ class Engine:
         strip1, shape1 = self._feature_strip(f1); strip5, shape5 = self._feature_strip(f5)
         res_n, hf_n = self._residual(xn); res_d, hf_d = self._residual(xd)
 
-        # probes: JPEG re-encoding of the native window, and five window positions in the region
         u8 = tf.cast(tf.clip_by_value(xn[0], 0, 1) * 255, tf.uint8)
         jpeg = {}
         for q in (95, 75):
@@ -247,10 +237,9 @@ class Engine:
                               "latency_ms": round(float(np.median(tc)), 2)}
         return out
 
-
 def make_handler(engine, samples_dir):
     class H(SimpleHTTPRequestHandler):
-        def log_message(self, *a):            # quiet
+        def log_message(self, *a):
             pass
 
         def _send(self, body, ctype="application/json", code=200):
@@ -297,10 +286,9 @@ def make_handler(engine, samples_dir):
             body = self.rfile.read(n)
             try:
                 self._send(json.dumps(engine.predict(body)))
-            except Exception as e:                       # a bad upload must not kill the demo
+            except Exception as e:
                 self._send(json.dumps({"error": str(e)}), code=500)
     return H
-
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -321,7 +309,6 @@ def main():
           + f"; samples from {args.samples}")
     print(f"open  http://localhost:{args.port}   (Ctrl+C to stop)", flush=True)
     HTTPServer(("127.0.0.1", args.port), make_handler(engine, args.samples)).serve_forever()
-
 
 if __name__ == "__main__":
     main()
