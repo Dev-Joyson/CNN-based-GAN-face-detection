@@ -22,134 +22,50 @@ from tensorflow.keras import layers, models
 
 MASK_MODES = ("face_only", "background_only", "none")
 
-
-# --------------------------------------------------------------------------- #
-# Config
-# --------------------------------------------------------------------------- #
-
 @dataclass
 class Config:
     name: str
     real_dir: str
-    fake_dir: str                         # one folder, or a list of folders (one per generator)
-    # counts per fake folder when fake_dir is a list; must sum to limit_per_class.
-    # Stated, not inferred: a mixed training set with an unknown ratio is not an
-    # experiment (FakeMix was 15k SG2 + 10k SG1 -- learned from its manifest).
+    fake_dir: str
     fake_mix: list = field(default=None)
 
-    # experiment knobs
-    mask_mode: str = "face_only"          # face_only | background_only | none
+    mask_mode: str = "face_only"
     limit_per_class: int = 20000
 
-    # data / model geometry
     img_size: int = 256
-    native_size: int = 512                # resize mode: intermediate resize before img_size
+    native_size: int = 512
     batch_size: int = 144
 
-    # input_mode -- how a 256^2 input is made from a 1024^2 image:
-    #   resize: 1024 -> native_size -> img_size, bicubic. Two low-passes; the
-    #           GAN fingerprint above img_size's Nyquist is gone before the
-    #           model sees a pixel (post-pipeline highfreq AUC 0.52 on SG2).
-    #   crop:   NO resampling. Cache the centre cache_size^2 at native pixels;
-    #           train on random img_size^2 windows of it, evaluate on the
-    #           centre window. Same input size, same model, same latency --
-    #           only where the pixels come from changes. cache_size trades
-    #           coverage (hair, background) against cache size and per-epoch
-    #           disk read: 512 -> 27 GB, 768 -> 62 GB, 1024 -> 157 GB.
     input_mode: str = "resize"
     cache_size: int = 512
 
-    # EVALUATION-ONLY: JPEG-compress every val/test image at this quality (at
-    # the cached resolution, i.e. native in crop mode) before the eval view.
-    # 0 = off. Not in the cache key (applied after the cache). Used by
-    # evaluate.py --eval-jpeg Q to test whether a model is reading the
-    # reals' compression history / sensor noise instead of the fingerprint:
-    # both classes get the same compression, so that cue is flattened.
     eval_jpeg: int = 0
 
-    # training
     epochs: int = 500
     lr: float = 3e-4
     patience: int = 6
     seed: int = 42
 
-    # architecture
-    fft_branch: bool = True               # False = spatial branch only (the ablation)
-    # stride of the first conv. 1 = the first block runs at the full 256^2 with
-    # 32 channels -- where most of the model's MACs and its 1.3 GB peak memory
-    # go. Gragnaniello et al. (ICME 2021) argue early downsampling destroys the
-    # GAN fingerprint, which is the reason for 1; that claim has not been tested
-    # on this data. 2 halves every feature map after it (~4x fewer MACs, ~4x
-    # less activation memory, same parameter count). Not in the cache key.
+    fft_branch: bool = True
     stem_stride: int = 1
-    # BatchNormalization after every conv (Ioffe & Szegedy 2015). Off in the
-    # headline. The from-scratch recipe has a chance plateau on every run (6-9
-    # epochs for the headline; test22/test23 never left it) -- BN is the
-    # textbook fix for gradients that do not flow from epoch 1. Inference
-    # cost: BN folds into the conv weights, so latency/memory are unchanged;
-    # params +0.2% (two per channel). Ablation knob, not a headline change.
     batchnorm: bool = False
-    # channel-width multiplier on the five conv blocks (32-64-128-256-256 × this).
-    # 1.0 = the headline. 0.5 halves every width: ~4× fewer MACs and params. The
-    # "how low can it go" knob for the compute axis; MobileNet's own alpha
-    # (Howard et al. 2017) is the same idea. Not in the cache key.
     width_mult: float = 1.0
 
-    # augmentation (train split only)
-    # ours: 3x3 box blur p=0.3, JPEG q~U[60,100] p=0.3 (the notebook's).
-    # wang: Wang et al. CVPR 2020 (CNNDetection) -- Gaussian blur sigma~U[0,3]
-    #       p=0.5, JPEG q~U[30,100] p=0.5. Their finding: this is what made a
-    #       ProGAN detector generalise to unseen generators. Not in the cache key.
     aug: str = "ours"
-    # crop mode only: training windows drawn at (img_size*f)^2 native pixels and
-    # bicubic-resized to img_size^2, f uniform over this list; None = native
-    # windows only (the headline). [1, 2] shows the model the same content at
-    # full and half scale, the view a 1024->512 downscale gives, at zero
-    # inference cost. Targets the on-resize failure (0.556 = chance). f=4 would
-    # need cache_size 1024. Eval unchanged (centre native window). Not in the key.
     scale_aug: list = field(default=None)
-    # warm start: name of a finished run under out_dir whose model.keras weights
-    # initialise this one (same architecture required). None = from scratch.
-    # Used when a recipe cannot bootstrap from random init -- test22 (Wang 2020
-    # augmentation) sat at chance for 16 epochs -- and the question is whether
-    # an already-trained detector can be pushed toward more general features.
     init_from: str = field(default=None)
-    # which weights model.keras holds at the end: "best" = the epoch with the
-    # highest val_auc (the default; every headline number), "last" = the final
-    # epoch. "last" is for continuation runs whose selection metric is not the
-    # in-distribution val_auc -- e.g. test22c, where SG2 val sits at 0.9999 from
-    # epoch 1 and the quantity of interest (SG3-R AUC) is scored afterwards.
-    # Pair it with patience >= epochs so early stopping cannot cut the run.
     checkpoint: str = "best"
-    # early stopping does not count before this epoch. 0 = the headline's rule
-    # (patience from epoch 1). A from-scratch run on a harder signal can sit at
-    # chance for longer than `patience` -- test22 (Wang aug) died at 16 without
-    # ever starting, test23 (two generators) sat at 0.5000 for 10+ -- and the
-    # rule then measures "slow to start", not "stopped improving". A start
-    # epoch never changes a run that improves before it, so headline numbers
-    # are unaffected; it only stops a slow starter from being killed unseen.
     es_start_epoch: int = 0
-    crop_frac_min: float = 0.85           # Test16: random crop keeps 85-100% of the side
-    shuffle_buffer: int = 4096            # images held for shuffling; Test16 used the whole train set
+    crop_frac_min: float = 0.85
+    shuffle_buffer: int = 4096
 
-    # mask geometry (feathered ellipse over an aligned FFHQ/StyleGAN face)
     mask_rx: float = 0.38
     mask_ry: float = 0.48
     mask_feather: float = 0.05
 
-    # io
-    cache_dir: str = "/content/cache"     # keyed by limit_per_class, NOT mask_mode
+    cache_dir: str = "/content/cache"
     out_dir: str = "experiments"
 
-    # knowledge distillation (train.py dispatches to distill.py when set):
-    #   headline: run whose baselines/<teacher>/model.keras are the teachers
-    #             and whose split this config must reproduce (same data fields)
-    #   teachers: list of baseline names, averaged if several
-    #   temperature, alpha, extra (use the unsampled pool), init (warm-start
-    #   from the headline's checkpoint), calibrate (temperature-scale the
-    #   teacher on val first -- Guo et al. 2017 -- because a teacher at
-    #   0.003/0.999 mean probability is saturated and its raw logits are a
-    #   worse target than hard labels; seen on test18)
     distill: dict = field(default=None)
 
     @property
@@ -214,18 +130,12 @@ class Config:
         tag = hashlib.sha1(ident).hexdigest()[:8]
         key = f"n{self.limit_per_class}_i{self.img_size}_n{self.native_size}_s{self.seed}_{tag}"
         if self.input_mode == "crop":
-            key += f"_crop{self.cache_size}"          # a different cache: native pixels, no resize
+            key += f"_crop{self.cache_size}"
         return os.path.join(self.cache_dir, key, split)
-
 
 def load_config(path):
     with open(path) as f:
         return Config(**yaml.safe_load(f))
-
-
-# --------------------------------------------------------------------------- #
-# Mask
-# --------------------------------------------------------------------------- #
 
 def feathered_ellipse(size, rx_frac=0.38, ry_frac=0.48, feather=0.05):
     """(size, size, 1) soft mask: 1 inside the face ellipse -> 0 outside."""
@@ -236,7 +146,6 @@ def feathered_ellipse(size, rx_frac=0.38, ry_frac=0.48, feather=0.05):
     m = tf.clip_by_value((1.0 - r) / feather + 0.5, 0.0, 1.0)
     return m[..., tf.newaxis]
 
-
 def apply_mask(image, face_mask, mask_mode):
     if mask_mode == "face_only":
         return image * face_mask
@@ -244,13 +153,7 @@ def apply_mask(image, face_mask, mask_mode):
         return image * (1.0 - face_mask)
     return image
 
-
-# --------------------------------------------------------------------------- #
-# Data pipeline
-# --------------------------------------------------------------------------- #
-
 IMAGE_EXTS = (".jpg", ".jpeg", ".png")
-
 
 def list_images(folder):
     """Image files in a folder, sorted. Anything else -- a readme, .DS_Store, a
@@ -258,7 +161,6 @@ def list_images(folder):
     the run. (The FakeMix folder had 25,001 entries for 25,000 images.)"""
     return sorted(p for p in glob(os.path.join(folder, '*'))
                   if p.lower().endswith(IMAGE_EXTS))
-
 
 def load_paths(cfg):
     """Seeded random sample of limit_per_class from each folder, then a
@@ -280,7 +182,7 @@ def load_paths(cfg):
     dirs = cfg.fake_dirs
     if cfg.fake_mix is not None:
         counts = list(cfg.fake_mix)
-    else:                                   # equal share, remainder to the first
+    else:
         k = len(dirs)
         counts = [cfg.limit_per_class // k] * k
         counts[0] += cfg.limit_per_class - sum(counts)
@@ -311,16 +213,11 @@ def load_paths(cfg):
         "test":  (test_paths,  test_labels),
     }
 
-
 def random_jpeg(image, q_min=60):
     quality = tf.random.uniform([], q_min, 100, dtype=tf.int32)
-    # clip BEFORE the uint8 cast: the bicubic resize in random_crop_resize
-    # overshoots past 1.0, and 1.07 * 255 = 273 wraps around to 17 -- bright
-    # edge pixels turn into black speckles.
     image_uint8 = tf.cast(tf.clip_by_value(image, 0.0, 1.0) * 255.0, tf.uint8)
     image_uint8 = tf.image.adjust_jpeg_quality(image_uint8, quality)
     return tf.cast(image_uint8, tf.float32) / 255.0
-
 
 def random_blur(image):
     return tf.cond(
@@ -328,7 +225,6 @@ def random_blur(image):
         lambda: tf.nn.avg_pool2d(image[None], ksize=3, strides=1, padding="SAME")[0],
         lambda: image,
     )
-
 
 def random_gaussian_blur(image, sigma_max=3.0, radius=9):
     """Wang et al. 2020's blur: Gaussian, sigma ~ U[0, sigma_max]. Fixed 19-tap
@@ -339,9 +235,8 @@ def random_gaussian_blur(image, sigma_max=3.0, radius=9):
     k1 = tf.exp(-0.5 * tf.square(x / tf.maximum(sigma, 1e-3)))
     k1 = k1 / tf.reduce_sum(k1)
     k2 = k1[:, None] * k1[None, :]
-    kernel = tf.tile(k2[:, :, None, None], [1, 1, 3, 1])       # depthwise, per channel
+    kernel = tf.tile(k2[:, :, None, None], [1, 1, 3, 1])
     return tf.nn.depthwise_conv2d(image[None], kernel, [1, 1, 1, 1], "SAME")[0]
-
 
 def random_scale_window(image, img_size, factors):
     """Crop-mode scale augmentation: a (img_size*f)^2 native window, bicubic-
@@ -356,7 +251,6 @@ def random_scale_window(image, img_size, factors):
     idx = tf.random.uniform([], 0, len(factors), dtype=tf.int32)
     return tf.switch_case(idx, [lambda f=f: window(f) for f in factors])
 
-
 def random_crop_resize(image, img_size, crop_frac_min):
     crop_frac = tf.random.uniform([], crop_frac_min, 1.0)
     h = tf.shape(image)[0]
@@ -368,30 +262,22 @@ def random_crop_resize(image, img_size, crop_frac_min):
     return tf.image.resize(image, [img_size, img_size],
                            method=tf.image.ResizeMethod.BICUBIC)
 
-
 def load_and_resize(path, label, cfg):
     """The slow, deterministic part -- this is what gets cached."""
     image = tf.io.read_file(path)
-    # decode_image handles JPEG and PNG (the fakes may be PNG); expand_animations
-    # keeps a static (H, W, 3) rather than a (frames, H, W, 3) for GIF-like input
     image = tf.io.decode_image(image, channels=3, expand_animations=False)
 
     if cfg.input_mode == "crop":
-        # centre cache_size^2 at native pixels. resize_with_crop_or_pad crops;
-        # it never interpolates. (Pads only if an image is smaller -- none are.)
         image = tf.image.resize_with_crop_or_pad(image, cfg.cache_size, cfg.cache_size)
         return tf.cast(image, tf.uint8), label
 
-    # Normalize native resolution (fix resolution bias), then resize to model input
     image = tf.image.resize(image, [cfg.native_size, cfg.native_size],
                             method=tf.image.ResizeMethod.BICUBIC)
     image = tf.image.resize(image, [cfg.img_size, cfg.img_size],
                             method=tf.image.ResizeMethod.BICUBIC)
 
-    # clip THEN cast to uint8 -> cache is 1/4 the size (bicubic overshoots 0..255)
     image = tf.cast(tf.clip_by_value(image, 0, 255), tf.uint8)
     return image, label
-
 
 def eval_view(image, cfg):
     """The evaluation-time input: in crop mode the centre img_size^2 window of
@@ -401,26 +287,21 @@ def eval_view(image, cfg):
         return tf.image.resize_with_crop_or_pad(image, cfg.img_size, cfg.img_size)
     return image
 
-
 def augment_and_mask(image, label, cfg, face_mask, training):
     if not training and cfg.eval_jpeg:
-        # robustness probe: same compression for both classes, at the cached
-        # (native, in crop mode) resolution, before any crop
         image = tf.image.adjust_jpeg_quality(image, cfg.eval_jpeg)
     if cfg.input_mode == "crop":
-        # a random window in training, the centre one otherwise. Native pixels,
-        # no resampling anywhere. random_crop_resize is skipped: it resizes.
         if training and cfg.scale_aug:
             image = random_scale_window(image, cfg.img_size, cfg.scale_aug)
         else:
             image = (tf.image.random_crop(image, [cfg.img_size, cfg.img_size, 3])
                      if training else eval_view(image, cfg))
-    image = tf.cast(image, tf.float32) / 255.0     # float conversion AFTER cache
+    image = tf.cast(image, tf.float32) / 255.0
 
     if training:
         if cfg.input_mode == "resize":
             image = random_crop_resize(image, cfg.img_size, cfg.crop_frac_min)
-            image = tf.clip_by_value(image, 0.0, 1.0)   # bicubic overshoots again
+            image = tf.clip_by_value(image, 0.0, 1.0)
         if cfg.aug == "wang":
             image = tf.cond(tf.random.uniform([]) < 0.5,
                             lambda: random_gaussian_blur(image), lambda: image)
@@ -432,14 +313,10 @@ def augment_and_mask(image, label, cfg, face_mask, training):
                             lambda: random_jpeg(image),
                             lambda: image)
 
-    # NOTE: outside the `if training` block on purpose. The mask must hit
-    # train + val + test identically -- indenting this line inside `if training:`
-    # was a real bug (see tests/test_mask_applied.py). Do not move it.
     image = apply_mask(image, face_mask, cfg.mask_mode)
 
     image = tf.clip_by_value(image, 0.0, 1.0)
     return image, label
-
 
 def cached_dataset(paths, labels, cfg, split):
     """(uint8 image, label) in path order, cached on disk. The slow part,
@@ -450,8 +327,7 @@ def cached_dataset(paths, labels, cfg, split):
     ds = tf.data.Dataset.from_tensor_slices((paths, labels))
     ds = ds.map(lambda p, y: load_and_resize(p, y, cfg),
                 num_parallel_calls=tf.data.AUTOTUNE)
-    return ds.cache(cache_path)                    # cache AFTER resize, BEFORE augment
-
+    return ds.cache(cache_path)
 
 def build_dataset(paths, labels, cfg, split, shuffle, training, face_mask=None):
     if face_mask is None:
@@ -460,14 +336,11 @@ def build_dataset(paths, labels, cfg, split, shuffle, training, face_mask=None):
 
     ds = cached_dataset(paths, labels, cfg, split)
     if shuffle:
-        # AFTER cache: shuffling before it would freeze the first epoch's order
-        # into the cache file and every later epoch would replay it.
         ds = ds.shuffle(min(cfg.shuffle_buffer, len(paths)), seed=cfg.seed,
                         reshuffle_each_iteration=True)
     ds = ds.map(lambda x, y: augment_and_mask(x, y, cfg, face_mask, training),
                 num_parallel_calls=tf.data.AUTOTUNE)
     return ds.batch(cfg.batch_size).prefetch(tf.data.AUTOTUNE)
-
 
 def build_datasets(cfg):
     splits = load_paths(cfg)
@@ -484,40 +357,27 @@ def build_datasets(cfg):
         for name, (paths, labels) in splits.items()
     }
 
-
-# --------------------------------------------------------------------------- #
-# Model
-# --------------------------------------------------------------------------- #
-
 @tf.keras.utils.register_keras_serializable(package="ganfd")
 def fft_layer(x):
-    # x: (batch, H, W, 3), float in [0,1]
 
-    # 1) Collapse color so the inner two axes become (H, W) -- the real image grid
-    g = tf.image.rgb_to_grayscale(x)          # (B, H, W, 1)
-    g = tf.squeeze(g, axis=-1)                # (B, H, W)  <- last two are row, column
+    g = tf.image.rgb_to_grayscale(x)
+    g = tf.squeeze(g, axis=-1)
 
-    # 2) 2D FFT over (H, W), now the correct axes
     fft = tf.signal.fft2d(tf.cast(g, tf.complex64))
     mag = tf.abs(fft)
 
-    # 3) Center the zero-frequency
     mag = tf.signal.fftshift(mag, axes=[1, 2])
 
-    # 4) Log-compress the huge dynamic range (once, not twice)
     mag = tf.math.log1p(mag)
 
-    # 5) Per-sample normalize to [0,1] so scale is consistent across images
     mn = tf.reduce_min(mag, axis=[1, 2], keepdims=True)
     mx = tf.reduce_max(mag, axis=[1, 2], keepdims=True)
     mag = (mag - mn) / (mx - mn + 1e-6)
 
-    return mag[..., tf.newaxis]                # (B, H, W, 1)
-
+    return mag[..., tf.newaxis]
 
 def conv_block(x, filters, name=None, stride=1, batchnorm=False):
     if batchnorm:
-        # conv -> BN -> ReLU; the conv keeps its name so Grad-CAM finds "spatial_conv_5"
         x = layers.Conv2D(filters, 3, strides=stride, padding='same', use_bias=False, name=name)(x)
         x = layers.BatchNormalization()(x)
         x = layers.ReLU()(x)
@@ -525,11 +385,9 @@ def conv_block(x, filters, name=None, stride=1, batchnorm=False):
         x = layers.Conv2D(filters, 3, strides=stride, padding='same', activation='relu', name=name)(x)
     return layers.MaxPooling2D()(x)
 
-
 def build_model(cfg):
     input_img = layers.Input(shape=(cfg.img_size, cfg.img_size, 3))
 
-    # Spatial branch -- fixed names so Grad-CAM can ask for "spatial_conv_5"
     bn = cfg.batchnorm
     w = lambda c: max(8, int(round(c * cfg.width_mult)))
     x = conv_block(input_img, w(32), name="spatial_conv_1", stride=cfg.stem_stride, batchnorm=bn)
@@ -540,7 +398,6 @@ def build_model(cfg):
     x = layers.GlobalAveragePooling2D()(x)
 
     if cfg.fft_branch:
-        # FFT branch
         f = layers.Lambda(fft_layer, name="fft")(input_img)
         f = layers.Conv2D(16, 3, activation='relu', padding='same')(f)
         f = layers.MaxPooling2D()(f)
@@ -548,18 +405,13 @@ def build_model(cfg):
         f = layers.GlobalAveragePooling2D()(f)
         combined = layers.Concatenate()([x, f])
     else:
-        # ablation: what does the spectrum buy? The branch is ~0.9% of the
-        # params (4.8k of the convs + 4.1k of the fusion width), so any AUC it
-        # buys is bought cheaply.
         combined = x
 
-    # Fusion
     combined = layers.Dense(128, activation='relu')(combined)
     combined = layers.Dropout(0.4)(combined)
     output = layers.Dense(1, activation='sigmoid')(combined)
 
     return models.Model(inputs=input_img, outputs=output)
-
 
 def compile_model(model, cfg):
     model.compile(
@@ -568,11 +420,6 @@ def compile_model(model, cfg):
         metrics=['accuracy', tf.keras.metrics.AUC(name='auc')],
     )
     return model
-
-
-# --------------------------------------------------------------------------- #
-# Training
-# --------------------------------------------------------------------------- #
 
 class HistoryCSV(tf.keras.callbacks.Callback):
     """Per-epoch history, appended and CLOSED every epoch.
@@ -595,7 +442,6 @@ class HistoryCSV(tf.keras.callbacks.Callback):
                 f.write("epoch," + ",".join(keys) + "\n")
             f.write(f"{epoch}," + ",".join(f"{float(logs[k]):.6g}" for k in keys) + "\n")
         self.append = True
-
 
 def train(cfg, resume=False, build_fn=None):
     """Train from scratch, or -- with resume=True -- pick up a run the VM lost.
@@ -622,10 +468,10 @@ def train(cfg, resume=False, build_fn=None):
     history_csv = os.path.join(cfg.run_dir, "history.csv")
     initial_epoch = 0
     if resume and os.path.exists(ckpt):
-        model = tf.keras.models.load_model(ckpt, safe_mode=False)   # compiled + optimizer state
+        model = tf.keras.models.load_model(ckpt, safe_mode=False)
         if os.path.exists(history_csv):
             with open(history_csv) as f:
-                initial_epoch = max(sum(1 for _ in f) - 1, 0)      # rows minus header
+                initial_epoch = max(sum(1 for _ in f) - 1, 0)
         print(f"RESUME: loaded {ckpt}, continuing from epoch {initial_epoch}")
     else:
         if resume:
@@ -646,7 +492,6 @@ def train(cfg, resume=False, build_fn=None):
                                         restore_best_weights=best,
                                         start_from_epoch=cfg.es_start_epoch),
         HistoryCSV(history_csv, append=initial_epoch > 0),
-        # live curves: %tensorboard --logdir <out_dir> in a notebook cell
         tf.keras.callbacks.TensorBoard(log_dir=os.path.join(cfg.run_dir, "tb"),
                                        write_graph=False),
     ]
@@ -656,8 +501,6 @@ def train(cfg, resume=False, build_fn=None):
 
     metrics = {"config": asdict(cfg), "params": int(model.count_params())}
     for split in ("val", "test"):
-        # return_dict keeps metric names ('accuracy', 'auc') -- Keras 3's
-        # model.metrics_names collapses them to 'compile_metrics'.
         scores = model.evaluate(ds[split], verbose=0, return_dict=True)
         metrics[split] = {k: float(v) for k, v in scores.items()}
         print(f"{split}: {metrics[split]}")
